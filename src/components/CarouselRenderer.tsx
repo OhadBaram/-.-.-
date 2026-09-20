@@ -6,6 +6,7 @@ import { saveAs } from 'file-saver';
 import { jsPDF } from 'jspdf';
 import SlideEditor from '@/components/SlideEditor';
 import CopilotWidget from '@/components/CopilotWidget';
+import { MAX_SLIDE_COUNT } from '@/lib/wizard';
 
 import {
   drawMinimal, drawBold, drawGradient, drawDarkLuxury, drawFrame, drawSplit,
@@ -520,6 +521,36 @@ export default function CarouselRenderer({
     setEditingIndex(null);
   };
 
+  const addSlide = (afterIndex: number = activeSlideIndex) => {
+    if (localSlides.length >= MAX_SLIDE_COUNT) return;
+    const source = localSlides[afterIndex] || localSlides[localSlides.length - 1];
+    const insertAt = Math.min(afterIndex + 1, localSlides.length);
+    const newSlide: Slide = {
+      id: `slide-${Date.now()}-${insertAt + 1}`,
+      text: 'שקף חדש — ערכו כאן',
+      backgroundColor: source?.backgroundColor || '#ffffff',
+      textColor: source?.textColor || '#111827',
+      template: source?.template || 'minimal',
+    };
+
+    setLocalSlides((prev) => {
+      const next = [...prev];
+      next.splice(insertAt, 0, newSlide);
+      return next;
+    });
+    setSlideOverrides((prev) => {
+      const next: Record<number, { fontSize?: number; textY?: number }> = {};
+      Object.entries(prev).forEach(([key, value]) => {
+        const i = Number(key);
+        if (i < insertAt) next[i] = value;
+        else next[i + 1] = value;
+      });
+      return next;
+    });
+    setActiveSlideIndex(insertAt);
+    setEditingIndex(null);
+  };
+
   return (
     <div className="flex flex-col md:flex-row h-full min-h-0 w-full bg-gray-50 dark:bg-gray-900 overflow-hidden" dir="rtl">
       
@@ -896,15 +927,33 @@ export default function CarouselRenderer({
           {localSlides[activeSlideIndex] && (
             <div className="w-full max-w-xl">
               
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="font-bold text-gray-700 dark:text-gray-300">עריכת שקף {activeSlideIndex + 1}</h3>
-            <button 
-              onClick={() => removeSlide(activeSlideIndex)}
-              className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded text-sm transition-colors"
-              disabled={localSlides.length <= 1}
-            >
-              🗑️ מחק שקף זה
-            </button>
+          <div className="flex justify-between items-center mb-4 gap-2">
+            <h3 className="font-bold text-gray-700 dark:text-gray-300">
+              עריכת שקף {activeSlideIndex + 1}
+            </h3>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => addSlide(activeSlideIndex)}
+                disabled={localSlides.length >= MAX_SLIDE_COUNT}
+                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 p-2 rounded text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                title={
+                  localSlides.length >= MAX_SLIDE_COUNT
+                    ? `מקסימום ${MAX_SLIDE_COUNT} שקפים`
+                    : 'הוסף שקף אחרי הנוכחי'
+                }
+              >
+                + הוסף שקף
+              </button>
+              <button
+                type="button"
+                onClick={() => removeSlide(activeSlideIndex)}
+                className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded text-sm transition-colors disabled:opacity-40"
+                disabled={localSlides.length <= 1}
+              >
+                מחק שקף זה
+              </button>
+            </div>
           </div>
           <SlideEditor
                 slide={localSlides[activeSlideIndex]}
@@ -937,7 +986,7 @@ export default function CarouselRenderer({
         </div>
 
         {/* Bottom Filmstrip (Optional) */}
-        <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex gap-3 overflow-x-auto">
+        <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex gap-3 overflow-x-auto items-center">
           {localSlides.map((_, i) => (
             <button 
               key={i} 
@@ -951,6 +1000,20 @@ export default function CarouselRenderer({
               {i + 1}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => addSlide(activeSlideIndex)}
+            disabled={localSlides.length >= MAX_SLIDE_COUNT}
+            className="shrink-0 w-12 h-12 rounded border-2 border-dashed border-blue-400 text-blue-600 font-black text-xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title={
+              localSlides.length >= MAX_SLIDE_COUNT
+                ? `מקסימום ${MAX_SLIDE_COUNT} שקפים`
+                : 'הוסף שקף'
+            }
+            aria-label="הוסף שקף"
+          >
+            +
+          </button>
         </div>
       </div>
     </div>
