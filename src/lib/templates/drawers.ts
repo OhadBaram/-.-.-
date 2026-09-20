@@ -254,7 +254,7 @@ export function drawSplit(
   ctx.fillRect(0, splitY, W, H - splitY);
 
   ctx.fillStyle = 'rgba(255,255,255,0.9)';
-  ctx.font = 'bold 140px ${fontFamily}';
+  ctx.font = `bold 140px ${fontFamily}`;
   ctx.direction = 'rtl';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -347,7 +347,7 @@ export function drawNumbered(
 
   ctx.fillStyle = fg;
   ctx.globalAlpha = 0.08;
-  ctx.font = 'bold 700px ${fontFamily}';
+  ctx.font = `bold 700px ${fontFamily}`;
   ctx.direction = 'ltr';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -502,7 +502,7 @@ export async function drawImageSplit(
   brandColor: string,
   isDark: boolean,
   override: SlideOverride,
-  imageUrl?: string, fontFamily: string = 'Heebo, ${fontFamily}'
+  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
 ): Promise<void> {
   const splitY = H * 0.65;
 
@@ -534,7 +534,7 @@ export async function drawImageSplit(
     ctx.fillRect(0, 0, W, splitY);
     // Draw placeholder icon/text
     ctx.fillStyle = isDark ? '#4b5563' : '#94a3b8';
-    ctx.font = 'bold 48px ${fontFamily}';
+    ctx.font = `bold 48px ${fontFamily}`;
     ctx.textAlign = 'center';
     ctx.fillText('אין תמונה', W / 2, splitY / 2);
   }
@@ -603,7 +603,7 @@ export async function drawImageOrPlaceholder(
     ctx.fillStyle = isDark ? '#1f2937' : '#e2e8f0';
     ctx.fillRect(x, y, w, h);
     ctx.fillStyle = isDark ? '#4b5563' : '#94a3b8';
-    ctx.font = 'bold 48px ${fontFamily}';
+    ctx.font = `bold 48px ${fontFamily}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('אין תמונה', x + w / 2, y + h / 2);
@@ -619,7 +619,7 @@ export async function drawImageFullDark(
   brandColor: string,
   isDark: boolean,
   override: SlideOverride,
-  imageUrl?: string, fontFamily: string = 'Heebo, ${fontFamily}'
+  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
 ): Promise<void> {
   await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, H, isDark);
   
@@ -647,7 +647,7 @@ export async function drawImageCircle(
   brandColor: string,
   isDark: boolean,
   override: SlideOverride,
-  imageUrl?: string, fontFamily: string = 'Heebo, ${fontFamily}'
+  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
 ): Promise<void> {
   ctx.fillStyle = brandColor;
   ctx.fillRect(0, 0, W, H);
@@ -680,7 +680,7 @@ export async function drawImageSplitBottom(
   brandColor: string,
   isDark: boolean,
   override: SlideOverride,
-  imageUrl?: string, fontFamily: string = 'Heebo, ${fontFamily}'
+  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
 ): Promise<void> {
   const splitY = H * 0.35;
   
@@ -707,7 +707,7 @@ export async function drawImagePolaroid(
   brandColor: string,
   isDark: boolean,
   override: SlideOverride,
-  imageUrl?: string, fontFamily: string = 'Heebo, ${fontFamily}'
+  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
 ): Promise<void> {
   const bg = isDark ? '#111827' : '#f9fafb';
   ctx.fillStyle = bg;
@@ -751,7 +751,7 @@ export async function drawImageSide(
   brandColor: string,
   isDark: boolean,
   override: SlideOverride,
-  imageUrl?: string, fontFamily: string = 'Heebo, ${fontFamily}'
+  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
 ): Promise<void> {
   ctx.fillStyle = brandColor;
   ctx.fillRect(0, 0, W / 2, H);
@@ -776,7 +776,7 @@ export async function drawImageMagazine(
   brandColor: string,
   isDark: boolean,
   override: SlideOverride,
-  imageUrl?: string, fontFamily: string = 'Heebo, ${fontFamily}'
+  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
 ): Promise<void> {
   const splitY = H * 0.8;
   
@@ -804,7 +804,7 @@ export async function drawImageOverlay(
   brandColor: string,
   isDark: boolean,
   override: SlideOverride,
-  imageUrl?: string, fontFamily: string = 'Heebo, ${fontFamily}'
+  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
 ): Promise<void> {
   await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, H, isDark);
   
@@ -831,7 +831,7 @@ export async function drawImageArch(
   brandColor: string,
   isDark: boolean,
   override: SlideOverride,
-  imageUrl?: string, fontFamily: string = 'Heebo, ${fontFamily}'
+  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
 ): Promise<void> {
   const bg = isDark ? '#111827' : '#f9fafb';
   ctx.fillStyle = bg;

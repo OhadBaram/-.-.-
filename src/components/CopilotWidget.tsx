@@ -24,7 +24,7 @@ export default function CopilotWidget({
   onChangeFont,
   onChangeColors
 }: CopilotWidgetProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  
   const [isRecording, setIsRecording] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<{role: 'user'|'assistant', text: string}[]>([
@@ -134,23 +134,13 @@ export default function CopilotWidget({
     }
   };
 
-  if (!isOpen) {
-    return (
-      <button 
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 left-6 z-50 bg-indigo-600 text-white p-4 rounded-full shadow-2xl hover:bg-indigo-700 transition-all flex items-center gap-2 group"
-      >
-        <span className="text-2xl">✨</span>
-        <span className="hidden group-hover:block font-bold pl-2">Carousel Copilot</span>
-      </button>
-    );
-  }
+
 
   return (
-    <div className="fixed bottom-6 left-6 z-50 w-80 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col h-96">
+    <div className="w-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col h-80 shadow-inner">
       <div className="bg-indigo-600 p-3 flex justify-between items-center text-white">
         <span className="font-bold flex items-center gap-2">✨ AI Copilot</span>
-        <button onClick={() => setIsOpen(false)} className="hover:bg-indigo-700 p-1 rounded">✕</button>
+        
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
