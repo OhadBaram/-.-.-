@@ -20,12 +20,22 @@ export default async function CreateCarouselPage() {
     include: { workspaces: { include: { workspace: true } } }
   });
 
-  const workspace = user?.workspaces[0]?.workspace;
+  let workspace = user?.workspaces[0]?.workspace;
+  
+  if (!workspace && user) {
+    workspace = await prisma.workspace.create({
+      data: { name: `המרחב של ${user.name || 'המשתמש'}` }
+    });
+    await prisma.workspaceUser.create({
+      data: { userId: user.id, workspaceId: workspace.id, role: 'owner' }
+    });
+  }
 
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-900" dir="rtl">
       
       <CarouselCreator 
+        userName={user?.name || session.user.name || ''}
         initialWebsiteUrl={workspace?.websiteUrl || ''}
         initialReferenceLink1={workspace?.referenceLink1 || ''}
         initialReferenceLink2={workspace?.referenceLink2 || ''}

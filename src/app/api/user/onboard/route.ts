@@ -19,13 +19,34 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Name and phone are required' }, { status: 400 });
     }
 
-    const updatedUser = await prisma.user.update({
+    let updatedUser = await prisma.user.update({
       where: { email: session.user.email },
       data: { name, phone },
       include: { workspaces: true }
     });
 
-    if (updatedUser.workspaces.length > 0) {
+    if (updatedUser.workspaces.length === 0) {
+      // Create a default workspace for the user
+      const newWorkspace = await prisma.workspace.create({
+        data: {
+          name: `המרחב של ${name}`,
+        }
+      });
+      await prisma.workspaceUser.create({
+        data: {
+          userId: updatedUser.id,
+          workspaceId: newWorkspace.id,
+          role: 'owner'
+        }
+      });
+      // Refresh user with workspaces
+      updatedUser = await prisma.user.findUnique({
+        where: { id: updatedUser.id },
+        include: { workspaces: true }
+      }) as any;
+    }
+
+    if (updatedUser && updatedUser.workspaces.length > 0) {
       const workspaceId = updatedUser.workspaces[0].workspaceId;
       try {
         const tenantDb = await getTenantDB(workspaceId, updatedUser.id, ['owner', 'admin']);

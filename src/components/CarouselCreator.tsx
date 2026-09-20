@@ -6,6 +6,7 @@ import CarouselForm from '@/components/CarouselForm';
 import SkeletonLoader from '@/components/SkeletonLoader';
 
 interface CarouselCreatorProps {
+  userName?: string;
   initialWebsiteUrl: string;
   initialReferenceLink1: string;
   initialReferenceLink2: string;
@@ -18,7 +19,8 @@ export default function CarouselCreator({
   initialReferenceLink1, 
   initialReferenceLink2, 
   initialReferenceLink3,
-  brandColor
+  brandColor,
+  userName
 }: CarouselCreatorProps) {
   const [slides, setSlides] = useState<Slide[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -57,6 +59,7 @@ export default function CarouselCreator({
     ) : (
       <div className="p-8 max-w-4xl mx-auto">
         <header className="mb-10 text-center relative">
+          {userName && <div className="text-indigo-600 dark:text-indigo-400 font-bold mb-4">שלום, {userName} 👋</div>}
           <h1 className="text-4xl md:text-5xl font-black mb-3 text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 dark:from-indigo-400 to-purple-600 dark:to-purple-400">יצירת קרוסלה חדשה</h1>
           <p className="text-gray-600 dark:text-gray-300 text-lg md:text-xl font-medium">הזן פרטים וקבל קרוסלה מוכנה תוך שניות</p>
         </header>
