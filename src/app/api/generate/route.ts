@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     const referenceLink3 = body.referenceLink3 || null;
 
     let aiProvider = process.env.DEFAULT_AI_PROVIDER || 'gemini';
-    let aiModel = process.env.DEFAULT_AI_MODEL || 'gemini-2.5-flash';
+    let aiModel = process.env.DEFAULT_AI_MODEL || 'gemini-3.8-flash';
     let workspaceId = null;
     let ws: any = null;
 
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
         if (ws.aiModel) {
           aiModel = ws.aiModel;
           if (aiModel === 'gemini-1.5-flash' || !aiModel) {
-            aiModel = 'gemini-2.5-flash';
+            aiModel = 'gemini-3.8-flash';
             aiProvider = 'gemini';
           }
         }
@@ -156,6 +156,6 @@ ${scrapedContext ? `\nלמד על סגנון המותג, הנושאים והטו
     return NextResponse.json({ slides, explanation });
   } catch (error) {
     console.error('Error generating carousel:', error);
-    return NextResponse.json({ error: 'Failed to generate carousel' }, { status: 500 });
+    return NextResponse.json({ error: error?.message || 'Failed to generate carousel' }, { status: 500 });
   }
 }
