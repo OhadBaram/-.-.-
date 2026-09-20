@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 
@@ -19,18 +19,22 @@ export default function CarouselRenderer({ slides }: CarouselRendererProps) {
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const [isExporting, setIsExporting] = useState(false);
   const [localSlides, setLocalSlides] = useState<Slide[]>(slides);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   const CANVAS_WIDTH = 1080;
   const CANVAS_HEIGHT = 1350;
 
-  const drawSlide = (canvas: HTMLCanvasElement, slide: Slide) => {
+  const drawSlide = useCallback((canvas: HTMLCanvasElement, slide: Slide) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.fillStyle = slide.backgroundColor;
+    const bg = theme === 'dark' ? '#111827' : '#ffffff';
+    const fg = theme === 'dark' ? '#ffffff' : '#111827';
+
+    ctx.fillStyle = bg;
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    ctx.fillStyle = slide.textColor;
+    ctx.fillStyle = fg;
     ctx.font = 'bold 64px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -55,7 +59,7 @@ export default function CarouselRenderer({ slides }: CarouselRendererProps) {
       }
     }
     ctx.fillText(line, CANVAS_WIDTH / 2, y);
-  };
+  }, [theme]);
 
   React.useEffect(() => {
     setLocalSlides(slides);
@@ -68,7 +72,7 @@ export default function CarouselRenderer({ slides }: CarouselRendererProps) {
         drawSlide(canvas, slide);
       }
     });
-  }, [localSlides]);
+  }, [localSlides, drawSlide]);
 
   const handleExportZip = async () => {
     setIsExporting(true);
@@ -105,11 +109,31 @@ export default function CarouselRenderer({ slides }: CarouselRendererProps) {
     }
   };
 
+  const toggleTheme = () => {
+    setTheme(t => t === 'light' ? 'dark' : 'light');
+  };
+
   return (
     <div className="flex flex-col items-center gap-6 p-4 w-full">
-      <div className="flex flex-row overflow-x-auto snap-x gap-4 w-full pb-4">
+      <div className="flex w-full justify-center">
+        <button
+          onClick={toggleTheme}
+          className={`px-6 py-2 rounded-full font-semibold transition-all duration-300 shadow-sm ${
+            theme === 'light'
+              ? 'bg-gray-900 text-white hover:bg-gray-800'
+              : 'bg-white text-gray-900 hover:bg-gray-100'
+          }`}
+        >
+          {theme === 'light' ? 'מצב כהה' : 'מצב בהיר'}
+        </button>
+      </div>
+
+      <div 
+        className="flex flex-row overflow-x-auto snap-x snap-mandatory pb-4 w-full max-w-full gap-4"
+        style={{ direction: 'rtl' }}
+      >
         {localSlides.map((slide, index) => (
-          <div key={slide.id} className="border p-2 rounded-lg shadow-sm flex-none snap-center w-[80vw] max-w-sm flex flex-col gap-2">
+          <div key={slide.id} className="shrink-0 snap-center border p-2 rounded-lg shadow-sm flex flex-col gap-2 w-[80vw] max-w-sm">
             <canvas
               ref={(el) => {
                 canvasRefs.current[index] = el;
