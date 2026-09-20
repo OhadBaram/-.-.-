@@ -275,6 +275,8 @@ export default function CarouselRenderer({
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [advancedPanel, setAdvancedPanel] = useState<AdvancedPanelId>('layout');
   const [showMoreTemplates, setShowMoreTemplates] = useState(false);
+  const [dragFromIndex, setDragFromIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const activeSlide = localSlides[activeSlideIndex];
   const activeSlideTemplate = activeSlide ? getSlideTemplate(activeSlide) : DEFAULT_TEXT_TEMPLATE;
@@ -551,6 +553,64 @@ export default function CarouselRenderer({
     setEditingIndex(null);
   };
 
+  const reorderSlides = (fromIndex: number, toIndex: number) => {
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= localSlides.length ||
+      toIndex >= localSlides.length
+    ) {
+      return;
+    }
+
+    setLocalSlides((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+
+    setSlideOverrides((prev) => {
+      const ordered = localSlides.map((_, i) => prev[i]);
+      const [moved] = ordered.splice(fromIndex, 1);
+      ordered.splice(toIndex, 0, moved);
+      const next: Record<number, { fontSize?: number; textY?: number }> = {};
+      ordered.forEach((value, i) => {
+        if (value) next[i] = value;
+      });
+      return next;
+    });
+
+    setActiveSlideIndex((current) => {
+      if (current === fromIndex) return toIndex;
+      if (fromIndex < current && toIndex >= current) return current - 1;
+      if (fromIndex > current && toIndex <= current) return current + 1;
+      return current;
+    });
+
+    setEditingIndex((current) => {
+      if (current == null) return null;
+      if (current === fromIndex) return toIndex;
+      if (fromIndex < current && toIndex >= current) return current - 1;
+      if (fromIndex > current && toIndex <= current) return current + 1;
+      return current;
+    });
+
+    setRemixingIndex((current) => {
+      if (current == null) return null;
+      if (current === fromIndex) return toIndex;
+      if (fromIndex < current && toIndex >= current) return current - 1;
+      if (fromIndex > current && toIndex <= current) return current + 1;
+      return current;
+    });
+  };
+
+  const clearDragState = () => {
+    setDragFromIndex(null);
+    setDragOverIndex(null);
+  };
+
   return (
     <div className="flex flex-col md:flex-row h-full min-h-0 w-full bg-gray-50 dark:bg-gray-900 overflow-hidden" dir="rtl">
       
@@ -604,31 +664,80 @@ export default function CarouselRenderer({
               </div>
             )}
 
-            <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">שקפים</h4>
+            <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
+              שקפים
+            </h4>
+            <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-2">
+              גררו לשינוי סדר · לחצו לבחירה
+            </p>
             <div className="flex flex-col gap-2">
-              {localSlides.map((slide, i) => (
-                <div
-                  key={slide.id}
-                  onClick={() => setActiveSlideIndex(i)}
-                  className={`p-3 border rounded cursor-pointer transition-colors ${
-                    i === activeSlideIndex
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2 mb-0.5">
-                    <div className="font-bold text-sm text-gray-600 dark:text-gray-400">שקף {i + 1}</div>
-                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 shrink-0">
-                      {isImageTemplate(getSlideTemplate(slide))
-                        ? slide.imageUrl
-                          ? 'תמונה הועלתה'
-                          : 'ממתין לתמונה'
-                        : 'טקסט'}
-                    </span>
+              {localSlides.map((slide, i) => {
+                const isDragging = dragFromIndex === i;
+                const isDropTarget =
+                  dragOverIndex === i &&
+                  dragFromIndex != null &&
+                  dragFromIndex !== i;
+                return (
+                  <div
+                    key={slide.id}
+                    draggable
+                    onDragStart={(e) => {
+                      setDragFromIndex(i);
+                      e.dataTransfer.effectAllowed = 'move';
+                      e.dataTransfer.setData('text/plain', String(i));
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      if (dragOverIndex !== i) setDragOverIndex(i);
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverIndex === i) setDragOverIndex(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const from = dragFromIndex ?? Number(e.dataTransfer.getData('text/plain'));
+                      if (Number.isFinite(from)) reorderSlides(from, i);
+                      clearDragState();
+                    }}
+                    onDragEnd={clearDragState}
+                    onClick={() => setActiveSlideIndex(i)}
+                    className={`p-3 border rounded cursor-grab active:cursor-grabbing transition-all select-none ${
+                      i === activeSlideIndex
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    } ${isDragging ? 'opacity-40 scale-[0.98]' : ''} ${
+                      isDropTarget
+                        ? 'ring-2 ring-blue-400 border-blue-400'
+                        : ''
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className="text-gray-400 dark:text-gray-500 text-sm leading-none shrink-0"
+                          aria-hidden
+                        >
+                          ⋮⋮
+                        </span>
+                        <div className="font-bold text-sm text-gray-600 dark:text-gray-400">
+                          שקף {i + 1}
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 shrink-0">
+                        {isImageTemplate(getSlideTemplate(slide))
+                          ? slide.imageUrl
+                            ? 'תמונה הועלתה'
+                            : 'ממתין לתמונה'
+                          : 'טקסט'}
+                      </span>
+                    </div>
+                    <div className="text-sm text-gray-800 dark:text-gray-200 truncate pr-5">
+                      {slide.text}
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-800 dark:text-gray-200 truncate">{slide.text}</div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
 
@@ -987,19 +1096,49 @@ export default function CarouselRenderer({
 
         {/* Bottom Filmstrip (Optional) */}
         <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex gap-3 overflow-x-auto items-center">
-          {localSlides.map((_, i) => (
-            <button 
-              key={i} 
-              onClick={() => setActiveSlideIndex(i)}
-              className={`shrink-0 w-12 h-12 rounded font-bold shadow-sm transition-colors ${
-                i === activeSlideIndex 
-                  ? 'bg-blue-600 text-white border-2 border-blue-600' 
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
-              }`}
-            >
-              {i + 1}
-            </button>
-          ))}
+          {localSlides.map((slide, i) => {
+            const isDragging = dragFromIndex === i;
+            const isDropTarget =
+              dragOverIndex === i &&
+              dragFromIndex != null &&
+              dragFromIndex !== i;
+            return (
+              <button
+                key={slide.id}
+                type="button"
+                draggable
+                onDragStart={(e) => {
+                  setDragFromIndex(i);
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', String(i));
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  if (dragOverIndex !== i) setDragOverIndex(i);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const from =
+                    dragFromIndex ?? Number(e.dataTransfer.getData('text/plain'));
+                  if (Number.isFinite(from)) reorderSlides(from, i);
+                  clearDragState();
+                }}
+                onDragEnd={clearDragState}
+                onClick={() => setActiveSlideIndex(i)}
+                className={`shrink-0 w-12 h-12 rounded font-bold shadow-sm transition-all cursor-grab active:cursor-grabbing ${
+                  i === activeSlideIndex
+                    ? 'bg-blue-600 text-white border-2 border-blue-600'
+                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
+                } ${isDragging ? 'opacity-40' : ''} ${
+                  isDropTarget ? 'ring-2 ring-offset-1 ring-blue-400' : ''
+                }`}
+                title="גררו לשינוי סדר"
+              >
+                {i + 1}
+              </button>
+            );
+          })}
           <button
             type="button"
             onClick={() => addSlide(activeSlideIndex)}
