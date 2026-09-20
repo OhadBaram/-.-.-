@@ -56,28 +56,47 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* AI Value Section */}
       <section id="features" className="py-20 bg-white">
         <div className="max-w-6xl mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">למה לבחור בקרוסל. איי. אי?</h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100">
-              <div className="w-12 h-12 bg-indigo-100 text-indigo-600 flex items-center justify-center rounded-xl mb-4 text-2xl">⚡</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">מהירות שיא</h3>
-              <p className="text-gray-600">קבל קרוסלה מעוצבת וכתובה היטב תוך שניות בודדות, ללא צורך בידע מוקדם בעיצוב.</p>
+          <div className="text-center mb-12">
+            <div className="inline-block bg-indigo-50 text-indigo-700 font-bold px-4 py-2 rounded-full text-sm mb-4">
+              🧠 הכוח האמיתי של המערכת
             </div>
-            <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100">
-              <div className="w-12 h-12 bg-purple-100 text-purple-600 flex items-center justify-center rounded-xl mb-4 text-2xl">🎯</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">מותאם לקהל שלך</h3>
-              <p className="text-gray-600">הטקסטים והעיצוב מותאמים בדיוק לקהל היעד שלך, למטרה העסקית ולזהות המותג.</p>
+            <h2 className="text-4xl font-black text-gray-900 mb-4">
+              ה-AI שלנו לא רק כותב – הוא <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">מכיר את העסק שלך</span>
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              המערכת לומדת מהאתר שלך, מהפרסומים שאהבת, ומהסגנון הייחודי לך. התוצאה: קרוסלות שנשמעות ונראות בדיוק כמוך – רק מוכנות תוך 30 שניות.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8 mb-16">
+            <div className="p-8 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-3xl border border-indigo-100">
+              <div className="w-14 h-14 bg-indigo-600 text-white flex items-center justify-center rounded-2xl mb-5 text-3xl">🌐</div>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">קורא את האתר שלך</h3>
+              <p className="text-gray-600 leading-relaxed">מזין כתובת האתר שלך פעם אחת, וה-AI לומד את המוצרים, הערכים, השפה והייחוד שלך לעומק. כל קרוסלה עתידית תגלם את זה.</p>
             </div>
-            <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100">
-              <div className="w-12 h-12 bg-blue-100 text-blue-600 flex items-center justify-center rounded-xl mb-4 text-2xl">🎨</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">עיצוב מקצועי</h3>
-              <p className="text-gray-600">טמפלייטים מודרניים המבוססים על העיצובים שעובדים הכי טוב ברשתות החברתיות היום.</p>
+            <div className="p-8 bg-gradient-to-br from-purple-50 to-pink-50 rounded-3xl border border-purple-100">
+              <div className="w-14 h-14 bg-purple-600 text-white flex items-center justify-center rounded-2xl mb-5 text-3xl">📸</div>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">לומד מהסגנון שאהבת</h3>
+              <p className="text-gray-600 leading-relaxed">מוסיף קישורים לקרוסלות הטובות שיצרת בעבר, וה-AI ינתח את המבנה, הטון והאסתטיקה – ויחזור אליך עם עוד מאותו הדבר שעבד.</p>
+            </div>
+            <div className="p-8 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl border border-blue-100">
+              <div className="w-14 h-14 bg-blue-600 text-white flex items-center justify-center rounded-2xl mb-5 text-3xl">⚡</div>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">חיסכון של שעות בשבוע</h3>
+              <p className="text-gray-600 leading-relaxed">מה שלקח שעתיים של עיצוב, קופירייטינג ותיקונים – קורה עכשיו ב-30 שניות. בדיוק בסגנון שלך, בדיוק לקהל שלך, בדיוק בזמן שלך.</p>
             </div>
           </div>
+
+          {/* Social proof strip */}
+          <div className="bg-gray-900 rounded-3xl p-8 text-center text-white">
+            <p className="text-2xl font-bold mb-2">שעתיים עיצוב = 30 שניות עם CarouselAI</p>
+            <p className="text-gray-400">הגיוון, הצבעים, התבניות, הטקסט – הכל אוטומטי, הכל בסגנון שלך</p>
+          </div>
         </div>
+      </section>
+
       </section>
 
       {/* CTA / Pricing Section */}

@@ -28,14 +28,14 @@ export default async function BillingPage() {
   const workspace = user.workspaces[0].workspace;
 
   let planName = 'חינמי';
-  let usageLimit = 3;
+  let usageLimit = 2;
   
   if (workspace.plan === 'pro') {
-    planName = 'מקצוען (Pro)';
-    usageLimit = 50;
-  } else if (workspace.plan === 'agency') {
-    planName = 'סוכנות';
-    usageLimit = 9999;
+    planName = 'פרו';
+    usageLimit = 25;
+  } else if (workspace.plan === 'premium') {
+    planName = 'פרימיום';
+    usageLimit = 60;
   }
 
   const usagePercent = Math.min(Math.round((workspace.usageCount / usageLimit) * 100), 100);

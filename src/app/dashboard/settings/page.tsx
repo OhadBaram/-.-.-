@@ -49,7 +49,11 @@ export default async function SettingsPage() {
         <SettingsForm 
           workspaceId={workspace.id} 
           initialBrandIdentity={workspace.brandIdentity || ''} 
-          initialBrandColor={workspace.brandColor || '#3730a3'} 
+          initialBrandColor={workspace.brandColor || '#3730a3'}
+          initialWebsiteUrl={workspace.websiteUrl || ''}
+          initialReferenceLink1={workspace.referenceLink1 || ''}
+          initialReferenceLink2={workspace.referenceLink2 || ''}
+          initialReferenceLink3={workspace.referenceLink3 || ''}
           initialAiProvider={workspace.aiProvider || 'gemini'}
           initialAiModel={workspace.aiModel || 'gemini-1.5-flash'}
         />
