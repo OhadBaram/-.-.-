@@ -79,6 +79,7 @@ export default function CopilotWidget({
         method: 'POST',
         body: formData,
       });
+      if (!res.ok) throw new Error('API Error');
       const data = await res.json();
       if (data.text) {
         await executeCopilotCommand(data.text);

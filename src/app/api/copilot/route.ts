@@ -102,8 +102,11 @@ Current State: ${JSON.stringify(currentState)}`
 
     // Get the text response
     let text = 'ביצעתי את השינויים.';
-    if (response.text()) {
-      text = response.text();
+    try {
+      const respText = response.text();
+      if (respText) text = respText;
+    } catch (e) {
+      // Gemini throws if response only contains function calls without text
     }
 
     return NextResponse.json({ 
