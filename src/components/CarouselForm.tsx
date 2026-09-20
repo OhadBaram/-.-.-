@@ -8,6 +8,7 @@ interface CarouselFormProps {
     audience: string; 
     goal: string; 
     brand: string;
+    slideCount: number;
     websiteUrl?: string;
     referenceLink1?: string;
     referenceLink2?: string;
@@ -19,6 +20,8 @@ interface CarouselFormProps {
   initialReferenceLink2?: string;
   initialReferenceLink3?: string;
 }
+
+const SLIDE_COUNT_OPTIONS = [3, 4, 5, 6, 7, 8, 9, 10] as const;
 
 export default function CarouselForm({ 
   onSubmit, 
@@ -83,6 +86,40 @@ export default function CarouselForm({
           placeholder="לדוגמה: 5 טיפים לניהול זמן אפקטיבי"
         />
         <p className="text-xs text-gray-500 mt-1">ככל שתהיה ספציפי יותר, כך ה-AI יכתוב תוכן מדויק יותר.</p>
+      </div>
+
+      <div>
+        <label className="block text-gray-800 font-bold mb-2">
+          מספר שקפים
+          <span className="mr-2 text-indigo-600 font-black">{slideCount}</span>
+        </label>
+        <input
+          type="range"
+          min={3}
+          max={10}
+          step={1}
+          value={slideCount}
+          onChange={(e) => setSlideCount(Number(e.target.value))}
+          className="w-full accent-indigo-600 cursor-pointer"
+          aria-label="מספר שקפים בקרוסלה"
+        />
+        <div className="mt-3 flex flex-wrap gap-2 justify-between">
+          {SLIDE_COUNT_OPTIONS.map((n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => setSlideCount(n)}
+              className={`w-9 h-9 rounded-lg text-sm font-bold transition-colors ${
+                slideCount === n
+                  ? 'bg-indigo-600 text-white shadow'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-gray-500 mt-2">בחרו כמה שקפים לייצר לפני יצירת הקרוסלה (3–10).</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
