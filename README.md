@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# קרוסל. איי. אי מבית בינה לתעשייה
 
-## Getting Started
+מערכת SaaS ארגונית (Enterprise) חכמה ליצירת קרוסלות לאינסטגרם המופעלת באמצעות בינה מלאכותית, פותחה מבית "בינה לתעשייה". 
 
-First, run the development server:
+## מבט על הארכיטקטורה
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+המערכת פותחה בארכיטקטורת Multi-Tenant מתקדמת המבטיחה בידוד נתונים מוחלט לכל לקוח (Workspace), תוך שימוש בטכנולוגיות המובילות בשוק:
+
+- **Frontend & Backend**: Next.js (App Router) 
+- **Database**: PostgreSQL
+- **ORM**: Prisma (כולל Tenant DB Extension לבידוד נתונים RLS)
+- **Authentication**: NextAuth.js (Auth.js) דרך Google Provider
+- **AI Integration**: Google Gemini / OpenRouter (תמיכה בניתוב מודלים גמיש)
+- **Rate Limiting**: @upstash/ratelimit & Redis
+- **Background Jobs**: BullMQ (לתורים)
+- **Observability**: Pino Logger (מזהה Tenant בכל שגיאה)
+
+## תכונות מרכזיות
+
+- **יצירת תוכן מבוססת AI**: הפקת קרוסלות מלאות (טקסט ועיצוב) בשניות.
+- **לוח בקרה אישי**: צפייה בהיסטוריית הקרוסלות וניהול פרופיל.
+- **ספריית מותג (Brand Identity)**: שמירת זהות מותג וצבעים אישית לכל מרחב עבודה.
+- **בידוד נתונים (Tenant Isolation)**: הפרדה מלאה ברמת מסד הנתונים למניעת זליגת מידע (IDOR Protection).
+- **תמחור מבוסס שימוש (Billing)**: מנגנון בנק קרדיטים ומוני שימוש אינטגרליים לחבילות (Free, Pro, Agency).
+- **תאימות ל-GDPR (Offboarding)**: נתיב מחיקת נתונים וייצוא מלא למשתמש שעוזב.
+- **Feature Flags**: מתגי תכונות לשליטה בפיצ'רים מתקדמים פר לקוח.
+
+## משתני סביבה (Environment Variables)
+
+לפני הרצת הפרויקט, יש לוודא שקובץ ה-`.env` מכיל את הערכים הבאים:
+
+```env
+DATABASE_URL="postgresql://user:password@localhost:5432/db"
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="your_secret_key"
+GOOGLE_CLIENT_ID="your_google_id"
+GOOGLE_CLIENT_SECRET="your_google_secret"
+GEMINI_API_KEY="your_gemini_key"
+OPENROUTER_API_KEY="your_openrouter_key"
+UPSTASH_REDIS_REST_URL="your_upstash_url"
+UPSTASH_REDIS_REST_TOKEN="your_upstash_token"
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## התקנה והרצה מקומית
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. התקנת חבילות התוכנה:
+```bash
+npm install
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+2. סנכרון מסד הנתונים (מול פוסטגרס):
+```bash
+npx prisma db push
+```
 
-## Learn More
+3. הרצת שרת הפיתוח:
+```bash
+npm run dev
+```
+האפליקציה תהיה זמינה בכתובת `http://localhost:3000`.
 
-To learn more about Next.js, take a look at the following resources:
+## מבנה התיקיות המרכזי
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `/src/app` - ראוטר הדפים של המערכת (API, Dashboard, Pricing, Home).
+- `/src/components` - רכיבי ממשק משתמש (קנבס, טפסים, חיווי טעינה).
+- `/src/lib` - ספריות שירות (חיבור ל-DB, תצורת Auth, מנגנון Tenant-DB, ספריות Rate Limit ו-Logger).
+- `/prisma` - סכמת מסד הנתונים (`schema.prisma`).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+© 2026 קרוסל. איי. אי מבית בינה לתעשייה.
