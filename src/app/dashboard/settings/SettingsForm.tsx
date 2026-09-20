@@ -42,16 +42,19 @@ export default function SettingsForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <div>
         <label className="block text-gray-700 font-bold mb-2">זהות המותג ותיאור חברה</label>
         <textarea 
           value={brandIdentity}
           onChange={(e) => setBrandIdentity(e.target.value)}
           rows={4}
-          className="w-full border rounded p-2 focus:ring-2 focus:ring-indigo-500"
-          placeholder="לדוגמה: מותג יוקרתי, פונה לאנשי עסקים, משתמש בשפה רשמית ומקצועית"
+          className="w-full border border-gray-300 rounded-lg p-3 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow"
+          placeholder="לדוגמה: בינה לתעשייה, יוצרת ai..."
         />
+        <p className="text-sm text-gray-500 mt-2">
+          💡 <strong className="font-medium">למה זה חשוב?</strong> המידע שתרשום כאן יישלח לבינה המלאכותית בכל פעם שתיצור קרוסלה, וישפיע ישירות על סגנון הכתיבה, השפה, הדוגמאות והאווירה של התוכן שייווצר.
+        </p>
       </div>
 
       <div>
@@ -67,41 +70,13 @@ export default function SettingsForm({
             type="text"
             value={brandColor}
             onChange={(e) => setBrandColor(e.target.value)}
-            className="border rounded p-2 flex-grow max-w-xs text-left"
+            className="border border-gray-300 rounded-lg p-2 flex-grow max-w-xs text-left text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             dir="ltr"
           />
         </div>
-      </div>
-
-      <div className="pt-4 border-t">
-        <h3 className="text-lg font-bold mb-4">הגדרות בינה מלאכותית</h3>
-        
-        <div className="mb-4">
-          <label className="block text-gray-700 font-bold mb-2">ספק מודל (AI Provider)</label>
-          <select 
-            value={aiProvider}
-            onChange={(e) => setAiProvider(e.target.value)}
-            className="w-full border rounded p-2 focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="gemini">Google Gemini</option>
-            <option value="openrouter">OpenRouter</option>
-          </select>
-        </div>
-
-        <div className="mb-4">
-          <label className="block text-gray-700 font-bold mb-2">שם המודל (Model Name)</label>
-          <input 
-            type="text"
-            value={aiModel}
-            onChange={(e) => setAiModel(e.target.value)}
-            className="w-full border rounded p-2 focus:ring-2 focus:ring-indigo-500"
-            dir="ltr"
-            placeholder="למשל: openai/gpt-4o"
-          />
-          <p className="text-sm text-gray-500 mt-1">
-            הזן את השם המדויק של המודל כפי שהוא מופיע בספק (למשל: <code>gemini-1.5-flash</code> או <code>openai/gpt-4o</code>).
-          </p>
-        </div>
+        <p className="text-sm text-gray-500 mt-2">
+          💡 <strong className="font-medium">מה זה עושה?</strong> הצבע הזה ישמש באופן אוטומטי את מחולל התמונות כדי להדגיש מילות מפתח חשובות וטקסטים מרכזיים בתוך הקרוסלות שלך.
+        </p>
       </div>
 
       <button 
