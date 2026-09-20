@@ -102,9 +102,16 @@ export async function GET() {
   const emailTransportConfigured = hasResend || hasEmailServer || hasSmtpParts;
   const ready = hasEmailFrom && emailTransportConfigured && hasSecret && hasNextAuthUrl && databaseOk;
 
+  // בדיקת נוכחות בלבד — לא מתחברים ל-SMTP / Gmail כאן
+  const emailServerLooksLikeUrl = Boolean(
+    process.env.EMAIL_SERVER?.trim() && /^smtps?:\/\//i.test(process.env.EMAIL_SERVER.trim())
+  );
+
   const protocolHint = databaseUrlHint(dbUrlDiag.issue);
   const hint = ready
-    ? 'Auth email config looks complete.'
+    ? hasResend
+      ? 'Auth email config looks complete (Resend).'
+      : 'Env present, but SMTP connectivity is NOT tested here. If /api/auth/signin/email returns 500, fix Gmail App Password (prefer EMAIL_SERVER_HOST/USER/PASSWORD) and check Vercel function logs for [auth] SMTP sendMail failed.'
     : protocolHint ??
       'Missing email and/or database config in Vercel Production env. Set EMAIL_FROM + RESEND_API_KEY (recommended), NEXTAUTH_SECRET, NEXTAUTH_URL, DATABASE_URL, then Redeploy.';
 
@@ -114,7 +121,9 @@ export async function GET() {
       EMAIL_FROM: hasEmailFrom,
       RESEND_API_KEY: hasResend,
       EMAIL_SERVER: hasEmailServer,
+      EMAIL_SERVER_LOOKS_LIKE_URL: hasEmailServer ? emailServerLooksLikeUrl : null,
       EMAIL_SERVER_HOST_USER_PASS: hasSmtpParts,
+      smtpConnectivityChecked: false,
       NEXTAUTH_SECRET: hasSecret,
       NEXTAUTH_URL: hasNextAuthUrl,
       NEXTAUTH_URL_VALUE: process.env.NEXTAUTH_URL?.trim() || null,
