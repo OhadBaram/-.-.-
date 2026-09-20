@@ -33,11 +33,16 @@ export async function POST(req: Request) {
 
     const changeTemplateDeclaration: FunctionDeclaration = {
       name: 'change_template',
-      description: 'Change the global template of the carousel.',
+      description:
+        'Change the visual design template of one slide (pass slideIndex) or of every slide (omit slideIndex). Each slide has its own template.',
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
-          templateId: { type: SchemaType.STRING, description: 'The ID of the new template.' }
+          templateId: { type: SchemaType.STRING, description: 'The ID of the new template.' },
+          slideIndex: {
+            type: SchemaType.NUMBER,
+            description: 'Optional 0-based slide index. If omitted, apply to all slides.',
+          },
         },
         required: ['templateId']
       }

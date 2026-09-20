@@ -21,6 +21,8 @@ export interface Slide {
   backgroundColor: string;
   textColor: string;
   imageUrl?: string;
+  /** Visual style template for this slide only */
+  template?: TemplateId;
 }
 
 export type TemplateId =
@@ -75,6 +77,124 @@ const TEMPLATES: TemplateOption[] = [
   { id: 'neon',         label: 'ניאון'        },
 ];
 
+const IMAGE_TEMPLATES = TEMPLATES.filter((t) => t.id.startsWith('image-'));
+const TEXT_TEMPLATES = TEMPLATES.filter((t) => !t.id.startsWith('image-'));
+
+const DEFAULT_IMAGE_TEMPLATE: TemplateId = 'image-split';
+const DEFAULT_TEXT_TEMPLATE: TemplateId = 'minimal';
+
+export type CarouselLayoutPresetId =
+  | 'first-and-last'
+  | 'first-only'
+  | 'all-images'
+  | 'no-images'
+  | 'custom';
+
+interface CarouselLayoutPreset {
+  id: Exclude<CarouselLayoutPresetId, 'custom'>;
+  label: string;
+  hint: string;
+}
+
+const CAROUSEL_LAYOUT_PRESETS: CarouselLayoutPreset[] = [
+  {
+    id: 'first-and-last',
+    label: 'ראשון ואחרון עם תמונה',
+    hint: 'שקף פתיחה וסיום עם תמונה, האמצע טקסט',
+  },
+  {
+    id: 'first-only',
+    label: 'רק שקף ראשון עם תמונה',
+    hint: 'פתיחה עם תמונה, שאר השקפים טקסט',
+  },
+  {
+    id: 'all-images',
+    label: 'כל השקפים עם תמונה',
+    hint: 'כל שקף מקבל תבנית עם מקום לתמונה',
+  },
+  {
+    id: 'no-images',
+    label: 'בלי תמונות (הכל טקסט)',
+    hint: 'כל השקפים בתבניות טקסט בלבד',
+  },
+];
+
+const FONT_OPTIONS = [
+  { id: 'Heebo', label: 'Heebo' },
+  { id: 'Rubik', label: 'Rubik' },
+  { id: 'Assistant', label: 'Assistant' },
+  { id: 'Varela Round', label: 'Varela Round' },
+] as const;
+
+function isImageTemplate(id: TemplateId): boolean {
+  return id.startsWith('image-');
+}
+
+function getSlideTemplate(slide: Slide): TemplateId {
+  return slide.template ?? DEFAULT_TEXT_TEMPLATE;
+}
+
+function withDefaultTemplates(slides: Slide[], fallback: TemplateId = DEFAULT_TEXT_TEMPLATE): Slide[] {
+  return slides.map((slide) => ({
+    ...slide,
+    template: slide.template ?? fallback,
+  }));
+}
+
+function slideWantsImageForPreset(
+  preset: Exclude<CarouselLayoutPresetId, 'custom'>,
+  index: number,
+  total: number
+): boolean {
+  switch (preset) {
+    case 'first-and-last':
+      return index === 0 || index === total - 1;
+    case 'first-only':
+      return index === 0;
+    case 'all-images':
+      return true;
+    case 'no-images':
+      return false;
+  }
+}
+
+function applyCarouselLayoutPreset(
+  slides: Slide[],
+  preset: Exclude<CarouselLayoutPresetId, 'custom'>
+): Slide[] {
+  const total = slides.length;
+  return slides.map((slide, index) => {
+    const wantsImage = slideWantsImageForPreset(preset, index, total);
+    const current = getSlideTemplate(slide);
+    if (isImageTemplate(current) === wantsImage) {
+      return { ...slide, template: current };
+    }
+    return {
+      ...slide,
+      template: wantsImage ? DEFAULT_IMAGE_TEMPLATE : DEFAULT_TEXT_TEMPLATE,
+    };
+  });
+}
+
+function detectCarouselLayoutPreset(slides: Slide[]): CarouselLayoutPresetId {
+  const total = slides.length;
+  if (total === 0) return 'no-images';
+
+  const flags = slides.map((slide) => isImageTemplate(getSlideTemplate(slide)));
+  if (flags.every(Boolean)) return 'all-images';
+  if (flags.every((flag) => !flag)) return 'no-images';
+  if (flags[0] && flags.slice(1).every((flag) => !flag)) return 'first-only';
+  if (
+    total >= 2 &&
+    flags[0] &&
+    flags[total - 1] &&
+    flags.slice(1, -1).every((flag) => !flag)
+  ) {
+    return 'first-and-last';
+  }
+  return 'custom';
+}
+
 export interface SlideOverride {
   fontSize?: number;
   textY?: number;
@@ -94,11 +214,15 @@ export default function CarouselRenderer({
   onGoBack,
 }: CarouselRendererProps) {
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
+  const drawGenerationRef = useRef(0);
   const [isExporting, setIsExporting] = useState(false);
   const [activeBrandColor, setActiveBrandColor] = useState(initialBrandColor);
-  const [localSlides, setLocalSlides] = useState<Slide[]>(slides);
-  const [theme,    setTheme]    = useState<'light' | 'dark'>('light');
-  const [template, setTemplate] = useState<TemplateId>('minimal');
+  const [localSlides, setLocalSlides] = useState<Slide[]>(() => withDefaultTemplates(slides));
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window === 'undefined') return 'light';
+    const saved = window.sessionStorage.getItem('carousel-canvas-theme');
+    return saved === 'dark' ? 'dark' : 'light';
+  });
   const [globalFont, setGlobalFont] = useState('Heebo');
 
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
@@ -106,8 +230,13 @@ export default function CarouselRenderer({
   const [slideOverrides, setSlideOverrides] = useState<Record<number, { fontSize?: number; textY?: number }>>(initialSlideOverrides);
   const [remixingIndex, setRemixingIndex] = useState<number | null>(null);
 
+  const activeSlide = localSlides[activeSlideIndex];
+  const activeSlideTemplate = activeSlide ? getSlideTemplate(activeSlide) : DEFAULT_TEXT_TEMPLATE;
+  const carouselLayoutPreset = detectCarouselLayoutPreset(localSlides);
+
   const CANVAS_WIDTH  = 1080;
   const CANVAS_HEIGHT = 1350;
+  const isCanvasDark = theme === 'dark';
 
   const handleRemix = async (index: number, currentText: string) => {
     setRemixingIndex(index);
@@ -137,12 +266,14 @@ export default function CarouselRenderer({
       slide: Slide,
       slideIndex: number,
       tpl: TemplateId,
-      override?: SlideOverride
+      override?: SlideOverride,
+      generation?: number
     ) => {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
+      if (generation !== undefined && generation !== drawGenerationRef.current) return;
 
-      const currentOverride = override ?? slideOverrides[slideIndex];
+      const currentOverride = override ?? slideOverrides[slideIndex] ?? {};
       const isDark          = theme === 'dark';
       const W               = CANVAS_WIDTH;
       const H               = CANVAS_HEIGHT;
@@ -175,28 +306,70 @@ export default function CarouselRenderer({
         case 'image-arch': await drawImageArch(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
         default:            drawMinimal    (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);
       }
+
+      if (generation !== undefined && generation !== drawGenerationRef.current) return;
     },
     [theme, activeBrandColor, slideOverrides, globalFont]
   );
 
   React.useEffect(() => {
-    setLocalSlides(slides);
+    setLocalSlides(withDefaultTemplates(slides));
   }, [slides]);
 
   React.useEffect(() => {
+    try {
+      window.sessionStorage.setItem('carousel-canvas-theme', theme);
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }, [theme]);
+
+  React.useEffect(() => {
+    const generation = ++drawGenerationRef.current;
     localSlides.forEach((slide, index) => {
       const canvas = canvasRefs.current[index];
       if (canvas) {
-        drawSlide(canvas, slide, index, template, slideOverrides[index]);
+        void drawSlide(canvas, slide, index, getSlideTemplate(slide), slideOverrides[index], generation);
       }
     });
-  }, [localSlides, drawSlide, template, slideOverrides]);
+  }, [localSlides, drawSlide, slideOverrides, theme]);
+
+  const redrawAllSlides = async () => {
+    const generation = ++drawGenerationRef.current;
+    await Promise.all(
+      localSlides.map(async (slide, index) => {
+        const canvas = canvasRefs.current[index];
+        if (!canvas) return;
+        await drawSlide(canvas, slide, index, getSlideTemplate(slide), slideOverrides[index], generation);
+      })
+    );
+  };
+
+  const setSlideTemplate = (index: number, nextTemplate: TemplateId) => {
+    setLocalSlides((prev) =>
+      prev.map((slide, i) => (i === index ? { ...slide, template: nextTemplate } : slide))
+    );
+  };
+
+  const applyLayoutPreset = (preset: Exclude<CarouselLayoutPresetId, 'custom'>) => {
+    setLocalSlides((prev) => applyCarouselLayoutPreset(prev, preset));
+  };
+
+  const handleChangeTemplateFromCopilot = (tpl: TemplateId, slideIndex?: number) => {
+    if (typeof slideIndex === 'number' && Number.isFinite(slideIndex)) {
+      setSlideTemplate(slideIndex, tpl);
+      return;
+    }
+    // Without an index: apply the same visual template to every slide
+    setLocalSlides((prev) => prev.map((slide) => ({ ...slide, template: tpl })));
+  };
 
   const handleExportZip = async () => {
     setIsExporting(true);
     const zip = new JSZip();
 
     try {
+      await redrawAllSlides();
       const imagePromises = localSlides.map((_, index) => {
         return new Promise<void>((resolve, reject) => {
           const canvas = canvasRefs.current[index];
@@ -226,6 +399,7 @@ export default function CarouselRenderer({
   const handleExportPdf = async () => {
     setIsExporting(true);
     try {
+      await redrawAllSlides();
       const doc = new jsPDF({ orientation: 'portrait', unit: 'px', format: [1080, 1350] });
       localSlides.forEach((_, index) => {
         const canvas = canvasRefs.current[index];
@@ -244,7 +418,23 @@ export default function CarouselRenderer({
     }
   };
 
-  const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
+  const toggleTheme = () => setTheme((t) => (t === 'light' ? 'dark' : 'light'));
+
+  const removeSlide = (index: number) => {
+    if (localSlides.length <= 1) return;
+    setLocalSlides((prev) => prev.filter((_, i) => i !== index));
+    setSlideOverrides((prev) => {
+      const next: Record<number, { fontSize?: number; textY?: number }> = {};
+      Object.entries(prev).forEach(([key, value]) => {
+        const i = Number(key);
+        if (i < index) next[i] = value;
+        else if (i > index) next[i - 1] = value;
+      });
+      return next;
+    });
+    setActiveSlideIndex((i) => Math.max(0, Math.min(i, localSlides.length - 2)));
+    setEditingIndex(null);
+  };
 
   return (
     <div className="flex flex-col md:flex-row h-[100dvh] w-full bg-gray-50 dark:bg-gray-900 overflow-hidden" dir="rtl">
@@ -269,47 +459,147 @@ export default function CarouselRenderer({
         </div>
 
         <div className="mb-6">
-          <h3 className="font-bold mb-2 text-gray-800 dark:text-gray-200">תבנית עיצוב</h3>
-          <select 
-            value={template} 
-            onChange={(e) => setTemplate(e.target.value as TemplateId)}
-            className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-          >
-            {TEMPLATES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-          </select>
+          <h3 className="font-bold mb-1 text-gray-800 dark:text-gray-200">תבנית לקרוסלה</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+            קובעת באילו שקפים יהיה מקום לתמונה — בלי למחוק את הטקסט
+          </p>
+          <div className="flex flex-col gap-2">
+            {CAROUSEL_LAYOUT_PRESETS.map((preset) => {
+              const isActive = carouselLayoutPreset === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => applyLayoutPreset(preset.id)}
+                  className={`w-full px-3 py-2.5 rounded border text-right transition-colors ${
+                    isActive
+                      ? 'border-blue-500 bg-blue-50 text-blue-800 dark:bg-blue-900/30 dark:text-blue-100 dark:border-blue-400'
+                      : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <div className="text-sm font-semibold">{preset.label}</div>
+                  <div className="text-[11px] mt-0.5 opacity-80">{preset.hint}</div>
+                </button>
+              );
+            })}
+            {carouselLayoutPreset === 'custom' && (
+              <div className="text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5">
+                פריסה מותאמת אישית — שינית תבניות לשקפים בודדים
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <h3 className="font-bold mb-1 text-gray-800 dark:text-gray-200">
+            תבנית לשקף {activeSlideIndex + 1}
+          </h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+            עיצוב ויזואלי לשקף הנבחר בלבד
+          </p>
+          <div className="flex flex-col gap-4">
+            <div>
+              <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                עם תמונה
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {IMAGE_TEMPLATES.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setSlideTemplate(activeSlideIndex, t.id)}
+                    className={`px-2 py-2 text-sm rounded border text-right transition-colors ${
+                      activeSlideTemplate === t.id
+                        ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-400'
+                        : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                בלי תמונה
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {TEXT_TEMPLATES.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setSlideTemplate(activeSlideIndex, t.id)}
+                    className={`px-2 py-2 text-sm rounded border text-right transition-colors ${
+                      activeSlideTemplate === t.id
+                        ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-400'
+                        : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="mb-6">
           <h3 className="font-bold mb-2 text-gray-800 dark:text-gray-200">גופן</h3>
-          <select 
-            value={globalFont} 
-            onChange={(e) => setGlobalFont(e.target.value)}
-            className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-          >
-            <option value="Heebo">Heebo</option>
-            <option value="Rubik">Rubik</option>
-            <option value="Assistant">Assistant</option>
-            <option value="Varela Round">Varela Round</option>
-          </select>
+          <div className="flex flex-col gap-2">
+            {FONT_OPTIONS.map((font) => (
+              <button
+                key={font.id}
+                type="button"
+                onClick={() => setGlobalFont(font.id)}
+                className={`w-full px-3 py-2.5 rounded border text-right transition-colors flex items-center justify-between gap-3 ${
+                  globalFont === font.id
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 dark:border-blue-400'
+                    : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                }`}
+              >
+                <span
+                  className="text-base text-gray-900 dark:text-gray-100"
+                  style={{ fontFamily: `"${font.id}", sans-serif` }}
+                >
+                  {font.label}
+                </span>
+                <span
+                  className="text-sm text-gray-500 dark:text-gray-300 shrink-0"
+                  style={{ fontFamily: `"${font.id}", sans-serif` }}
+                >
+                  שלום
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="mb-6">
+          <h3 className="font-bold mb-2 text-gray-800 dark:text-gray-200">ערכת צבעי שקפים</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            משנה את רקע וטקסט השקפים בתצוגה ובייצוא (לא את ערכת הנושא של האתר)
+          </p>
           <button
+            type="button"
             onClick={toggleTheme}
-            className={`w-full px-4 py-2 rounded font-semibold transition-all duration-300 shadow-sm ${
-              theme === 'light'
-                ? 'bg-gray-900 text-white hover:bg-gray-800'
-                : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+            aria-pressed={isCanvasDark}
+            className={`w-full px-4 py-2.5 rounded font-semibold transition-all duration-300 shadow-sm border ${
+              isCanvasDark
+                ? 'bg-gray-100 text-gray-900 border-gray-300 hover:bg-white'
+                : 'bg-gray-900 text-white border-gray-900 hover:bg-gray-800'
             }`}
           >
-            {theme === 'light' ? 'מצב כהה' : 'מצב בהיר'}
+            {isCanvasDark ? 'עבור למצב בהיר' : 'עבור למצב כהה'}
           </button>
+          <div className="mt-2 text-center text-xs font-medium text-indigo-600 dark:text-indigo-300">
+            כרגע: {isCanvasDark ? 'שקפים כהים' : 'שקפים בהירים'}
+          </div>
         </div>
 
         <div className="mb-6">
           <CopilotWidget 
             slides={localSlides}
-            template={template}
+            template={activeSlideTemplate}
             globalFont={globalFont}
             brandColor={activeBrandColor}
             theme={theme}
@@ -320,10 +610,11 @@ export default function CarouselRenderer({
                 setLocalSlides(newSlides);
               }
             }}
-            onChangeTemplate={(tpl) => setTemplate(tpl)}
+            onChangeTemplate={handleChangeTemplateFromCopilot}
             onChangeFont={(font) => setGlobalFont(font)}
             onChangeColors={(color, newTheme) => {
-              console.log('Copilot tried to change color:', color, newTheme);
+              if (color) setActiveBrandColor(color);
+              if (newTheme === 'light' || newTheme === 'dark') setTheme(newTheme);
             }}
           />
         </div>
@@ -341,7 +632,12 @@ export default function CarouselRenderer({
                     : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
                 }`}
               >
-                <div className="font-bold text-sm text-gray-600 dark:text-gray-400">שקף {i + 1}</div>
+                <div className="flex items-center justify-between gap-2 mb-0.5">
+                  <div className="font-bold text-sm text-gray-600 dark:text-gray-400">שקף {i + 1}</div>
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 shrink-0">
+                    {isImageTemplate(getSlideTemplate(slide)) ? 'עם תמונה' : 'טקסט'}
+                  </span>
+                </div>
                 <div className="text-sm text-gray-800 dark:text-gray-200 truncate">{slide.text}</div>
               </div>
             ))}
@@ -382,8 +678,12 @@ export default function CarouselRenderer({
           </div>
         </div>
 
-        {/* Canvas Area */}
-        <div className="flex-1 flex justify-center items-center p-8 overflow-auto bg-gray-100 dark:bg-gray-900 relative">
+        {/* Canvas Area — background follows canvas theme (not next-themes) */}
+        <div
+          className={`flex-1 flex justify-center items-center p-8 overflow-auto relative transition-colors duration-300 ${
+            isCanvasDark ? 'bg-gray-950' : 'bg-gray-200'
+          }`}
+        >
           {localSlides.map((slide, i) => (
             <div key={slide.id} className={`transition-opacity duration-300 ${i === activeSlideIndex ? 'block opacity-100' : 'hidden opacity-0'}`}>
               <canvas 
@@ -411,7 +711,7 @@ export default function CarouselRenderer({
               🗑️ מחק שקף זה
             </button>
           </div>
-\n          <SlideEditor
+          <SlideEditor
                 slide={localSlides[activeSlideIndex]}
                 index={activeSlideIndex}
                 canvasRef={{ current: null }}
@@ -433,15 +733,27 @@ export default function CarouselRenderer({
                   setLocalSlides(newSlides);
                 }}
                 onImageUpload={(base64) => {
-                  const newSlides = [...localSlides];
-                  newSlides[activeSlideIndex] = { ...newSlides[activeSlideIndex], imageUrl: base64 };
-                  setLocalSlides(newSlides);
-                  
-                  if (!template.startsWith('image-')) {
-                    setTemplate('image-split');
-                    
+                  setLocalSlides((prev) => {
+                    const newSlides = [...prev];
+                    const current = newSlides[activeSlideIndex];
+                    if (!current) return prev;
+
+                    const currentTpl = getSlideTemplate(current);
+                    const nextTemplate = isImageTemplate(currentTpl)
+                      ? currentTpl
+                      : DEFAULT_IMAGE_TEMPLATE;
+
+                    newSlides[activeSlideIndex] = {
+                      ...current,
+                      imageUrl: base64,
+                      template: nextTemplate,
+                    };
+                    return newSlides;
+                  });
+
+                  if (!isImageTemplate(activeSlideTemplate)) {
                     const toast = document.createElement('div');
-                    toast.innerText = 'התבנית הוחלפה אוטומטית כדי לתמוך בתמונה!';
+                    toast.innerText = 'תבנית השקף הוחלפה אוטומטית כדי לתמוך בתמונה';
                     toast.className = 'fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded-full shadow-lg z-50 text-sm font-bold animate-bounce';
                     document.body.appendChild(toast);
                     setTimeout(() => toast.remove(), 4000);

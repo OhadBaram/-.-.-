@@ -33,8 +33,10 @@
 DATABASE_URL="postgresql://user:password@localhost:5432/db"
 NEXTAUTH_URL="http://localhost:3000"
 NEXTAUTH_SECRET="your_secret_key"
-GOOGLE_CLIENT_ID="your_google_id"
-GOOGLE_CLIENT_SECRET="your_google_secret"
+EMAIL_FROM="קרוסל.איי.אי <noreply@yourdomain.com>"
+RESEND_API_KEY="re_xxxxxxxx"
+# או במקום Resend:
+# EMAIL_SERVER="smtp://user:pass@smtp.example.com:587"
 GEMINI_API_KEY="your_gemini_key"
 OPENROUTER_API_KEY="your_openrouter_key"
 UPSTASH_REDIS_REST_URL="your_upstash_url"

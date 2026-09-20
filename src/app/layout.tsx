@@ -15,11 +15,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="he" dir="rtl">
-      <body className="antialiased min-h-screen flex flex-col">
+    <html lang="he" dir="rtl" suppressHydrationWarning>
+      <body className="antialiased min-h-screen flex flex-col bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
         <Providers>
           <div className="flex-grow">{children}</div>
-          <footer className="w-full py-6 text-center text-sm text-gray-500 bg-gray-50 border-t border-gray-200">
+          <footer className="w-full py-6 text-center text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 transition-colors duration-300">
             <div className="mb-2">© {new Date().getFullYear()} קרוסל. איי. אי מבית בינה לתעשייה. כל הזכויות שמורות.</div>
             <div className="flex justify-center gap-4">
               <a href="/privacy" className="hover:underline">מדיניות פרטיות</a>

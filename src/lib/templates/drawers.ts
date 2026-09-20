@@ -152,14 +152,15 @@ export function drawGradient(
   H: number,
   text: string,
   brandColor: string,
-  _isDark: boolean,
+  isDark: boolean,
   override?: SlideOverride,
   fontFamily: string = 'Heebo, sans-serif'
 ) {
-  const darker = darkenHex(brandColor, 70);
+  const top = isDark ? darkenHex(brandColor, 90) : brandColor;
+  const bottom = isDark ? darkenHex(brandColor, 140) : darkenHex(brandColor, 70);
   const grad = ctx.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, brandColor);
-  grad.addColorStop(1, darker);
+  grad.addColorStop(0, top);
+  grad.addColorStop(1, bottom);
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H);
 
@@ -179,12 +180,14 @@ export function drawDarkLuxury(
   H: number,
   text: string,
   _brandColor: string,
-  _isDark: boolean,
+  isDark: boolean,
   override?: SlideOverride,
   fontFamily: string = 'Heebo, sans-serif'
 ) {
   const gold = '#D4AF37';
-  ctx.fillStyle = '#0a0a0a';
+  const bg = isDark ? '#0a0a0a' : '#f7f3e8';
+  const fg = isDark ? '#ffffff' : '#1a1a1a';
+  ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
   ctx.strokeStyle = gold;
@@ -200,7 +203,7 @@ export function drawDarkLuxury(
   const lh = Math.round(fs * 1.27);
   const startY = override?.textY !== undefined ? (H * override.textY) / 100 : H / 2 - 60;
 
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = fg;
   ctx.font = `bold ${fs}px serif`;
   ctx.textBaseline = 'middle';
   drawWrappedText(ctx, text, W / 2, startY, W - 200, lh);
@@ -281,16 +284,16 @@ export function drawStory(
   H: number,
   text: string,
   brandColor: string,
-  _isDark: boolean,
+  isDark: boolean,
   override?: SlideOverride,
   fontFamily: string = 'Heebo, sans-serif'
 ) {
-  ctx.fillStyle = brandColor;
+  ctx.fillStyle = isDark ? darkenHex(brandColor, 50) : brandColor;
   ctx.fillRect(0, 0, W, H);
 
   const overlay = ctx.createLinearGradient(0, 0, 0, H);
-  overlay.addColorStop(0, 'rgba(0,0,0,0.1)');
-  overlay.addColorStop(1, 'rgba(0,0,0,0.7)');
+  overlay.addColorStop(0, isDark ? 'rgba(0,0,0,0.25)' : 'rgba(0,0,0,0.05)');
+  overlay.addColorStop(1, isDark ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.55)');
   ctx.fillStyle = overlay;
   ctx.fillRect(0, 0, W, H);
 
@@ -346,7 +349,8 @@ export function drawNumbered(
   brandColor: string,
   isDark: boolean,
   slideIndex: number,
-  override?: SlideOverride
+  override?: SlideOverride,
+  fontFamily: string = 'Heebo, sans-serif'
 ) {
   const bg = isDark ? '#111827' : '#ffffff';
   const fg = isDark ? '#f9fafb' : '#111827';
@@ -479,11 +483,11 @@ export function drawNeon(
   H: number,
   text: string,
   brandColor: string,
-  _isDark: boolean,
+  isDark: boolean,
   override?: SlideOverride,
   fontFamily: string = 'Heebo, sans-serif'
 ) {
-  ctx.fillStyle = '#000000';
+  ctx.fillStyle = isDark ? '#000000' : '#f3f4f6';
   ctx.fillRect(0, 0, W, H);
 
   const fs = override?.fontSize ?? 70;
@@ -491,8 +495,8 @@ export function drawNeon(
   const startY = override?.textY !== undefined ? (H * override.textY) / 100 : H / 2 - 60;
 
   ctx.shadowColor = brandColor;
-  ctx.shadowBlur = 30;
-  ctx.fillStyle = '#ffffff';
+  ctx.shadowBlur = isDark ? 30 : 12;
+  ctx.fillStyle = isDark ? '#ffffff' : brandColor;
   ctx.font = `bold ${fs}px ${fontFamily}`;
   ctx.textBaseline = 'middle';
   drawWrappedText(ctx, text, W / 2, startY, W - 140, lh);
@@ -512,7 +516,7 @@ export async function drawImageSplit(
   text: string,
   brandColor: string,
   isDark: boolean,
-  override: SlideOverride,
+  override: SlideOverride = {},
   imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
 ): Promise<void> {
   const splitY = H * 0.65;
@@ -541,17 +545,12 @@ export async function drawImageSplit(
     }
     ctx.drawImage(img, offsetX, offsetY, renderW, renderH);
   } else {
-    ctx.fillStyle = isDark ? '#1f2937' : '#e2e8f0';
-    ctx.fillRect(0, 0, W, splitY);
-    // Draw placeholder icon/text
-    ctx.fillStyle = isDark ? '#4b5563' : '#94a3b8';
-    ctx.font = `bold 48px ${fontFamily}`;
-    ctx.textAlign = 'center';
-    ctx.fillText('אין תמונה', W / 2, splitY / 2);
+    drawImagePlacementMarker(ctx, 0, 0, W, splitY, isDark, fontFamily);
+    strokeImagePlacementOutline(ctx, 0, 0, W, splitY, isDark);
   }
 
-  // Draw bottom split
-  ctx.fillStyle = brandColor;
+  // Draw bottom split — darken brand panel in canvas dark mode
+  ctx.fillStyle = isDark ? darkenHex(brandColor, 55) : brandColor;
   ctx.fillRect(0, splitY, W, H - splitY);
 
   // Draw Text
@@ -561,9 +560,96 @@ export async function drawImageSplit(
   
   // Custom Y or default to center of bottom split
   const defaultTextY = splitY + ((H - splitY) / 2);
-  const textY = override.textY ? (H * (override.textY / 100)) : defaultTextY;
+  const textY = override.textY !== undefined ? (H * (override.textY / 100)) : defaultTextY;
   
   drawWrappedText(ctx, text, W / 2, textY, W * 0.85, fontSize * 1.4);
+}
+
+/** Builds a clip path only (no clip()). Used by drawImageOrPlaceholder. */
+type ClipPathBuilder = () => void;
+
+function drawCameraGlyph(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  scale: number,
+  color: string
+) {
+  const bodyW = 70 * scale;
+  const bodyH = 48 * scale;
+  const lensR = 14 * scale;
+
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = Math.max(2, 3 * scale);
+  ctx.lineJoin = 'round';
+
+  ctx.strokeRect(cx - bodyW / 2, cy - bodyH / 2, bodyW, bodyH);
+  ctx.beginPath();
+  ctx.arc(cx, cy + 2 * scale, lensR, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillRect(cx - 14 * scale, cy - bodyH / 2 - 10 * scale, 28 * scale, 10 * scale);
+}
+
+function drawImagePlacementMarker(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  isDark: boolean,
+  fontFamily: string,
+  buildPath?: ClipPathBuilder
+) {
+  const accent = isDark ? '#9ca3af' : '#64748b';
+  const fill = isDark ? '#1f2937' : '#e2e8f0';
+  const labelFs = Math.max(22, Math.min(40, Math.floor(Math.min(w, h) * 0.06)));
+  const iconScale = Math.max(0.55, Math.min(1.2, Math.min(w, h) / 500));
+
+  // Fill (clipped by caller when buildPath is used)
+  ctx.fillStyle = fill;
+  if (buildPath) {
+    buildPath();
+    ctx.fill();
+  } else {
+    ctx.fillRect(x, y, w, h);
+  }
+
+  const cx = x + w / 2;
+  const cy = y + h / 2 - labelFs * 0.55;
+  drawCameraGlyph(ctx, cx, cy, iconScale, accent);
+
+  const bodyH = 48 * iconScale;
+  ctx.fillStyle = accent;
+  ctx.font = `bold ${labelFs}px ${fontFamily}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.direction = 'rtl';
+  ctx.fillText('כאן תופיע התמונה', cx, cy + bodyH / 2 + 14 * iconScale);
+}
+
+function strokeImagePlacementOutline(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  isDark: boolean,
+  buildPath?: ClipPathBuilder
+) {
+  const accent = isDark ? '#9ca3af' : '#64748b';
+  ctx.save();
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = Math.max(3, Math.min(w, h) * 0.01);
+  ctx.setLineDash([16, 12]);
+  if (buildPath) {
+    buildPath();
+    ctx.stroke();
+  } else {
+    const inset = Math.max(10, Math.min(w, h) * 0.025);
+    ctx.strokeRect(x + inset, y + inset, w - inset * 2, h - inset * 2);
+  }
+  ctx.restore();
 }
 
 export async function drawImageOrPlaceholder(
@@ -574,11 +660,13 @@ export async function drawImageOrPlaceholder(
   w: number,
   h: number,
   isDark: boolean,
-  clipPath?: () => void
+  clipPath?: ClipPathBuilder,
+  fontFamily: string = 'Heebo, sans-serif'
 ) {
   ctx.save();
   if (clipPath) {
     clipPath();
+    ctx.clip();
   } else {
     ctx.beginPath();
     ctx.rect(x, y, w, h);
@@ -610,16 +698,13 @@ export async function drawImageOrPlaceholder(
       }
     }
     ctx.drawImage(img, x + offsetX, y + offsetY, renderW, renderH);
+    ctx.restore();
   } else {
-    ctx.fillStyle = isDark ? '#1f2937' : '#e2e8f0';
-    ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = isDark ? '#4b5563' : '#94a3b8';
-    ctx.font = `bold 48px ${fontFamily}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('אין תמונה', x + w / 2, y + h / 2);
+    drawImagePlacementMarker(ctx, x, y, w, h, isDark, fontFamily, clipPath);
+    ctx.restore();
+    // Outline after restore so dashed border isn't half-clipped away
+    strokeImagePlacementOutline(ctx, x, y, w, h, isDark, clipPath);
   }
-  ctx.restore();
 }
 
 export async function drawImageFullDark(
@@ -629,16 +714,19 @@ export async function drawImageFullDark(
   text: string,
   brandColor: string,
   isDark: boolean,
-  override: SlideOverride,
+  override: SlideOverride = {},
   imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
 ): Promise<void> {
-  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, H, isDark);
+  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, H, isDark, undefined, fontFamily);
   
   const grad = ctx.createLinearGradient(0, 0, 0, H);
   grad.addColorStop(0, 'rgba(0,0,0,0)');
-  grad.addColorStop(1, 'rgba(0,0,0,0.8)');
+  grad.addColorStop(1, isDark ? 'rgba(0,0,0,0.88)' : 'rgba(0,0,0,0.55)');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H);
+
+  ctx.fillStyle = isDark ? darkenHex(brandColor, 40) : brandColor;
+  ctx.fillRect(0, H - 16, W, 16);
 
   const fontSize = override.fontSize ?? 64;
   ctx.font = `bold ${fontSize}px ${fontFamily}`;
@@ -657,10 +745,10 @@ export async function drawImageCircle(
   text: string,
   brandColor: string,
   isDark: boolean,
-  override: SlideOverride,
+  override: SlideOverride = {},
   imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
 ): Promise<void> {
-  ctx.fillStyle = brandColor;
+  ctx.fillStyle = isDark ? darkenHex(brandColor, 50) : brandColor;
   ctx.fillRect(0, 0, W, H);
 
   const radius = 250;
@@ -670,8 +758,7 @@ export async function drawImageCircle(
   await drawImageOrPlaceholder(ctx, imageUrl, cx - radius, cy - radius, radius * 2, radius * 2, isDark, () => {
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.clip();
-  });
+  }, fontFamily);
 
   const fontSize = override.fontSize ?? 64;
   ctx.font = `bold ${fontSize}px ${fontFamily}`;
@@ -690,15 +777,15 @@ export async function drawImageSplitBottom(
   text: string,
   brandColor: string,
   isDark: boolean,
-  override: SlideOverride,
+  override: SlideOverride = {},
   imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
 ): Promise<void> {
   const splitY = H * 0.35;
   
-  ctx.fillStyle = brandColor;
+  ctx.fillStyle = isDark ? darkenHex(brandColor, 50) : brandColor;
   ctx.fillRect(0, 0, W, splitY);
   
-  await drawImageOrPlaceholder(ctx, imageUrl, 0, splitY, W, H - splitY, isDark);
+  await drawImageOrPlaceholder(ctx, imageUrl, 0, splitY, W, H - splitY, isDark, undefined, fontFamily);
 
   const fontSize = override.fontSize ?? 64;
   ctx.font = `bold ${fontSize}px ${fontFamily}`;
@@ -717,7 +804,7 @@ export async function drawImagePolaroid(
   text: string,
   brandColor: string,
   isDark: boolean,
-  override: SlideOverride,
+  override: SlideOverride = {},
   imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
 ): Promise<void> {
   const bg = isDark ? '#111827' : '#f9fafb';
@@ -742,7 +829,7 @@ export async function drawImagePolaroid(
   const imgW = pw - margin * 2;
   const imgH = ph - margin - bottomMargin;
   
-  await drawImageOrPlaceholder(ctx, imageUrl, px + margin, py + margin, imgW, imgH, isDark);
+  await drawImageOrPlaceholder(ctx, imageUrl, px + margin, py + margin, imgW, imgH, isDark, undefined, fontFamily);
 
   const fontSize = override.fontSize ?? 48;
   ctx.font = `bold ${fontSize}px ${fontFamily}`;
@@ -761,13 +848,13 @@ export async function drawImageSide(
   text: string,
   brandColor: string,
   isDark: boolean,
-  override: SlideOverride,
+  override: SlideOverride = {},
   imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
 ): Promise<void> {
-  ctx.fillStyle = brandColor;
+  ctx.fillStyle = isDark ? darkenHex(brandColor, 50) : brandColor;
   ctx.fillRect(0, 0, W / 2, H);
 
-  await drawImageOrPlaceholder(ctx, imageUrl, W / 2, 0, W / 2, H, isDark);
+  await drawImageOrPlaceholder(ctx, imageUrl, W / 2, 0, W / 2, H, isDark, undefined, fontFamily);
 
   const fontSize = override.fontSize ?? 54;
   ctx.font = `bold ${fontSize}px ${fontFamily}`;
@@ -786,7 +873,7 @@ export async function drawImageMagazine(
   text: string,
   brandColor: string,
   isDark: boolean,
-  override: SlideOverride,
+  override: SlideOverride = {},
   imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
 ): Promise<void> {
   const splitY = H * 0.8;
@@ -795,7 +882,7 @@ export async function drawImageMagazine(
   ctx.fillStyle = bg;
   ctx.fillRect(0, splitY, W, H - splitY);
 
-  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, splitY, isDark);
+  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, splitY, isDark, undefined, fontFamily);
 
   const fontSize = override.fontSize ?? 90;
   ctx.font = `bold ${fontSize}px ${fontFamily}`;
@@ -814,13 +901,13 @@ export async function drawImageOverlay(
   text: string,
   brandColor: string,
   isDark: boolean,
-  override: SlideOverride,
+  override: SlideOverride = {},
   imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
 ): Promise<void> {
-  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, H, isDark);
+  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, H, isDark, undefined, fontFamily);
   
-  ctx.globalAlpha = 0.6;
-  ctx.fillStyle = brandColor;
+  ctx.globalAlpha = isDark ? 0.72 : 0.5;
+  ctx.fillStyle = isDark ? darkenHex(brandColor, 60) : brandColor;
   ctx.fillRect(0, 0, W, H);
   ctx.globalAlpha = 1.0;
 
@@ -841,7 +928,7 @@ export async function drawImageArch(
   text: string,
   brandColor: string,
   isDark: boolean,
-  override: SlideOverride,
+  override: SlideOverride = {},
   imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
 ): Promise<void> {
   const bg = isDark ? '#111827' : '#f9fafb';
@@ -862,8 +949,7 @@ export async function drawImageArch(
     ctx.lineTo(ax + archW, ay + archH);
     ctx.lineTo(ax, ay + archH);
     ctx.closePath();
-    ctx.clip();
-  });
+  }, fontFamily);
 
   const fontSize = override.fontSize ?? 60;
   ctx.font = `bold ${fontSize}px ${fontFamily}`;
