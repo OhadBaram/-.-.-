@@ -43,6 +43,14 @@ async function sendVerificationRequest({
   url: string;
   provider: unknown;
 }) {
+  // Ensure verification token storage works before attempting to send mail.
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+  } catch (error) {
+    console.error('[auth] database unreachable before email send', error);
+    throw new Error('DATABASE_URL is missing or unreachable from Vercel.');
+  }
+
   const from = getEmailFrom();
   const resendKey = process.env.RESEND_API_KEY?.trim();
 
