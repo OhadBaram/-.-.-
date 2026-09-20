@@ -5,81 +5,204 @@ import { useRouter } from 'next/navigation';
 
 export default function OnboardingPage() {
   const router = useRouter();
+  
+  const [step, setStep] = useState(1);
+  
+  // Step 1: Personal
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  
+  // Step 2: URLs
+  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [referenceLink1, setReferenceLink1] = useState('');
+  
+  // Step 3: Analysis
+  const [brandIdentity, setBrandIdentity] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleNextStep1 = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!name || !phone) {
+      setError('יש למלא שם וטלפון');
+      return;
+    }
+    setError('');
+    setStep(2);
+  };
+
+  const handleNextStep2 = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
+    // If no URLs provided, just skip analysis and go to final save
+    if (!websiteUrl && !referenceLink1) {
+      handleFinalSave('');
+      return;
+    }
+
+    setStep(3);
+    setIsAnalyzing(true);
+    
+    try {
+      const res = await fetch('/api/analyze-brand', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ websiteUrl, referenceLink1 }),
+      });
+
+      if (!res.ok) throw new Error('שגיאה בניתוח המותג');
+      
+      const data = await res.json();
+      setBrandIdentity(data.brandIdentity || '');
+    } catch (err: any) {
+      console.error(err);
+      setError('לא הצלחנו לנתח את הקישורים. תוכל להזין את תיאור העסק ידנית.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleFinalSave = async (finalBrandIdentity = brandIdentity) => {
     setLoading(true);
     setError('');
 
     try {
       const res = await fetch('/api/user/onboard', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name, phone }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          name, 
+          phone,
+          websiteUrl,
+          referenceLink1,
+          brandIdentity: finalBrandIdentity
+        }),
       });
 
-      if (!res.ok) {
-        throw new Error('Failed to update profile');
-      }
+      if (!res.ok) throw new Error('Failed to save profile');
 
-      router.push('/dashboard');
+      router.push('/dashboard/create');
       router.refresh();
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message || 'An error occurred');
-      } else {
-        setError('An error occurred');
-      }
-    } finally {
+    } catch (err: any) {
+      setError(err.message || 'אירעה שגיאה בשמירת הנתונים');
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen p-8 flex items-center justify-center bg-gray-50" dir="rtl">
-      <div className="bg-white p-8 rounded shadow-md w-full max-w-md">
-        <h1 className="text-2xl font-bold mb-6 text-center">השלמת פרטים</h1>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
-          
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">שם מלא</label>
-            <input
-              type="text"
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring focus:ring-indigo-200"
-              required
-            />
+    <div className="min-h-screen p-4 md:p-8 flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50" dir="rtl">
+      <div className="bg-white p-6 md:p-8 rounded-3xl shadow-xl w-full max-w-lg border border-indigo-50">
+        
+        {/* Progress steps */}
+        <div className="flex justify-center mb-8">
+          <div className="flex items-center gap-2">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold transition-colors ${step >= 1 ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-100 text-gray-400'}`}>1</div>
+            <div className={`w-10 h-1 rounded transition-colors ${step >= 2 ? 'bg-indigo-600' : 'bg-gray-100'}`}></div>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold transition-colors ${step >= 2 ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-100 text-gray-400'}`}>2</div>
+            <div className={`w-10 h-1 rounded transition-colors ${step >= 3 ? 'bg-indigo-600' : 'bg-gray-100'}`}></div>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold transition-colors ${step >= 3 ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-100 text-gray-400'}`}>3</div>
           </div>
-          
-          <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">מספר טלפון</label>
-            <input
-              type="tel"
-              id="phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring focus:ring-indigo-200"
-              required
-            />
-          </div>
+        </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2 px-4 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {loading ? 'שומר...' : 'שמור והמשך'}
-          </button>
-        </form>
+        {error && <div className="text-red-600 text-sm mb-6 text-center bg-red-50 p-3 rounded-lg border border-red-100">{error}</div>}
+
+        {step === 1 && (
+          <form onSubmit={handleNextStep1} className="space-y-6 animate-fade-in">
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-black text-gray-900 mb-2">ברוך הבא! 👋</h1>
+              <p className="text-gray-500">בוא נכיר קצת לפני שנתחיל ליצור.</p>
+            </div>
+            
+            <div>
+              <label htmlFor="name" className="block text-sm font-bold text-gray-700 mb-2">איך קוראים לך?</label>
+              <input type="text" id="name" value={name} onChange={(e) => setName(e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 focus:bg-white transition-colors" placeholder="ישראל ישראלי" required />
+            </div>
+            
+            <div>
+              <label htmlFor="phone" className="block text-sm font-bold text-gray-700 mb-2">מה מספר הטלפון שלך?</label>
+              <input type="tel" id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-left bg-gray-50 focus:bg-white transition-colors" placeholder="050-0000000" dir="ltr" required />
+            </div>
+
+            <button type="submit" className="w-full py-4 px-4 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-md hover:shadow-lg mt-8">
+              המשך לשלב הבא
+            </button>
+          </form>
+        )}
+
+        {step === 2 && (
+          <form onSubmit={handleNextStep2} className="space-y-6 animate-fade-in">
+            <div className="text-center mb-8">
+              <div className="inline-block bg-indigo-50 text-indigo-700 font-bold px-3 py-1 rounded-full text-sm mb-3">למידת מותג אוטומטית</div>
+              <h1 className="text-2xl font-black text-gray-900 mb-3">תן ל-AI ללמוד אותך 🧠</h1>
+              <p className="text-gray-600 text-sm leading-relaxed">
+                <span className="font-bold text-indigo-600">שלב זה מומלץ מאוד (אך אופציונלי).</span><br/>
+                המערכת תקרא את האתר שלך ותלמד את הסגנון שלך כדי שכל קרוסלה תרגיש 100% אתה, ותחסוך לך שעות של דיוקים.
+              </p>
+            </div>
+            
+            <div className="space-y-5">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">כתובת אתר העסק</label>
+                <input type="url" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-left bg-gray-50 focus:bg-white transition-colors" placeholder="https://your-website.com" dir="ltr" />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">קישור לפוסט/קרוסלה אהובה באינסטגרם</label>
+                <input type="url" value={referenceLink1} onChange={(e) => setReferenceLink1(e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-left bg-gray-50 focus:bg-white transition-colors" placeholder="https://instagram.com/p/..." dir="ltr" />
+              </div>
+            </div>
+
+            <div className="flex gap-4 pt-4">
+              <button type="button" onClick={() => setStep(1)} className="w-1/3 py-4 px-4 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-colors">
+                חזור
+              </button>
+              <button type="submit" className="w-2/3 py-4 px-4 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-md">
+                {(websiteUrl || referenceLink1) ? 'נתח את המותג שלי ✨' : 'דלג והמשך'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {step === 3 && (
+          <div className="space-y-6 animate-fade-in">
+            {isAnalyzing ? (
+              <div className="py-12 text-center flex flex-col items-center">
+                <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-6"></div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">ה-AI קורא את האתר שלך...</h2>
+                <p className="text-gray-500">זה עשוי לקחת כ-15 שניות. אנו לומדים את שפת המותג וקהל היעד.</p>
+              </div>
+            ) : (
+              <>
+                <div className="text-center mb-6">
+                  <h1 className="text-2xl font-black text-gray-900 mb-2">הנה מה שלמדנו עליך 🎯</h1>
+                  <p className="text-gray-600 text-sm">זהו המידע שישמש את המערכת ליצירת התוכן שלך. תוכל לערוך ולדייק אותו עכשיו.</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">זהות המותג וטון הדיבור:</label>
+                  <textarea 
+                    value={brandIdentity} 
+                    onChange={(e) => setBrandIdentity(e.target.value)} 
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 focus:bg-white min-h-[150px] leading-relaxed resize-y"
+                    placeholder="תאר את העסק, קהל היעד והסגנון..."
+                  />
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button type="button" onClick={() => setStep(2)} className="w-1/3 py-4 px-4 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-colors">
+                    חזור
+                  </button>
+                  <button onClick={() => handleFinalSave()} disabled={loading} className="w-2/3 py-4 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-colors shadow-lg disabled:opacity-50">
+                    {loading ? 'שומר...' : 'שמור ובוא ניצור קרוסלה! 🚀'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
