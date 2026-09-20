@@ -124,6 +124,10 @@ const FONT_OPTIONS = [
   { id: 'Rubik', label: 'Rubik' },
   { id: 'Assistant', label: 'Assistant' },
   { id: 'Varela Round', label: 'Varela Round' },
+  { id: 'Playpen Sans Hebrew', label: 'Playpen Sans Hebrew' },
+  { id: 'Gveret Levin', label: 'Gveret Levin' },
+  { id: 'Solitreo', label: 'Solitreo' },
+  { id: 'Fredoka', label: 'Fredoka' },
 ] as const;
 
 function isImageTemplate(id: TemplateId): boolean {
@@ -278,33 +282,43 @@ export default function CarouselRenderer({
       const W               = CANVAS_WIDTH;
       const H               = CANVAS_HEIGHT;
       const text            = slide.text;
+      // Quote family names so multi-word fonts (e.g. Playpen Sans Hebrew) work in canvas.
+      const fontFamily      = `"${globalFont}", sans-serif`;
+
+      if (typeof document !== 'undefined' && document.fonts?.load) {
+        try {
+          await document.fonts.load(`700 64px "${globalFont}"`);
+        } catch {
+          /* font may still render via CSS fallback once available */
+        }
+      }
 
       ctx.shadowBlur  = 0;
       ctx.globalAlpha = 1;
 
       switch (tpl) {
-        case 'minimal':     drawMinimal    (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);              break;
-        case 'bold':        drawBold       (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);              break;
-        case 'gradient':    drawGradient   (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);              break;
-        case 'dark-luxury': drawDarkLuxury (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);              break;
-        case 'frame':       drawFrame      (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);              break;
-        case 'split':       drawSplit      (ctx, W, H, text, activeBrandColor, isDark, slideIndex, currentOverride, globalFont);  break;
-        case 'story':       drawStory      (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);              break;
-        case 'quote':       drawQuote      (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);              break;
-        case 'numbered':    drawNumbered   (ctx, W, H, text, activeBrandColor, isDark, slideIndex, currentOverride, globalFont);  break;
-        case 'magazine':    drawMagazine   (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);              break;
-        case 'waves':       drawWaves      (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);              break;
-        case 'neon':        drawNeon       (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);              break;
-        case 'image-split': await drawImageSplit(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
-        case 'image-full-dark': await drawImageFullDark(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
-        case 'image-circle-profile': await drawImageCircle(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
-        case 'image-split-bottom': await drawImageSplitBottom(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
-        case 'image-polaroid': await drawImagePolaroid(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
-        case 'image-side': await drawImageSide(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
-        case 'image-magazine': await drawImageMagazine(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
-        case 'image-overlay': await drawImageOverlay(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
-        case 'image-arch': await drawImageArch(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
-        default:            drawMinimal    (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);
+        case 'minimal':     drawMinimal    (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'bold':        drawBold       (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'gradient':    drawGradient   (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'dark-luxury': drawDarkLuxury (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'frame':       drawFrame      (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'split':       drawSplit      (ctx, W, H, text, activeBrandColor, isDark, slideIndex, currentOverride, fontFamily);  break;
+        case 'story':       drawStory      (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'quote':       drawQuote      (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'numbered':    drawNumbered   (ctx, W, H, text, activeBrandColor, isDark, slideIndex, currentOverride, fontFamily);  break;
+        case 'magazine':    drawMagazine   (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'waves':       drawWaves      (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'neon':        drawNeon       (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'image-split': await drawImageSplit(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, fontFamily); break;
+        case 'image-full-dark': await drawImageFullDark(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, fontFamily); break;
+        case 'image-circle-profile': await drawImageCircle(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, fontFamily); break;
+        case 'image-split-bottom': await drawImageSplitBottom(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, fontFamily); break;
+        case 'image-polaroid': await drawImagePolaroid(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, fontFamily); break;
+        case 'image-side': await drawImageSide(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, fontFamily); break;
+        case 'image-magazine': await drawImageMagazine(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, fontFamily); break;
+        case 'image-overlay': await drawImageOverlay(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, fontFamily); break;
+        case 'image-arch': await drawImageArch(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, fontFamily); break;
+        default:            drawMinimal    (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);
       }
 
       if (generation !== undefined && generation !== drawGenerationRef.current) return;

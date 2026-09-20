@@ -54,7 +54,7 @@ export async function POST(req: Request) {
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
-          fontFamily: { type: SchemaType.STRING, description: 'The new font family name (Heebo, Assistant, Rubik, Varela Round).' }
+          fontFamily: { type: SchemaType.STRING, description: 'The new font family name (Heebo, Assistant, Rubik, Varela Round, Playpen Sans Hebrew, Gveret Levin, Solitreo, Fredoka).' }
         },
         required: ['fontFamily']
       }
