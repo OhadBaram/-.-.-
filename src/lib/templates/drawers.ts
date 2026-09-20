@@ -517,7 +517,9 @@ export async function drawImageSplit(
   brandColor: string,
   isDark: boolean,
   override: SlideOverride = {},
-  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
+  imageUrl?: string,
+  fontFamily: string = 'Heebo, sans-serif',
+  shouldAbort?: () => boolean
 ): Promise<void> {
   const splitY = H * 0.65;
 
@@ -529,6 +531,7 @@ export async function drawImageSplit(
       img.onload = resolve;
       img.onerror = resolve;
     });
+    if (shouldAbort?.()) return;
     // object-fit: cover equivalent for canvas
     const imgRatio = img.width / img.height;
     const canvasRatio = W / splitY;
@@ -661,7 +664,8 @@ export async function drawImageOrPlaceholder(
   h: number,
   isDark: boolean,
   clipPath?: ClipPathBuilder,
-  fontFamily: string = 'Heebo, sans-serif'
+  fontFamily: string = 'Heebo, sans-serif',
+  shouldAbort?: () => boolean
 ) {
   ctx.save();
   if (clipPath) {
@@ -681,6 +685,10 @@ export async function drawImageOrPlaceholder(
       img.onload = resolve;
       img.onerror = resolve;
     });
+    if (shouldAbort?.()) {
+      ctx.restore();
+      return;
+    }
     
     let renderW = w;
     let renderH = h;
@@ -715,9 +723,10 @@ export async function drawImageFullDark(
   brandColor: string,
   isDark: boolean,
   override: SlideOverride = {},
-  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
+  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif', shouldAbort?: () => boolean
 ): Promise<void> {
-  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, H, isDark, undefined, fontFamily);
+  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, H, isDark, undefined, fontFamily, shouldAbort);
+  if (shouldAbort?.()) return;
   
   const grad = ctx.createLinearGradient(0, 0, 0, H);
   grad.addColorStop(0, 'rgba(0,0,0,0)');
@@ -746,7 +755,7 @@ export async function drawImageCircle(
   brandColor: string,
   isDark: boolean,
   override: SlideOverride = {},
-  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
+  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif', shouldAbort?: () => boolean
 ): Promise<void> {
   ctx.fillStyle = isDark ? darkenHex(brandColor, 50) : brandColor;
   ctx.fillRect(0, 0, W, H);
@@ -758,7 +767,8 @@ export async function drawImageCircle(
   await drawImageOrPlaceholder(ctx, imageUrl, cx - radius, cy - radius, radius * 2, radius * 2, isDark, () => {
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-  }, fontFamily);
+  }, fontFamily, shouldAbort);
+  if (shouldAbort?.()) return;
 
   const fontSize = override.fontSize ?? 64;
   ctx.font = `bold ${fontSize}px ${fontFamily}`;
@@ -778,14 +788,15 @@ export async function drawImageSplitBottom(
   brandColor: string,
   isDark: boolean,
   override: SlideOverride = {},
-  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
+  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif', shouldAbort?: () => boolean
 ): Promise<void> {
   const splitY = H * 0.35;
   
   ctx.fillStyle = isDark ? darkenHex(brandColor, 50) : brandColor;
   ctx.fillRect(0, 0, W, splitY);
   
-  await drawImageOrPlaceholder(ctx, imageUrl, 0, splitY, W, H - splitY, isDark, undefined, fontFamily);
+  await drawImageOrPlaceholder(ctx, imageUrl, 0, splitY, W, H - splitY, isDark, undefined, fontFamily, shouldAbort);
+  if (shouldAbort?.()) return;
 
   const fontSize = override.fontSize ?? 64;
   ctx.font = `bold ${fontSize}px ${fontFamily}`;
@@ -805,7 +816,7 @@ export async function drawImagePolaroid(
   brandColor: string,
   isDark: boolean,
   override: SlideOverride = {},
-  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
+  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif', shouldAbort?: () => boolean
 ): Promise<void> {
   const bg = isDark ? '#111827' : '#f9fafb';
   ctx.fillStyle = bg;
@@ -829,7 +840,8 @@ export async function drawImagePolaroid(
   const imgW = pw - margin * 2;
   const imgH = ph - margin - bottomMargin;
   
-  await drawImageOrPlaceholder(ctx, imageUrl, px + margin, py + margin, imgW, imgH, isDark, undefined, fontFamily);
+  await drawImageOrPlaceholder(ctx, imageUrl, px + margin, py + margin, imgW, imgH, isDark, undefined, fontFamily, shouldAbort);
+  if (shouldAbort?.()) return;
 
   const fontSize = override.fontSize ?? 48;
   ctx.font = `bold ${fontSize}px ${fontFamily}`;
@@ -849,12 +861,13 @@ export async function drawImageSide(
   brandColor: string,
   isDark: boolean,
   override: SlideOverride = {},
-  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
+  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif', shouldAbort?: () => boolean
 ): Promise<void> {
   ctx.fillStyle = isDark ? darkenHex(brandColor, 50) : brandColor;
   ctx.fillRect(0, 0, W / 2, H);
 
-  await drawImageOrPlaceholder(ctx, imageUrl, W / 2, 0, W / 2, H, isDark, undefined, fontFamily);
+  await drawImageOrPlaceholder(ctx, imageUrl, W / 2, 0, W / 2, H, isDark, undefined, fontFamily, shouldAbort);
+  if (shouldAbort?.()) return;
 
   const fontSize = override.fontSize ?? 54;
   ctx.font = `bold ${fontSize}px ${fontFamily}`;
@@ -874,7 +887,7 @@ export async function drawImageMagazine(
   brandColor: string,
   isDark: boolean,
   override: SlideOverride = {},
-  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
+  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif', shouldAbort?: () => boolean
 ): Promise<void> {
   const splitY = H * 0.8;
   
@@ -882,7 +895,8 @@ export async function drawImageMagazine(
   ctx.fillStyle = bg;
   ctx.fillRect(0, splitY, W, H - splitY);
 
-  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, splitY, isDark, undefined, fontFamily);
+  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, splitY, isDark, undefined, fontFamily, shouldAbort);
+  if (shouldAbort?.()) return;
 
   const fontSize = override.fontSize ?? 90;
   ctx.font = `bold ${fontSize}px ${fontFamily}`;
@@ -902,9 +916,10 @@ export async function drawImageOverlay(
   brandColor: string,
   isDark: boolean,
   override: SlideOverride = {},
-  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
+  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif', shouldAbort?: () => boolean
 ): Promise<void> {
-  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, H, isDark, undefined, fontFamily);
+  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, H, isDark, undefined, fontFamily, shouldAbort);
+  if (shouldAbort?.()) return;
   
   ctx.globalAlpha = isDark ? 0.72 : 0.5;
   ctx.fillStyle = isDark ? darkenHex(brandColor, 60) : brandColor;
@@ -929,7 +944,7 @@ export async function drawImageArch(
   brandColor: string,
   isDark: boolean,
   override: SlideOverride = {},
-  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif'
+  imageUrl?: string, fontFamily: string = 'Heebo, sans-serif', shouldAbort?: () => boolean
 ): Promise<void> {
   const bg = isDark ? '#111827' : '#f9fafb';
   ctx.fillStyle = bg;
@@ -949,7 +964,8 @@ export async function drawImageArch(
     ctx.lineTo(ax + archW, ay + archH);
     ctx.lineTo(ax, ay + archH);
     ctx.closePath();
-  }, fontFamily);
+  }, fontFamily, shouldAbort);
+  if (shouldAbort?.()) return;
 
   const fontSize = override.fontSize ?? 60;
   ctx.font = `bold ${fontSize}px ${fontFamily}`;

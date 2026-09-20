@@ -139,10 +139,36 @@ function getSlideTemplate(slide: Slide): TemplateId {
 }
 
 function withDefaultTemplates(slides: Slide[], fallback: TemplateId = DEFAULT_TEXT_TEMPLATE): Slide[] {
-  return slides.map((slide) => ({
+  // שיבוט עמוק ברמת השקף — מונע שיתוף מקרי של אותו אובייקט בין שקפים
+  return slides.map((slide, index) => ({
     ...slide,
+    id: slide.id != null && String(slide.id).length > 0 ? String(slide.id) : `slide-${index + 1}`,
+    text: slide.text,
+    backgroundColor: slide.backgroundColor,
+    textColor: slide.textColor,
+    imageUrl: slide.imageUrl,
     template: slide.template ?? fallback,
   }));
+}
+
+/** מעדכן תמונה לשקף אחד בלבד — לא נוגע בשאר השקפים */
+export function setSlideImageAt(
+  slides: Slide[],
+  slideIndex: number,
+  imageUrl: string | undefined,
+  fallbackImageTemplate: TemplateId = DEFAULT_IMAGE_TEMPLATE
+): Slide[] {
+  if (slideIndex < 0 || slideIndex >= slides.length) return slides;
+  return slides.map((slide, i) => {
+    if (i !== slideIndex) return slide;
+    const currentTpl = getSlideTemplate(slide);
+    const nextTemplate = isImageTemplate(currentTpl) ? currentTpl : fallbackImageTemplate;
+    return {
+      ...slide,
+      imageUrl,
+      template: imageUrl ? nextTemplate : currentTpl,
+    };
+  });
 }
 
 function slideWantsImageForPreset(
@@ -275,7 +301,9 @@ export default function CarouselRenderer({
     ) => {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-      if (generation !== undefined && generation !== drawGenerationRef.current) return;
+      const isStale = () =>
+        generation !== undefined && generation !== drawGenerationRef.current;
+      if (isStale()) return;
 
       const currentOverride = override ?? slideOverrides[slideIndex] ?? {};
       const isDark          = theme === 'dark';
@@ -284,6 +312,8 @@ export default function CarouselRenderer({
       const text            = slide.text;
       // Quote family names so multi-word fonts (e.g. Playpen Sans Hebrew) work in canvas.
       const fontFamily      = `"${globalFont}", sans-serif`;
+      // רק תמונת השקף הנוכחי — אין נפילה לתמונה של שקף אחר
+      const slideImageUrl   = slide.imageUrl;
 
       if (typeof document !== 'undefined' && document.fonts?.load) {
         try {
@@ -293,6 +323,8 @@ export default function CarouselRenderer({
         }
       }
 
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, W, H);
       ctx.shadowBlur  = 0;
       ctx.globalAlpha = 1;
 
@@ -309,19 +341,19 @@ export default function CarouselRenderer({
         case 'magazine':    drawMagazine   (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
         case 'waves':       drawWaves      (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
         case 'neon':        drawNeon       (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
-        case 'image-split': await drawImageSplit(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, fontFamily); break;
-        case 'image-full-dark': await drawImageFullDark(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, fontFamily); break;
-        case 'image-circle-profile': await drawImageCircle(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, fontFamily); break;
-        case 'image-split-bottom': await drawImageSplitBottom(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, fontFamily); break;
-        case 'image-polaroid': await drawImagePolaroid(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, fontFamily); break;
-        case 'image-side': await drawImageSide(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, fontFamily); break;
-        case 'image-magazine': await drawImageMagazine(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, fontFamily); break;
-        case 'image-overlay': await drawImageOverlay(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, fontFamily); break;
-        case 'image-arch': await drawImageArch(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, fontFamily); break;
+        case 'image-split': await drawImageSplit(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-full-dark': await drawImageFullDark(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-circle-profile': await drawImageCircle(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-split-bottom': await drawImageSplitBottom(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-polaroid': await drawImagePolaroid(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-side': await drawImageSide(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-magazine': await drawImageMagazine(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-overlay': await drawImageOverlay(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-arch': await drawImageArch(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
         default:            drawMinimal    (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);
       }
 
-      if (generation !== undefined && generation !== drawGenerationRef.current) return;
+      if (isStale()) return;
     },
     [theme, activeBrandColor, slideOverrides, globalFont]
   );
@@ -363,6 +395,25 @@ export default function CarouselRenderer({
     setLocalSlides((prev) =>
       prev.map((slide, i) => (i === index ? { ...slide, template: nextTemplate } : slide))
     );
+  };
+
+  const handleSlideImageUpload = (slideIndex: number, base64: string) => {
+    setLocalSlides((prev) => {
+      const before = prev[slideIndex];
+      const wasImageTpl = before ? isImageTemplate(getSlideTemplate(before)) : true;
+      if (!wasImageTpl) {
+        const toast = document.createElement('div');
+        toast.innerText = 'תבנית השקף הוחלפה אוטומטית כדי לתמוך בתמונה';
+        toast.className = 'fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded-full shadow-lg z-50 text-sm font-bold animate-bounce';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+      }
+      return setSlideImageAt(prev, slideIndex, base64);
+    });
+  };
+
+  const handleSlideImageClear = (slideIndex: number) => {
+    setLocalSlides((prev) => setSlideImageAt(prev, slideIndex, undefined));
   };
 
   const applyLayoutPreset = (preset: Exclude<CarouselLayoutPresetId, 'custom'>) => {
@@ -649,7 +700,11 @@ export default function CarouselRenderer({
                 <div className="flex items-center justify-between gap-2 mb-0.5">
                   <div className="font-bold text-sm text-gray-600 dark:text-gray-400">שקף {i + 1}</div>
                   <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 shrink-0">
-                    {isImageTemplate(getSlideTemplate(slide)) ? 'עם תמונה' : 'טקסט'}
+                    {isImageTemplate(getSlideTemplate(slide))
+                      ? slide.imageUrl
+                        ? 'תמונה הועלתה'
+                        : 'ממתין לתמונה'
+                      : 'טקסט'}
                   </span>
                 </div>
                 <div className="text-sm text-gray-800 dark:text-gray-200 truncate">{slide.text}</div>
@@ -699,11 +754,16 @@ export default function CarouselRenderer({
           }`}
         >
           {localSlides.map((slide, i) => (
-            <div key={slide.id} className={`transition-opacity duration-300 ${i === activeSlideIndex ? 'block opacity-100' : 'hidden opacity-0'}`}>
-              <canvas 
-                ref={(el) => { if (el) canvasRefs.current[i] = el; }} 
-                width={1080} 
-                height={1350} 
+            <div
+              key={`canvas-${i}-${slide.id}`}
+              className={`transition-opacity duration-300 ${i === activeSlideIndex ? 'block opacity-100' : 'hidden opacity-0'}`}
+            >
+              <canvas
+                ref={(el) => {
+                  canvasRefs.current[i] = el;
+                }}
+                width={1080}
+                height={1350}
                 className="max-h-[60vh] max-w-full object-contain shadow-2xl rounded"
               />
             </div>
@@ -746,33 +806,8 @@ export default function CarouselRenderer({
                   newSlides[activeSlideIndex] = { ...newSlides[activeSlideIndex], text };
                   setLocalSlides(newSlides);
                 }}
-                onImageUpload={(base64) => {
-                  setLocalSlides((prev) => {
-                    const newSlides = [...prev];
-                    const current = newSlides[activeSlideIndex];
-                    if (!current) return prev;
-
-                    const currentTpl = getSlideTemplate(current);
-                    const nextTemplate = isImageTemplate(currentTpl)
-                      ? currentTpl
-                      : DEFAULT_IMAGE_TEMPLATE;
-
-                    newSlides[activeSlideIndex] = {
-                      ...current,
-                      imageUrl: base64,
-                      template: nextTemplate,
-                    };
-                    return newSlides;
-                  });
-
-                  if (!isImageTemplate(activeSlideTemplate)) {
-                    const toast = document.createElement('div');
-                    toast.innerText = 'תבנית השקף הוחלפה אוטומטית כדי לתמוך בתמונה';
-                    toast.className = 'fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded-full shadow-lg z-50 text-sm font-bold animate-bounce';
-                    document.body.appendChild(toast);
-                    setTimeout(() => toast.remove(), 4000);
-                  }
-                }}
+                onImageUpload={handleSlideImageUpload}
+                onImageClear={handleSlideImageClear}
                 remixingIndex={remixingIndex}
                 onRemix={handleRemix}
               />
