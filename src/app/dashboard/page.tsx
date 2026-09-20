@@ -105,7 +105,13 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
             חבילה: <strong>{usage.plan === 'freemium' ? 'חינמית' : usage.plan === 'pro' ? 'Pro' : 'Premium'}</strong>
           </p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex gap-3 items-center">
+          {user?.isAdmin && (
+            <Link href="/admin" className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold rounded-lg shadow-md hover:from-purple-700 hover:to-indigo-700 transition flex items-center gap-1.5 text-sm">
+              <span>👑</span>
+              <span>דאשבורד מנהל</span>
+            </Link>
+          )}
           <Link href="/dashboard/settings" className="px-4 py-2 bg-white dark:bg-gray-800 border dark:border-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-50 dark:bg-gray-900 font-bold">
             הגדרות מותג
           </Link>

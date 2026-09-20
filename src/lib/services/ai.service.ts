@@ -16,8 +16,8 @@ export interface GenerateOptions {
 
 export async function generateText({ 
   prompt, 
-  provider = process.env.DEFAULT_AI_PROVIDER || 'openrouter', 
-  model = process.env.DEFAULT_AI_MODEL || 'google/gemini-2.5-flash', 
+  provider = process.env.DEFAULT_AI_PROVIDER || 'gemini', 
+  model = process.env.DEFAULT_AI_MODEL || 'gemini-2.5-flash', 
   isJson = false 
 }: GenerateOptions): Promise<string> {
   if (provider === 'openrouter') {

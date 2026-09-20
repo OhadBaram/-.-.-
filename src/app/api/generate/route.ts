@@ -26,8 +26,8 @@ export async function POST(req: Request) {
     const referenceLink2 = body.referenceLink2 || null;
     const referenceLink3 = body.referenceLink3 || null;
 
-    let aiProvider = process.env.DEFAULT_AI_PROVIDER || 'openrouter';
-    let aiModel = process.env.DEFAULT_AI_MODEL || 'google/gemini-2.5-flash';
+    let aiProvider = process.env.DEFAULT_AI_PROVIDER || 'gemini';
+    let aiModel = process.env.DEFAULT_AI_MODEL || 'gemini-2.5-flash';
     let workspaceId = null;
     let ws: any = null;
 
@@ -42,9 +42,9 @@ export async function POST(req: Request) {
         if (ws.aiProvider) aiProvider = ws.aiProvider;
         if (ws.aiModel) {
           aiModel = ws.aiModel;
-          if (aiModel === 'gemini-1.5-flash') {
-            aiModel = 'google/gemini-2.5-flash';
-            aiProvider = 'openrouter';
+          if (aiModel === 'gemini-1.5-flash' || !aiModel) {
+            aiModel = 'gemini-2.5-flash';
+            aiProvider = 'gemini';
           }
         }
       }
