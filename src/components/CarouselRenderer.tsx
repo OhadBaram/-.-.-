@@ -352,6 +352,27 @@ export default function CarouselRenderer({
           {isExporting ? 'מייצא...' : 'הורד כ-PDF (ללינקדאין)'}
         </button>
       </div>
+
+      <CopilotWidget 
+        slides={localSlides}
+        template={template}
+        globalFont={globalFont}
+        brandColor={brandColor}
+        theme={theme}
+        onUpdateSlideText={(index, text) => {
+          const newSlides = [...localSlides];
+          if (newSlides[index]) {
+            newSlides[index] = { ...newSlides[index], text };
+            setLocalSlides(newSlides);
+          }
+        }}
+        onChangeTemplate={(tpl) => setTemplate(tpl)}
+        onChangeFont={(font) => setGlobalFont(font)}
+        onChangeColors={(color, newTheme) => {
+          // Parent logic would be needed for brandColor, but for now we just log or we can pass setBrandColor if we have it
+          console.log('Copilot tried to change color:', color, newTheme);
+        }}
+      />
     </div>
   );
 }
