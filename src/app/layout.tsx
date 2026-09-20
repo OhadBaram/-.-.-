@@ -28,12 +28,14 @@ export default function RootLayout({
           </footer>
         </Providers>
         <CookieBanner />
-        <Script 
-          src="https://cdn.userway.org/widget.js" 
-          data-account="PLACEHOLDER" 
-          data-position="6"
-          strategy="lazyOnload" 
-        />
+        {process.env.NEXT_PUBLIC_USERWAY_ACCOUNT_ID ? (
+          <Script
+            src="https://cdn.userway.org/widget.js"
+            data-account={process.env.NEXT_PUBLIC_USERWAY_ACCOUNT_ID}
+            data-position="6"
+            strategy="lazyOnload"
+          />
+        ) : null}
       </body>
     </html>
   );

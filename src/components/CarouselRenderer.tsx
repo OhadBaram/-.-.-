@@ -84,12 +84,14 @@ interface CarouselRendererProps {
   slides: Slide[];
   brandColor?: string;
   slideOverrides?: Record<number, SlideOverride>;
+  onGoBack?: () => void;
 }
 
 export default function CarouselRenderer({
   slides,
   brandColor: initialBrandColor = '#6366f1',
   slideOverrides: initialSlideOverrides = {},
+  onGoBack,
 }: CarouselRendererProps) {
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const [isExporting, setIsExporting] = useState(false);
