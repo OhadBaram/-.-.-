@@ -41,6 +41,8 @@ export async function getWorkspaceUsage(workspaceId: string, userId: string) {
     limit = 25;
   } else if (workspace.plan === 'premium') {
     limit = 60;
+  } else if (workspace.plan === 'unlimited') {
+    limit = 999999;
   } else {
     limit = 2; // fallback
   }
