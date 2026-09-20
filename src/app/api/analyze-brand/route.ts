@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import prisma from '@/lib/prisma';
+import { getTenantDB } from '@/lib/tenant-db';
 
 export const maxDuration = 60;
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const openai = new OpenAI({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY || '',
+});
 
 export async function POST(req: Request) {
   try {
@@ -63,10 +68,27 @@ ${scrapedContext}
 החזר רק את טקסט הסיכום, ללא כותרות וללא הקדמות.
     `;
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const aiText = response.text().trim();
+    // Try finding user's preferred model or fallback
+    let aiModel = 'google/gemini-2.5-flash';
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        include: { workspaces: { include: { workspace: true } } }
+      });
+      if (user && user.workspaces.length > 0) {
+        if (user.workspaces[0].workspace.aiModel) {
+          aiModel = user.workspaces[0].workspace.aiModel;
+          if (aiModel === 'gemini-1.5-flash') aiModel = 'google/gemini-2.5-flash'; // map to openrouter
+        }
+      }
+    } catch(e) {}
+
+    const completion = await openai.chat.completions.create({
+      model: aiModel,
+      messages: [{ role: 'user', content: prompt }]
+    });
+
+    const aiText = completion.choices[0].message.content?.trim() || '';
 
     return NextResponse.json({ brandIdentity: aiText });
   } catch (error) {
