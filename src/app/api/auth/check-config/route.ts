@@ -3,9 +3,69 @@ import prisma from '@/lib/prisma';
 
 export const runtime = 'nodejs';
 
+type DatabaseUrlIssue =
+  | 'missing'
+  | 'prisma_accelerate'
+  | 'mysql'
+  | 'missing_protocol'
+  | 'invalid_protocol';
+
+function diagnoseDatabaseUrl(raw: string | undefined): {
+  present: boolean;
+  protocolOk: boolean;
+  issue: DatabaseUrlIssue | null;
+} {
+  const value = raw?.trim() ?? '';
+  if (!value) {
+    return { present: false, protocolOk: false, issue: 'missing' };
+  }
+
+  const lower = value.toLowerCase();
+
+  if (lower.startsWith('postgresql://') || lower.startsWith('postgres://')) {
+    return { present: true, protocolOk: true, issue: null };
+  }
+
+  if (lower.startsWith('prisma://') || lower.startsWith('prisma+postgres://')) {
+    return { present: true, protocolOk: false, issue: 'prisma_accelerate' };
+  }
+
+  if (lower.startsWith('mysql://') || lower.startsWith('mysql2://')) {
+    return { present: true, protocolOk: false, issue: 'mysql' };
+  }
+
+  if (!lower.includes('://')) {
+    return { present: true, protocolOk: false, issue: 'missing_protocol' };
+  }
+
+  return { present: true, protocolOk: false, issue: 'invalid_protocol' };
+}
+
+function databaseUrlHint(issue: DatabaseUrlIssue | null): string | null {
+  if (!issue) return null;
+
+  const en =
+    'DATABASE_URL must start with postgresql:// or postgres:// (Neon / Supabase / Vercel Postgres pooled URL is fine). Do not use prisma:// or prisma+postgres:// unless Prisma Accelerate is configured separately. Fix in Vercel Production env, then Redeploy, then re-check until databaseOk:true.';
+
+  const heByIssue: Record<DatabaseUrlIssue, string> = {
+    missing:
+      'חסר\nDATABASE_URL\nבסביבת\nVercel.\nהגדירו כתובת שמתחילה ב־\npostgresql://\nאו\npostgres://\nואז\nRedeploy.',
+    prisma_accelerate:
+      'זוהה קידומת של\nPrisma Accelerate\n(prisma://).\nלאפליקציה הזו יש להשתמש ב־\npostgresql://\nאו\npostgres://\nרגיל (לא\nprisma://).\nתקנו ב־\nVercel\nואז\nRedeploy.',
+    mysql:
+      'זוהתה קידומת\nmysql://.\nנדרש\nPostgreSQL\nעם\npostgresql://\nאו\npostgres://.\nתקנו ב־\nVercel\nואז\nRedeploy.',
+    missing_protocol:
+      'ל־\nDATABASE_URL\nחסר פרוטוקול.\nחייבים להתחיל ב־\npostgresql://\nאו\npostgres://.\nתקנו ב־\nVercel\nואז\nRedeploy.',
+    invalid_protocol:
+      'פרוטוקול\nDATABASE_URL\nלא תקין עבור\nPrisma.\nחייבים להתחיל ב־\npostgresql://\nאו\npostgres://.\nתקנו ב־\nVercel\nואז\nRedeploy.',
+  };
+
+  return `${heByIssue[issue]}\n\n${en}`;
+}
+
 /**
  * Public auth config probe for production debugging.
- * Returns only booleans — never secret values.
+ * Returns only booleans and safe diagnostics — never secret values.
  */
 export async function GET() {
   const hasEmailFrom = Boolean(process.env.EMAIL_FROM?.trim());
@@ -18,19 +78,35 @@ export async function GET() {
   );
   const hasSecret = Boolean(process.env.NEXTAUTH_SECRET?.trim());
   const hasNextAuthUrl = Boolean(process.env.NEXTAUTH_URL?.trim());
-  const hasDatabaseUrl = Boolean(process.env.DATABASE_URL?.trim());
+
+  const dbUrlDiag = diagnoseDatabaseUrl(process.env.DATABASE_URL);
+  const hasDatabaseUrl = dbUrlDiag.present;
 
   let databaseOk = false;
   let databaseError: string | null = null;
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    databaseOk = true;
-  } catch (error) {
-    databaseError = error instanceof Error ? error.message : 'database_unreachable';
+
+  if (dbUrlDiag.protocolOk) {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      databaseOk = true;
+    } catch (error) {
+      databaseError = error instanceof Error ? error.message : 'database_unreachable';
+    }
+  } else if (dbUrlDiag.issue === 'missing') {
+    databaseError = 'DATABASE_URL is missing';
+  } else {
+    databaseError =
+      'the URL must start with the protocol postgresql:// or postgres://';
   }
 
   const emailTransportConfigured = hasResend || hasEmailServer || hasSmtpParts;
   const ready = hasEmailFrom && emailTransportConfigured && hasSecret && hasNextAuthUrl && databaseOk;
+
+  const protocolHint = databaseUrlHint(dbUrlDiag.issue);
+  const hint = ready
+    ? 'Auth email config looks complete.'
+    : protocolHint ??
+      'Missing email and/or database config in Vercel Production env. Set EMAIL_FROM + RESEND_API_KEY (recommended), NEXTAUTH_SECRET, NEXTAUTH_URL, DATABASE_URL, then Redeploy.';
 
   return NextResponse.json({
     ready,
@@ -43,11 +119,11 @@ export async function GET() {
       NEXTAUTH_URL: hasNextAuthUrl,
       NEXTAUTH_URL_VALUE: process.env.NEXTAUTH_URL?.trim() || null,
       DATABASE_URL: hasDatabaseUrl,
+      databaseUrlProtocolOk: dbUrlDiag.protocolOk,
+      databaseUrlIssue: dbUrlDiag.issue,
       databaseOk,
       databaseError,
     },
-    hint: ready
-      ? 'Auth email config looks complete.'
-      : 'Missing email and/or database config in Vercel Production env. Set EMAIL_FROM + RESEND_API_KEY (recommended), NEXTAUTH_SECRET, NEXTAUTH_URL, DATABASE_URL, then Redeploy.',
+    hint,
   });
 }

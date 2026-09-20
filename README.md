@@ -25,12 +25,18 @@
 - **תאימות ל-GDPR (Offboarding)**: נתיב מחיקת נתונים וייצוא מלא למשתמש שעוזב.
 - **Feature Flags**: מתגי תכונות לשליטה בפיצ'רים מתקדמים פר לקוח.
 
-## משתני סביבה (Environment Variables)
+## משתני סביבה
 
-לפני הרצת הפרויקט, יש לוודא שקובץ ה-`.env` מכיל את הערכים הבאים:
+לפני הרצה, ודאו שקובץ
+
+`.env`
+
+מכיל ערכים כמו אלה:
 
 ```env
-DATABASE_URL="postgresql://user:password@localhost:5432/db"
+# PostgreSQL — must start with postgresql:// or postgres://
+# Neon / Supabase / Vercel Postgres pooled URL is fine.
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DB?sslmode=require"
 NEXTAUTH_URL="http://localhost:3000"
 NEXTAUTH_SECRET="your_secret_key"
 EMAIL_FROM="קרוסל.איי.אי <noreply@yourdomain.com>"
@@ -42,6 +48,60 @@ OPENROUTER_API_KEY="your_openrouter_key"
 UPSTASH_REDIS_REST_URL="your_upstash_url"
 UPSTASH_REDIS_REST_TOKEN="your_upstash_token"
 ```
+
+### חשוב ל־DATABASE_URL
+
+האפליקציה משתמשת ב־
+
+Prisma
+
+עם חיבור
+
+Postgres
+
+רגיל.
+
+הכתובת חייבת להתחיל ב־
+
+`postgresql://`
+
+או
+
+`postgres://`
+
+קידומות כמו
+
+`prisma://`
+
+או
+
+`prisma+postgres://`
+
+שייכות ל־
+
+Prisma Accelerate
+
+ודורשות הגדרה נפרדת — לאפליקציה הזו יש להשתמש ב־URL סטנדרטי (Neon / Supabase / Vercel Postgres).
+
+ב־
+
+Vercel
+
+: עדכנו את המשתנה ואז
+
+Redeploy.
+
+לבדיקה בפרודקשן:
+
+`GET /api/auth/check-config`
+
+עד שמופיע
+
+`databaseOk: true`
+
+ו־
+
+`ready: true`
 
 ## התקנה והרצה מקומית
 
