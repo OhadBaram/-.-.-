@@ -96,7 +96,7 @@ export async function POST(req: Request) {
       const suggestions = buildIntakeSuggestions(topic);
       const reply =
         buildOptionsAckReply(localPicks, topic) ||
-        'עדכנתי. כתבו «מומלץ» או «המשך» כדי לעבור לכיווני תוכן.';
+        'עדכנתי. לחצו «המשך עם ההמלצות» או כתבו «מומלץ» / «המשך».';
 
       return NextResponse.json({
         reply,
@@ -145,7 +145,7 @@ export async function POST(req: Request) {
 
 זרימה:
 1) כשמגיע נושא ברור בפעם הראשונה — החזר תשובת קליטה מובנית (intake), אל תעבור ליצירת שקפים.
-2) אחרי קליטה — המשתמש בוחר הגדרות או כותב «מומלץ».
+2) אחרי קליטה — המשתמש יכול לשנות בפאנל או ללחוץ «המשך עם ההמלצות» / לכתוב «מומלץ».
 3) רק אז phase=ready_for_directions. המערכת תציע שני כיווני תוכן בנפרד.
 
 מבנה חובה לתשובת intake (reply) בעברית, עם כותרות בדיוק כך:
@@ -157,7 +157,7 @@ export async function POST(req: Request) {
   תן המלצה מודעת-נישה (למשל לטק/AI: נועז / כהה ניגודיות גבוהה). ציין שצילומי מסך כהשראה — בקרוב, ואפשר תיאור חופשי.
 - ## צפיפות מידע
   קליל / סטנדרטי ⭐ / עשיר (${densityOptionsList})
-- סיום: לבחור בכל סעיף או לכתוב «מומלץ» כדי להמשיך עם כל ההמלצות.
+- סיום: אפשר לשנות בפאנל או לכתוב «מומלץ» / «המשך» כדי לעבור לכיווני תוכן.
 
 אם זו תשובת intake — readyForDirections=false.
 אם המשתמש כתב «מומלץ» או נעל הגדרות — readyForDirections=true ו-applyRecommendedAll בהתאם.

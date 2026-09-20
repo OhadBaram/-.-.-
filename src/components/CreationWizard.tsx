@@ -112,8 +112,8 @@ export default function CreationWizard({
     {
       role: 'assistant',
       text: userName
-        ? `היי ${userName}! שלחו נושא אחד — אכין קליטת הגדרות (עמודים, סטייל, צפיפות). אחר כך «מומלץ» או בחירה ידנית, ואז שני כיווני תוכן וחבילה מלאה.`
-        : 'היי! שלחו נושא אחד — אכין קליטת הגדרות (עמודים, סטייל, צפיפות). אחר כך «מומלץ» או בחירה ידנית, ואז שני כיווני תוכן וחבילה מלאה.',
+        ? `היי ${userName}! שלחו נושא אחד — אכין קליטת הגדרות (עמודים, סטייל, צפיפות). אחר כך אפשר לשנות בפאנל או להמשיך עם ההמלצות לשני כיווני תוכן.`
+        : 'היי! שלחו נושא אחד — אכין קליטת הגדרות (עמודים, סטייל, צפיפות). אחר כך אפשר לשנות בפאנל או להמשיך עם ההמלצות לשני כיווני תוכן.',
     },
   ]);
 
@@ -290,7 +290,19 @@ export default function CreationWizard({
         topic: nextTopic || topicDraft,
       });
 
-      if (data.phase === 'intake' || (data.reply || '').includes('## מספר עמודים')) {
+      const becomingIntake =
+        data.phase === 'intake' ||
+        (data.reply || '').includes('## מספר עמודים');
+      if (becomingIntake) {
+        const topicForIntake = (nextTopic || topicDraft).trim();
+        const shouldSeedPanel =
+          !intakeReady &&
+          Boolean(topicForIntake) &&
+          !data.applyRecommendedAll &&
+          !data.readyForDirections;
+        if (shouldSeedPanel && topicForIntake) {
+          patchOptions(buildIntakeSuggestions(topicForIntake));
+        }
         setIntakeReady(true);
       }
 
@@ -314,12 +326,16 @@ export default function CreationWizard({
       }
     } catch (err) {
       console.error(err);
+      const fallbackTopic = (topicDraft || message).trim();
       setTopicDraft((prev) => prev || message);
+      if (fallbackTopic) {
+        patchOptions(buildIntakeSuggestions(fallbackTopic));
+      }
       setMessages([
         ...nextHistory,
         {
           role: 'assistant',
-          text: 'שמרתי את הנושא. לחצו «מומלץ» או «הצע כיווני תוכן» כדי להמשיך.',
+          text: 'שמרתי את הנושא והמלצות בפאנל. לחצו «המשך עם ההמלצות» כשמוכנים.',
         },
       ]);
       setIntakeReady(true);
@@ -328,37 +344,39 @@ export default function CreationWizard({
     }
   };
 
-  const handleRecommendedAll = () => {
-    const topic = (topicDraft || inputText).trim();
-    if (!topic) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          text: 'קודם נושא אחד — ואז «מומלץ» ינעל את כל ההגדרות.',
-        },
-      ]);
-      inputRef.current?.focus();
-      return;
-    }
-    if (!topicDraft) setTopicDraft(topic);
-    void sendChat('מומלץ');
-  };
+  const settingsMatchRecommended = (() => {
+    const topic = topicDraft.trim();
+    if (!topic) return true;
+    const recommended = buildIntakeSuggestions(topic);
+    return (
+      options.slideCount === recommended.slideCount &&
+      options.density === recommended.density &&
+      options.visualStyle === recommended.visualStyle &&
+      options.useRecommendedStructure === recommended.useRecommendedStructure
+    );
+  })();
 
-  const handleProposeStyles = () => {
+  /** נתיב ראשי אחד: המלצות (או הגדרות הפאנל) + שני כיווני תוכן */
+  const handleContinuePrimary = () => {
     const topic = (topicDraft || inputText).trim();
     if (!topic) {
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          text: 'כדי להציע כיוונים צריך נושא אחד — כתבו בצ׳אט או בחרו הצעה מהירה.',
+          text: 'קודם נושא אחד בצ׳אט — ואז אפשר להמשיך עם ההמלצות.',
         },
       ]);
       inputRef.current?.focus();
       return;
     }
     if (!topicDraft) setTopicDraft(topic);
+
+    if (settingsMatchRecommended) {
+      void sendChat('מומלץ');
+      return;
+    }
+    // השתמשו בהגדרות שבפאנל בלי לאפס להמלצות
     void fetchStyleDirections(topic);
   };
 
@@ -577,10 +595,12 @@ export default function CreationWizard({
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={handleRecommendedAll}
+                    onClick={handleContinuePrimary}
                     className="text-xs md:text-sm px-3 py-1.5 rounded-full border border-indigo-400/50 bg-indigo-500/20 text-indigo-100 font-bold hover:bg-indigo-500/30 transition disabled:opacity-40"
                   >
-                    מומלץ — נעל הכל והמשך
+                    {settingsMatchRecommended
+                      ? 'המשך עם ההמלצות'
+                      : 'המשך עם ההגדרות שבחרתי'}
                   </button>
                 ) : null}
                 {QUICK_PROMPTS.map((prompt) => (
@@ -661,7 +681,7 @@ export default function CreationWizard({
           <div>
             <h2 className="text-lg font-bold text-white mb-1">הגדרות קרוסלה</h2>
             <p className="text-sm text-zinc-500">
-              מבנה, מראה וצפיפות — לפני היצירה לפורמט אנכי מוכן לאינסטגרם.
+              עמודים, סטייל וצפיפות — אפשר לשנות כאן לפני «המשך עם ההמלצות».
             </p>
           </div>
 
@@ -818,30 +838,31 @@ export default function CreationWizard({
 
           <div className="mt-auto pt-2 space-y-3 sticky bottom-0 pb-1">
             {phase === 'topic' ? (
-              <div className="space-y-2">
-                {intakeReady && topicDraft ? (
+              intakeReady && topicDraft ? (
+                <div className="space-y-2">
                   <button
                     type="button"
-                    onClick={handleRecommendedAll}
+                    onClick={handleContinuePrimary}
                     disabled={busy}
                     className="w-full rounded-2xl bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white font-black text-lg py-4 shadow-[0_0_40px_-12px_rgba(99,102,241,0.8)] transition transform hover:-translate-y-0.5 active:translate-y-0"
                   >
-                    מומלץ — המשך לכיווני תוכן
+                    {stylesLoading
+                      ? 'מציע כיוונים…'
+                      : settingsMatchRecommended
+                        ? 'המשך עם ההמלצות'
+                        : 'המשך עם ההגדרות שבחרתי'}
                   </button>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={handleProposeStyles}
-                  disabled={busy}
-                  className={`w-full rounded-2xl disabled:opacity-50 text-white font-black text-lg py-4 transition ${
-                    intakeReady && topicDraft
-                      ? 'bg-white/10 hover:bg-white/15 border border-white/15'
-                      : 'bg-indigo-500 hover:bg-indigo-400 shadow-[0_0_40px_-12px_rgba(99,102,241,0.8)] transform hover:-translate-y-0.5 active:translate-y-0'
-                  }`}
-                >
-                  {stylesLoading ? 'מציע כיוונים…' : 'הצע 2 כיווני תוכן'}
-                </button>
-              </div>
+                  <p className="text-center text-[11px] text-zinc-500 leading-snug px-1">
+                    {settingsMatchRecommended
+                      ? 'נועל עמודים, סטייל וצפיפות מומלצים ומציע שני כיווני תוכן.'
+                      : 'משתמש בהגדרות שבפאנל (בלי לאפס) ומציע שני כיווני תוכן.'}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-center text-sm text-zinc-500 py-3 px-2 leading-snug">
+                  שלחו נושא בצ׳אט — ואז יופיע כאן כפתור המשך עם ההמלצות.
+                </p>
+              )
             ) : (
               <button
                 type="button"
