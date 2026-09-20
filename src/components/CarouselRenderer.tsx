@@ -255,6 +255,7 @@ interface CarouselRendererProps {
   slides: Slide[];
   brandColor?: string;
   brandPalette?: BrandPalette;
+  onBrandPaletteChange?: (palette: BrandPalette) => void;
   slideOverrides?: Record<number, SlideOverride>;
   onGoBack?: () => void;
 }
@@ -263,19 +264,28 @@ export default function CarouselRenderer({
   slides,
   brandColor: initialBrandColor = '#6366f1',
   brandPalette: initialBrandPalette,
+  onBrandPaletteChange,
   slideOverrides: initialSlideOverrides = {},
   onGoBack,
 }: CarouselRendererProps) {
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const drawGenerationRef = useRef(0);
   const [isExporting, setIsExporting] = useState(false);
-  const [brandPalette, setBrandPalette] = useState<BrandPalette>(() =>
+  const [brandPalette, setBrandPaletteState] = useState<BrandPalette>(() =>
     clampPalette(
       initialBrandPalette?.length
         ? initialBrandPalette
         : parseBrandPalette(initialBrandColor)
     )
   );
+  const setBrandPalette = (next: BrandPalette | ((prev: BrandPalette) => BrandPalette)) => {
+    setBrandPaletteState((prev) => {
+      const resolved = typeof next === 'function' ? next(prev) : next;
+      const cleaned = clampPalette(resolved);
+      onBrandPaletteChange?.(cleaned);
+      return cleaned;
+    });
+  };
   const activeBrandColor = primaryBrandColor(brandPalette);
   const [localSlides, setLocalSlides] = useState<Slide[]>(() => withDefaultTemplates(slides));
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {

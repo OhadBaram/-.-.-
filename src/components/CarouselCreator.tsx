@@ -329,6 +329,7 @@ export default function CarouselCreator({
           slides={slides!}
           brandColor={primaryBrandColor(brandPalette)}
           brandPalette={brandPalette}
+          onBrandPaletteChange={setBrandPalette}
           onGoBack={goToWizardKeepDraft}
         />
       </div>
