@@ -90,8 +90,9 @@ export default function SlideEditor({
       )}
 
       
-      <div className="flex justify-between items-center mb-1">
-        <label className="text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded cursor-pointer transition-colors border">
+      
+      <div className="flex justify-between items-center mb-1 gap-2">
+        <label className="text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded cursor-pointer transition-colors border flex-1 text-center">
           <input 
             type="file" 
             accept="image/*" 
@@ -107,15 +108,24 @@ export default function SlideEditor({
               }
             }}
           />
-          📸 הוסף תמונה (רקע / חצי מסך)
+          📸 העלאת תמונה
         </label>
+        
+        <button 
+          onClick={() => alert("פיצ'ר יצירת תמונות ב-AI (כמו Midjourney/DALL-E) נמצא בבטא סגורה וזמין למנויי פרימיום בלבד.\n\nלקבלת גישה, אנא פנה לתמיכה.")}
+          className="text-xs font-semibold text-white bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 px-2 py-1 rounded cursor-pointer transition-colors border border-transparent shadow-sm flex-1 text-center"
+        >
+          ✨ ייצור ב-AI (פרו)
+        </button>
+
         {slide.imageUrl && (
-          <span className="text-[10px] text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded border border-green-200">
-            תמונה הועלתה ✓
+          <span className="text-[10px] text-green-600 font-bold bg-green-50 px-2 py-1 rounded border border-green-200 whitespace-nowrap">
+            ✓ תמונה הועלתה
           </span>
         )}
       </div>
       <div className="flex flex-col gap-2">
+
 
         <textarea
           value={slide.text}
