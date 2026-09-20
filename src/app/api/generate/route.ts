@@ -37,6 +37,7 @@ export async function POST(req: Request) {
       visualStyle,
       visualStyleCustom,
       useRecommendedStructure,
+      narrativeDirection,
     } = validatedFields.data;
     const websiteUrl = body.websiteUrl || null;
     const referenceLink1 = body.referenceLink1 || null;
@@ -56,7 +57,16 @@ export async function POST(req: Request) {
     const visualHint = buildVisualStylePrompt(wizardOptions);
     const structureHint = buildStructurePrompt(
       wizardOptions.slideCount,
-      wizardOptions.useRecommendedStructure
+      wizardOptions.useRecommendedStructure,
+      narrativeDirection
+        ? {
+            title: narrativeDirection.title,
+            structureHint:
+              narrativeDirection.structureHint ||
+              narrativeDirection.summary ||
+              '',
+          }
+        : null
     );
 
     let aiProvider = process.env.DEFAULT_AI_PROVIDER || 'gemini';
@@ -138,19 +148,30 @@ export async function POST(req: Request) {
     const scrapedContext = await scrapeUrls([finalWebsiteUrl, finalRef1, finalRef2, finalRef3]);
 
     const count = wizardOptions.slideCount;
+    const narrativeLine = narrativeDirection
+      ? `כיוון נרטיבי שנבחר: ${narrativeDirection.title}${
+          narrativeDirection.summary ? ` — ${narrativeDirection.summary}` : ''
+        }`
+      : 'כיוון נרטיבי: לא נבחר במפורש — בחר מבנה חזק לנושא.';
+
     const prompt = `
-אתה קופירייטר ומעצב קרוסלות לאינסטגרם.
-צור קרוסלה בת בדיוק ${count} שקפים עבור אינסטגרם בהתבסס על הנתונים הבאים:
+אתה קופירייטר ומעצב קרוסלות לאינסטגרם בפורמט אנכי 1080×1350.
+צור חבילת קרוסלה מלאה: שקפים + כיתוב פוסט + חבילת האשטאגים.
 נושא / טקסט מקור: ${topic}
 קהל יעד: ${audience || 'כללי'}
 מטרה: ${goal || 'מתן ערך ומעורבות'}
 זהות המותג / טון: ${brand || 'טבעי וברור בעברית'}
+${narrativeLine}
 ${brandIdentityContext}
 ${pastCarouselsContext}
 ${scrapedContext ? `\nלמד על סגנון המותג, הנושאים והטון מהתוכן הבא שנאסף מהרשת (אופציונלי אך מומלץ להתבסס עליו):\n${scrapedContext}\n` : ''}
 
-הנחיות מבנה:
+הנחיות מבנה (חובה):
 ${structureHint}
+- שער = הוק שעוצר גלילה
+- כל שקף תוכן = רעיון אחד בלבד
+- כלול שקף הוכחה כשיש מקום במבנה
+- שקף אחרון = CTA ברור
 
 הנחיות צפיפות מידע:
 ${densityHint}
@@ -160,21 +181,42 @@ ${visualHint}
 
 צור מערך באורך מדויק של ${count} שקפים בלבד — לא יותר ולא פחות.
 עבור כל שקף, אנא ספק את הטקסט בעברית בלבד.
-החזר את התשובה בפורמט JSON בלבד המכיל 2 מפתחות:
-1. "explanation": טקסט הסבר בעברית (כ-3 משפטים) למשתמש, שמתאר מה הבנת מהנושא/לינקים, ומה התוכנית והאסטרטגיה של הקרוסלה שיצרת.
-2. "slides": מערך השקפים.
-כל אובייקט ייצג שקף ויכלול את השדות:
-- id: מחרוזת מזהה (לדוגמה "1")
-- text: טקסט השקף בעברית לפי צפיפות המידע שנבחרה
-- backgroundColor: קוד צבע HEX שמתאים לסגנון הוויזואלי שנבחר
-- textColor: קוד צבע HEX (קריא ומתאים לרקע)
+החזר JSON בלבד עם המפתחות:
+1. "explanation": הסבר קצר בעברית (כ-3 משפטים) על האסטרטגיה והמבנה.
+2. "slides": מערך השקפים. כל אובייקט:
+   - id: מחרוזת מזהה (לדוגמה "1")
+   - role: אחד מתוך cover | content | proof | cta (שקף ראשון cover, אחרון cta, הוכחה proof אם קיימת)
+   - text: טקסט השקף בעברית לפי צפיפות המידע שנבחרה
+   - backgroundColor: קוד צבע HEX שמתאים לסגנון הוויזואלי שנבחר
+   - textColor: קוד צבע HEX (קריא ומתאים לרקע)
+3. "caption": כיתוב פוסט מלא בעברית (3–6 שורות), כולל פתיח, ערך קצר, וקריאה לפעולה — בלי האשטאגים בתוך הכיתוב.
+4. "hashtags": מערך של 8–15 האשטאגים רלוונטיים בעברית ו/או באנגלית (עם #), מותאמים לנושא.
 `;
 
 
     const parsedJson = await generateJson({ prompt, provider: aiProvider, model: aiModel });
     const slides = Array.isArray(parsedJson) ? parsedJson : (parsedJson.slides || parsedJson);
     const explanation = parsedJson.explanation || '';
+    const caption =
+      typeof parsedJson.caption === 'string' ? parsedJson.caption.trim() : '';
+    const hashtags = Array.isArray(parsedJson.hashtags)
+      ? parsedJson.hashtags
+          .map((tag: unknown) => String(tag || '').trim())
+          .filter(Boolean)
+          .map((tag: string) => (tag.startsWith('#') ? tag : `#${tag}`))
+      : [];
 
+    const packagePayload = {
+      slides,
+      caption,
+      hashtags,
+      narrativeDirection: narrativeDirection
+        ? {
+            id: narrativeDirection.id,
+            title: narrativeDirection.title,
+          }
+        : null,
+    };
 
     if (workspaceId && session?.user?.email) {
       try {
@@ -187,7 +229,7 @@ ${visualHint}
                topic,
                targetAudience: audience,
                status: 'generated',
-               slidesData: slides,
+               slidesData: packagePayload,
              }
            });
         }
@@ -196,7 +238,13 @@ ${visualHint}
       }
     }
 
-    return NextResponse.json({ slides, explanation });
+    return NextResponse.json({
+      slides,
+      explanation,
+      caption,
+      hashtags,
+      narrativeDirection: packagePayload.narrativeDirection,
+    });
   } catch (error) {
     console.error('Error generating carousel:', error);
     return NextResponse.json({ error: error?.message || 'Failed to generate carousel' }, { status: 500 });

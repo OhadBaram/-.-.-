@@ -122,15 +122,62 @@ export function buildDensityPrompt(density: DensityId): string {
   );
 }
 
+export interface NarrativeDirection {
+  id: string;
+  title: string;
+  summary: string;
+  whyItWorks: string;
+  structureHint: string;
+}
+
 export function buildStructurePrompt(
   slideCount: number,
-  useRecommendedStructure: boolean
+  useRecommendedStructure: boolean,
+  narrative?: Pick<NarrativeDirection, 'title' | 'structureHint'> | null
 ): string {
+  const narrativeBlock = narrative
+    ? `כיוון נרטיבי שנבחר: ${narrative.title}. הנחיית מבנה לכיוון: ${narrative.structureHint}`
+    : '';
+
+  let base: string;
   if (useRecommendedStructure && slideCount === RECOMMENDED_SLIDE_COUNT) {
-    return `מבנה מומלץ ל־${slideCount} שקפים: שקף 1 שער מושך, שקפים 2–6 תוכן ערך (טיפ/תובנה לכל שקף), שקף 7 סיום עם קריאה לפעולה.`;
+    base = `מבנה חבילה מלאה ל־${slideCount} שקפים בפורמט 1080×1350:
+1) שער הוק (כיסוי) שעוצר גלילה
+2–5) שקפי תוכן — רעיון אחד ברור לכל שקף
+6) שקף הוכחה / אמינות (מספר, תוצאה, לפני־אחרי, או עדות קצרה)
+7) סיום עם קריאה לפעולה חזקה`;
+  } else if (slideCount <= 4) {
+    base = `מבנה קצר ל־${slideCount} שקפים: שער הוק, תוכן ממוקד (רעיון אחד לשקף), סיום עם קריאה לפעולה. אם יש מקום — שלבו הוכחה קצרה לפני הסיום.`;
+  } else if (slideCount === 5) {
+    base = `מבנה ל־5 שקפים: שער הוק, 2–3 תוכן (רעיון אחד לשקף), הוכחה קצרה אופציונלית, סיום CTA.`;
+  } else {
+    base = `מבנה ל־${slideCount} שקפים: שער הוק בפתיחה, שקפי תוכן (רעיון אחד לכל שקף) באמצע, שקף הוכחה לפני הסוף אם אפשר, וסיום עם קריאה לפעולה.`;
   }
-  if (slideCount <= 4) {
-    return `מבנה קצר ל־${slideCount} שקפים: שער, תוכן ממוקד, סיום עם קריאה לפעולה.`;
-  }
-  return `מבנה ל־${slideCount} שקפים: שער בפתיחה, תוכן ערך באמצע, סיום עם קריאה לפעולה בסוף.`;
+
+  return narrativeBlock ? `${base}\n${narrativeBlock}` : base;
+}
+
+/** Fallback directions when the LLM is unavailable */
+export function buildFallbackNarrativeDirections(topic: string): NarrativeDirection[] {
+  const short = topic.trim().slice(0, 48) || 'הנושא שלכם';
+  return [
+    {
+      id: 'edu-list',
+      title: 'רשימה חינוכית חדה',
+      summary: `פירוק של «${short}» לטיפים ממוספרים שקל לשמור ולשתף.`,
+      whyItWorks:
+        'קרוסלות רשימה מצטיינות בשמירות ובשיתופים כשכל שקף נותן ערך מיידי בלי סיפור ארוך.',
+      structureHint:
+        'שער עם הבטחת מספר טיפים, שקפי תוכן ממוספרים (טיפ אחד לשקף), שקף הוכחה עם תוצאה/מספר, סיום CTA לשמירה או מעקב.',
+    },
+    {
+      id: 'story-arc',
+      title: 'קשת סיפור אישית',
+      summary: `מסע קצר סביב «${short}» — בעיה, תובנה, שינוי, וקריאה לפעולה.`,
+      whyItWorks:
+        'סיפור אישי מייצר הזדהות ושומר על הגלילה עד הסוף, במיוחד כשיש נקודת מפנה ברורה באמצע.',
+      structureHint:
+        'שער עם מתח או שאלה אישית, שקפי עלילה (לפני → תובנה → אחרי), שקף הוכחה מהשטח, סיום CTA רך ואנושי.',
+    },
+  ];
 }

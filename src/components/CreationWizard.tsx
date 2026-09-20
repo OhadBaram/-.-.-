@@ -8,6 +8,7 @@ import {
   MIN_SLIDE_COUNT,
   RECOMMENDED_SLIDE_COUNT,
   VISUAL_STYLE_OPTIONS,
+  type NarrativeDirection,
   type WizardOptions,
 } from '@/lib/wizard';
 
@@ -21,6 +22,7 @@ export interface CreationWizardSubmitPayload {
   visualStyle: WizardOptions['visualStyle'];
   visualStyleCustom: string;
   useRecommendedStructure: boolean;
+  narrativeDirection: NarrativeDirection;
   websiteUrl?: string;
   referenceLink1?: string;
   referenceLink2?: string;
@@ -42,6 +44,8 @@ interface ChatMessage {
   text: string;
 }
 
+type WizardPhase = 'topic' | 'styles';
+
 const QUICK_PROMPTS = [
   'טיפים לקרוסלת אינסטגרם שמביאה שמירות',
   'איך לבנות משפך לידים לעסק מקומי',
@@ -61,13 +65,20 @@ export default function CreationWizard({
   const [topicDraft, setTopicDraft] = useState('');
   const [inputText, setInputText] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [stylesLoading, setStylesLoading] = useState(false);
   const [showClassicHint, setShowClassicHint] = useState(false);
+  const [phase, setPhase] = useState<WizardPhase>('topic');
+  const [researchNote, setResearchNote] = useState('');
+  const [directions, setDirections] = useState<NarrativeDirection[]>([]);
+  const [selectedDirectionId, setSelectedDirectionId] = useState<string | null>(
+    null
+  );
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
       text: userName
-        ? `היי ${userName}! ספרו לי על מה הקרוסלה — נושא, טיוטה, או רשימת טיפים. בצד אפשר לכוון מספר שקפים, סגנון וצפיפות.`
-        : 'היי! ספרו לי על מה הקרוסלה — נושא, טיוטה, או רשימת טיפים. בצד אפשר לכוון מספר שקפים, סגנון וצפיפות.',
+        ? `היי ${userName}! נושא אחד מספיק — נציע שני כיווני תוכן, תבחרו, ותקבלו חבילה מלאה: שער, שקפים, הוכחה, סיום, כיתוב והאשטאגים.`
+        : 'היי! נושא אחד מספיק — נציע שני כיווני תוכן, תבחרו, ותקבלו חבילה מלאה: שער, שקפים, הוכחה, סיום, כיתוב והאשטאגים.',
     },
   ]);
 
@@ -79,7 +90,7 @@ export default function CreationWizard({
       top: listRef.current.scrollHeight,
       behavior: 'smooth',
     });
-  }, [messages, chatLoading]);
+  }, [messages, chatLoading, phase, directions]);
 
   const patchOptions = (partial: Partial<WizardOptions>) => {
     setOptions((prev) => ({ ...prev, ...partial }));
@@ -92,14 +103,69 @@ export default function CreationWizard({
     });
   };
 
+  const fetchStyleDirections = async (topic: string) => {
+    const cleanTopic = topic.trim();
+    if (!cleanTopic || stylesLoading || isLoading) return;
+
+    setStylesLoading(true);
+    setPhase('styles');
+    setSelectedDirectionId(null);
+    setDirections([]);
+    setResearchNote('');
+
+    try {
+      const res = await fetch('/api/propose-styles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic: cleanTopic,
+          audience: options.audience,
+          goal: options.goal,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'שגיאת כיוונים');
+
+      const nextDirections = (data.directions || []) as NarrativeDirection[];
+      setDirections(nextDirections);
+      setResearchNote(data.researchNote || '');
+      if (nextDirections[0]?.id) {
+        setSelectedDirectionId(nextDirections[0].id);
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          text:
+            data.researchNote ||
+            'הנה שני כיווני תוכן. בחרו אחד ואז ניצור את החבילה המלאה.',
+        },
+      ]);
+    } catch (err) {
+      console.error(err);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          text: 'לא הצלחתי להציע כיוונים עכשיו. נסו שוב בעוד רגע, או שלחו את הנושא שוב.',
+        },
+      ]);
+      setPhase('topic');
+    } finally {
+      setStylesLoading(false);
+    }
+  };
+
   const sendChat = async (raw: string) => {
     const message = raw.trim();
-    if (!message || chatLoading || isLoading) return;
+    if (!message || chatLoading || isLoading || stylesLoading) return;
 
     const nextHistory = [...messages, { role: 'user' as const, text: message }];
     setMessages(nextHistory);
     setInputText('');
     setChatLoading(true);
+    setPhase('topic');
 
     try {
       const res = await fetch('/api/wizard-chat', {
@@ -122,7 +188,8 @@ export default function CreationWizard({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'שגיאת סוכן');
 
-      if (data.topic) setTopicDraft(data.topic);
+      const nextTopic = (data.topic || message).trim();
+      if (nextTopic) setTopicDraft(nextTopic);
       if (data.suggestedAudience) {
         patchOptions({ audience: data.suggestedAudience });
       }
@@ -130,15 +197,23 @@ export default function CreationWizard({
         patchOptions({ goal: data.suggestedGoal });
       }
 
+      const reply =
+        data.reply ||
+        'מעולה. כשיש נושא ברור — נציע שני כיווני תוכן לבחירה.';
+
       setMessages([
         ...nextHistory,
         {
           role: 'assistant',
-          text:
-            data.reply ||
-            'מוכן. אפשר להמשיך לכוון או ליצור את הקרוסלה.',
+          text: reply,
         },
       ]);
+
+      if (data.readyToGenerate && nextTopic) {
+        setChatLoading(false);
+        await fetchStyleDirections(nextTopic);
+        return;
+      }
     } catch (err) {
       console.error(err);
       setTopicDraft(message);
@@ -146,7 +221,7 @@ export default function CreationWizard({
         ...nextHistory,
         {
           role: 'assistant',
-          text: 'שמרתי את הנושא. אפשר ליצור עכשיו עם ההגדרות שבצד.',
+          text: 'שמרתי את הנושא. לחצו «הצע כיווני תוכן» כדי לבחור כיוון ולהמשיך.',
         },
       ]);
     } finally {
@@ -154,17 +229,47 @@ export default function CreationWizard({
     }
   };
 
-  const handleGenerate = () => {
+  const handleProposeStyles = () => {
     const topic = (topicDraft || inputText).trim();
     if (!topic) {
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          text: 'כדי ליצור קרוסלה צריך נושא או טקסט — כתבו בצ׳אט או הדביקו טיוטה.',
+          text: 'כדי להציע כיוונים צריך נושא אחד — כתבו בצ׳אט או בחרו הצעה מהירה.',
         },
       ]);
       inputRef.current?.focus();
+      return;
+    }
+    if (!topicDraft) setTopicDraft(topic);
+    void fetchStyleDirections(topic);
+  };
+
+  const handleGenerate = () => {
+    const topic = topicDraft.trim();
+    const selected = directions.find((d) => d.id === selectedDirectionId);
+
+    if (!topic) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          text: 'חסר נושא ליצירה. חזרו לשלב הנושא.',
+        },
+      ]);
+      setPhase('topic');
+      return;
+    }
+
+    if (!selected) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          text: 'בחרו אחד משני כיווני התוכן לפני היצירה.',
+        },
+      ]);
       return;
     }
 
@@ -188,6 +293,7 @@ export default function CreationWizard({
       visualStyle: options.visualStyle,
       visualStyleCustom: options.visualStyleCustom,
       useRecommendedStructure: options.useRecommendedStructure,
+      narrativeDirection: selected,
       websiteUrl: initialWebsiteUrl,
       referenceLink1: initialReferenceLink1,
       referenceLink2: initialReferenceLink2,
@@ -198,8 +304,10 @@ export default function CreationWizard({
   const pageHint =
     options.useRecommendedStructure &&
     options.slideCount === RECOMMENDED_SLIDE_COUNT
-      ? 'שער + 5 תוכן + סיום'
+      ? 'שער + תוכן + הוכחה + סיום'
       : `${options.slideCount} שקפים מותאמים`;
+
+  const busy = isLoading || chatLoading || stylesLoading;
 
   return (
     <div
@@ -225,18 +333,41 @@ export default function CreationWizard({
       />
 
       <div className="relative grid min-h-[calc(100vh-2rem)] lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
-        {/* Chat column */}
         <section className="flex flex-col border-b border-white/8 lg:border-b-0 lg:border-l border-white/8">
           <header className="px-5 pt-6 pb-4 md:px-8 md:pt-8">
             <p className="text-sm font-medium text-indigo-300/90 mb-2 animate-[wizardFade_0.6s_ease-out]">
-              אשף יצירה בעברית
+              מנושא אחד לחבילת קרוסלה מוכנה לפרסום
             </p>
             <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white animate-[wizardRise_0.7s_ease-out]">
               קרוסל. איי. אי
             </h1>
             <p className="mt-2 max-w-xl text-zinc-400 text-base md:text-lg animate-[wizardRise_0.85s_ease-out]">
-              שוחחו עם הסוכן על הנושא — והגדירו מבנה, סגנון וצפיפות לפני היצירה.
+              בוחרים כיוון תוכן, מקבלים שער שעוצר גלילה, שקפי ערך, הוכחה, קריאה
+              לפעולה — ועוד כיתוב והאשטאגים להדבקה.
             </p>
+            <ol className="mt-4 flex flex-wrap gap-2 text-xs text-zinc-500">
+              <li
+                className={`rounded-full border px-3 py-1 ${
+                  phase === 'topic'
+                    ? 'border-indigo-400/50 text-indigo-200 bg-indigo-500/10'
+                    : 'border-white/10'
+                }`}
+              >
+                1 · נושא
+              </li>
+              <li
+                className={`rounded-full border px-3 py-1 ${
+                  phase === 'styles'
+                    ? 'border-sky-400/50 text-sky-100 bg-sky-500/10'
+                    : 'border-white/10'
+                }`}
+              >
+                2 · כיוון תוכן
+              </li>
+              <li className="rounded-full border border-white/10 px-3 py-1">
+                3 · חבילה מלאה
+              </li>
+            </ol>
           </header>
 
           <div
@@ -255,70 +386,144 @@ export default function CreationWizard({
                 {msg.text}
               </div>
             ))}
-            {chatLoading && (
+
+            {phase === 'styles' ? (
+              <div className="space-y-3 mt-1 animate-[wizardRise_0.5s_ease-out]">
+                {stylesLoading ? (
+                  <p className="text-sm text-zinc-500 animate-pulse">
+                    מנתח את הנושא ומציע שני כיווני תוכן…
+                  </p>
+                ) : (
+                  <>
+                    {researchNote ? (
+                      <p className="text-sm text-zinc-400 leading-relaxed">
+                        {researchNote}
+                      </p>
+                    ) : null}
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {directions.map((dir) => {
+                        const selected = selectedDirectionId === dir.id;
+                        return (
+                          <button
+                            key={dir.id}
+                            type="button"
+                            onClick={() => setSelectedDirectionId(dir.id)}
+                            className={`text-right rounded-2xl border px-4 py-4 transition ${
+                              selected
+                                ? 'border-sky-400/60 bg-sky-500/15 text-sky-50 shadow-[0_0_24px_-12px_rgba(56,189,248,0.7)]'
+                                : 'border-white/10 bg-white/[0.03] text-zinc-200 hover:bg-white/5'
+                            }`}
+                          >
+                            <div className="font-black text-base mb-1">
+                              {dir.title}
+                            </div>
+                            <p className="text-sm opacity-90 leading-snug mb-2">
+                              {dir.summary}
+                            </p>
+                            <p className="text-xs text-zinc-400 leading-snug">
+                              {dir.whyItWorks}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : null}
+
+            {chatLoading && phase === 'topic' ? (
               <div className="text-sm text-zinc-500 animate-pulse">
                 הסוכן חושב…
               </div>
-            )}
-          </div>
-
-          <div className="px-5 md:px-8 pb-3 flex flex-wrap gap-2">
-            {QUICK_PROMPTS.map((prompt) => (
-              <button
-                key={prompt}
-                type="button"
-                disabled={isLoading || chatLoading}
-                onClick={() => sendChat(prompt)}
-                className="text-xs md:text-sm px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white transition disabled:opacity-40"
-              >
-                {prompt}
-              </button>
-            ))}
-          </div>
-
-          <div className="px-5 md:px-8 pb-6 pt-2">
-            <div className="flex gap-2 items-end rounded-2xl border border-white/10 bg-black/30 p-2 focus-within:border-indigo-400/50 transition">
-              <textarea
-                ref={inputRef}
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendChat(inputText);
-                  }
-                }}
-                rows={2}
-                placeholder="לדוגמה: טיפים לקרוסלת אינסטגרם…"
-                className="flex-1 resize-none bg-transparent border-0 text-zinc-100 placeholder:text-zinc-500 px-3 py-2 focus:outline-none focus:ring-0 text-[15px]"
-                disabled={isLoading}
-              />
-              <button
-                type="button"
-                onClick={() => sendChat(inputText)}
-                disabled={!inputText.trim() || chatLoading || isLoading}
-                className="shrink-0 mb-1 ml-1 rounded-xl bg-zinc-100 text-zinc-900 font-bold px-4 py-2.5 hover:bg-white disabled:opacity-40 transition"
-              >
-                שלח
-              </button>
-            </div>
-            {topicDraft ? (
-              <p className="mt-3 text-xs text-zinc-500">
-                נושא ליצירה:{' '}
-                <span className="text-zinc-300 font-medium">{topicDraft}</span>
-              </p>
             ) : null}
           </div>
+
+          {phase === 'topic' ? (
+            <>
+              <div className="px-5 md:px-8 pb-3 flex flex-wrap gap-2">
+                {QUICK_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => sendChat(prompt)}
+                    className="text-xs md:text-sm px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white transition disabled:opacity-40"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+
+              <div className="px-5 md:px-8 pb-6 pt-2">
+                <div className="flex gap-2 items-end rounded-2xl border border-white/10 bg-black/30 p-2 focus-within:border-indigo-400/50 transition">
+                  <textarea
+                    ref={inputRef}
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendChat(inputText);
+                      }
+                    }}
+                    rows={2}
+                    placeholder="נושא אחד לקרוסלה — למשל: טיפים ללידים מעסק מקומי"
+                    className="flex-1 resize-none bg-transparent border-0 text-zinc-100 placeholder:text-zinc-500 px-3 py-2 focus:outline-none focus:ring-0 text-[15px]"
+                    disabled={busy}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => sendChat(inputText)}
+                    disabled={!inputText.trim() || busy}
+                    className="shrink-0 mb-1 ml-1 rounded-xl bg-zinc-100 text-zinc-900 font-bold px-4 py-2.5 hover:bg-white disabled:opacity-40 transition"
+                  >
+                    שלח
+                  </button>
+                </div>
+                {topicDraft ? (
+                  <p className="mt-3 text-xs text-zinc-500">
+                    נושא ליצירה:{' '}
+                    <span className="text-zinc-300 font-medium">
+                      {topicDraft}
+                    </span>
+                  </p>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <div className="px-5 md:px-8 pb-6 pt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setPhase('topic');
+                  setSelectedDirectionId(null);
+                }}
+                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-zinc-300 hover:bg-white/10 transition disabled:opacity-40"
+              >
+                חזרה לנושא
+              </button>
+              <button
+                type="button"
+                disabled={busy || !topicDraft}
+                onClick={() => void fetchStyleDirections(topicDraft)}
+                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-zinc-300 hover:bg-white/10 transition disabled:opacity-40"
+              >
+                הצע שוב כיוונים
+              </button>
+            </div>
+          )}
         </section>
 
-        {/* Options column */}
         <aside className="flex flex-col gap-6 px-5 py-6 md:px-7 md:py-8 bg-black/20 backdrop-blur-sm">
           <div>
             <h2 className="text-lg font-bold text-white mb-1">הגדרות קרוסלה</h2>
-            <p className="text-sm text-zinc-500">בחרו לפני היצירה — אפשר לשנות בכל רגע.</p>
+            <p className="text-sm text-zinc-500">
+              מבנה, מראה וצפיפות — לפני היצירה לפורמט אנכי מוכן לאינסטגרם.
+            </p>
           </div>
 
-          {/* Pages */}
           <div className="space-y-3">
             <div className="flex items-baseline justify-between gap-2">
               <h3 className="font-bold text-zinc-200">מספר שקפים</h3>
@@ -336,8 +541,12 @@ export default function CreationWizard({
                   : 'border-white/10 bg-white/5 text-zinc-300 hover:bg-white/8'
               }`}
             >
-              <div className="font-bold">מומלץ — {RECOMMENDED_SLIDE_COUNT} שקפים</div>
-              <div className="text-sm opacity-80 mt-0.5">שער + 5 תוכן + סיום</div>
+              <div className="font-bold">
+                מומלץ — {RECOMMENDED_SLIDE_COUNT} שקפים
+              </div>
+              <div className="text-sm opacity-80 mt-0.5">
+                שער + תוכן + הוכחה + סיום
+              </div>
             </button>
             <div>
               <label className="text-xs text-zinc-500 mb-2 block">
@@ -362,7 +571,6 @@ export default function CreationWizard({
             </div>
           </div>
 
-          {/* Visual style */}
           <div className="space-y-3">
             <h3 className="font-bold text-zinc-200">סגנון ויזואלי</h3>
             <div className="grid grid-cols-2 gap-2">
@@ -413,7 +621,6 @@ export default function CreationWizard({
             ) : null}
           </div>
 
-          {/* Density */}
           <div className="space-y-3">
             <h3 className="font-bold text-zinc-200">צפיפות מידע</h3>
             <div className="flex flex-col gap-2">
@@ -438,11 +645,12 @@ export default function CreationWizard({
             </div>
           </div>
 
-          {/* Optional audience / goal */}
           <details className="group rounded-xl border border-white/10 bg-white/[0.02] open:bg-white/[0.04]">
             <summary className="cursor-pointer list-none px-4 py-3 font-bold text-zinc-300 flex justify-between items-center">
               קהל ומטרה (אופציונלי)
-              <span className="text-zinc-600 group-open:rotate-180 transition">▾</span>
+              <span className="text-zinc-600 group-open:rotate-180 transition">
+                ▾
+              </span>
             </summary>
             <div className="px-4 pb-4 space-y-3">
               <input
@@ -463,16 +671,31 @@ export default function CreationWizard({
           </details>
 
           <div className="mt-auto pt-2 space-y-3 sticky bottom-0 pb-1">
-            <button
-              type="button"
-              onClick={handleGenerate}
-              disabled={isLoading || chatLoading}
-              className="w-full rounded-2xl bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white font-black text-lg py-4 shadow-[0_0_40px_-12px_rgba(99,102,241,0.8)] transition transform hover:-translate-y-0.5 active:translate-y-0"
-            >
-              {isLoading ? 'מייצר שקפים…' : 'צור קרוסלה ופתח בעורך'}
-            </button>
+            {phase === 'topic' ? (
+              <button
+                type="button"
+                onClick={handleProposeStyles}
+                disabled={busy}
+                className="w-full rounded-2xl bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white font-black text-lg py-4 shadow-[0_0_40px_-12px_rgba(99,102,241,0.8)] transition transform hover:-translate-y-0.5 active:translate-y-0"
+              >
+                {stylesLoading ? 'מציע כיוונים…' : 'הצע 2 כיווני תוכן'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleGenerate}
+                disabled={
+                  busy || !selectedDirectionId || directions.length === 0
+                }
+                className="w-full rounded-2xl bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white font-black text-lg py-4 shadow-[0_0_40px_-12px_rgba(99,102,241,0.8)] transition transform hover:-translate-y-0.5 active:translate-y-0"
+              >
+                {isLoading
+                  ? 'מייצר חבילה מלאה…'
+                  : 'צור חבילה ופתח בעורך'}
+              </button>
+            )}
             <p className="text-center text-[11px] text-zinc-600">
-              היצירה נשענת על מנוע הבינה הקיים ופותחת את העורך המוכר.
+              החבילה נשמרת בעורך הקיים בפורמט אנכי מוכן לייצוא.
             </p>
           </div>
         </aside>

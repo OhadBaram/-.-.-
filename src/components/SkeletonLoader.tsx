@@ -7,10 +7,10 @@ export default function SkeletonLoader() {
     <div className="flex flex-col items-center gap-6 p-4 w-full" dir="rtl">
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold text-zinc-100 animate-pulse mb-2">
-          מייצר קרוסלה…
+          בונה חבילת קרוסלה…
         </h2>
         <p className="text-zinc-500 animate-pulse">
-          הסוכן מכין שקפים לפי ההגדרות שבחרתם — עוד כמה שניות
+          שער, שקפי תוכן, הוכחה, סיום, כיתוב והאשטאגים — עוד רגע
         </p>
       </div>
 

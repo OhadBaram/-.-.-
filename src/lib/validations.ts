@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+const narrativeDirectionSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  summary: z.string().optional(),
+  whyItWorks: z.string().optional(),
+  structureHint: z.string().optional(),
+});
+
 export const generateCarouselSchema = z.object({
   topic: z.string().min(1, 'Topic is required'),
   audience: z.string().optional(),
@@ -13,6 +21,13 @@ export const generateCarouselSchema = z.object({
     .default('minimal'),
   visualStyleCustom: z.string().optional(),
   useRecommendedStructure: z.boolean().optional().default(true),
+  narrativeDirection: narrativeDirectionSchema.optional(),
+});
+
+export const proposeStylesSchema = z.object({
+  topic: z.string().min(1),
+  audience: z.string().optional(),
+  goal: z.string().optional(),
 });
 
 export const wizardChatSchema = z.object({
