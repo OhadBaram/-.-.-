@@ -28,6 +28,7 @@ export async function POST(req: Request) {
     let aiProvider = process.env.DEFAULT_AI_PROVIDER || 'gemini';
     let aiModel = process.env.DEFAULT_AI_MODEL || 'gemini-1.5-flash';
     let workspaceId = null;
+    let ws = null;
 
     if (session?.user?.email) {
       const user = await prisma.user.findUnique({
@@ -35,10 +36,45 @@ export async function POST(req: Request) {
         include: { workspaces: { include: { workspace: true } } }
       });
       if (user && user.workspaces.length > 0) {
-        const ws = user.workspaces[0].workspace;
+        ws = user.workspaces[0].workspace;
         workspaceId = ws.id;
         if (ws.aiProvider) aiProvider = ws.aiProvider;
         if (ws.aiModel) aiModel = ws.aiModel;
+      }
+    }
+
+    let scrapedContext = '';
+    let brandIdentityContext = '';
+
+    if (ws) {
+      if (ws.brandIdentity) {
+        brandIdentityContext = `\nזהות המותג המוגדרת במערכת: ${ws.brandIdentity}\n`;
+      }
+
+      const urlsToScrape = [ws.websiteUrl, ws.referenceLink1, ws.referenceLink2, ws.referenceLink3].filter(Boolean) as string[];
+      
+      if (urlsToScrape.length > 0) {
+        const scrapePromises = urlsToScrape.map(async (url) => {
+          const controller = new AbortController();
+          const id = setTimeout(() => controller.abort(), 10000);
+          try {
+            const res = await fetch(`https://r.jina.ai/${url}`, { signal: controller.signal });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const text = await res.text();
+            return `--- תוכן מתוך ${url} ---\n${text}\n`;
+          } catch (err) {
+            console.error(`Failed to scrape ${url}:`, err);
+            return '';
+          } finally {
+            clearTimeout(id);
+          }
+        });
+        
+        const results = await Promise.allSettled(scrapePromises);
+        scrapedContext = results
+          .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled')
+          .map(r => r.value)
+          .join('\n');
       }
     }
 
@@ -49,7 +85,8 @@ export async function POST(req: Request) {
 קהל יעד: ${audience}
 מטרה: ${goal}
 זהות המותג: ${brand}
-
+${brandIdentityContext}
+${scrapedContext ? `\nלמד על סגנון המותג, הנושאים והטון מהתוכן הבא שנאסף מהרשת (אופציונלי אך מומלץ להתבסס עליו):\n${scrapedContext}\n` : ''}
 עבור כל שקף, אנא ספק את הטקסט בעברית בלבד. 
 החזר את התשובה בפורמט JSON בלבד, המכיל מערך של אובייקטים או אובייקט JSON המכיל מפתח slides עם המערך (ללא טקסט נוסף).
 כל אובייקט ייצג שקף ויכלול את השדות:

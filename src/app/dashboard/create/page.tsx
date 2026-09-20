@@ -63,7 +63,7 @@ export default function CreateCarouselPage() {
           >
             חזור ליצירת קרוסלה חדשה
           </button>
-          <CarouselRenderer slides={slides} />
+          <CarouselRenderer slides={slides} brandColor="#6366f1" />
         </div>
       )}
     </main>

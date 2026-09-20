@@ -12,7 +12,7 @@ export async function PUT(req: Request) {
     }
 
     const body = await req.json();
-    const { brandIdentity, brandColor, aiProvider, aiModel, workspaceId } = body;
+    const { brandIdentity, brandColor, websiteUrl, referenceLink1, referenceLink2, referenceLink3, aiProvider, aiModel, workspaceId } = body;
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email }
@@ -29,6 +29,10 @@ export async function PUT(req: Request) {
         data: {
           brandIdentity,
           brandColor,
+          websiteUrl,
+          referenceLink1,
+          referenceLink2,
+          referenceLink3,
           aiProvider,
           aiModel
         }

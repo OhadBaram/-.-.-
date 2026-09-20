@@ -63,6 +63,10 @@ model Workspace {
   plan      String   @default("freemium") // freemium, paid_1, paid_2, paid_3, agency
   brandIdentity String? @db.Text
   brandColor    String? 
+  websiteUrl    String?
+  referenceLink1 String?
+  referenceLink2 String?
+  referenceLink3 String?
   aiProvider    String  @default("gemini") // gemini, openrouter
   aiModel       String  @default("gemini-1.5-flash")
   usageCount    Int      @default(0)
