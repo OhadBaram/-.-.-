@@ -492,3 +492,65 @@ export function drawNeon(
 // Main component
 // ---------------------------------------------------------------------------
 
+
+
+export async function drawImageSplit(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  text: string,
+  brandColor: string,
+  isDark: boolean,
+  override: SlideOverride,
+  imageUrl?: string
+): Promise<void> {
+  const splitY = H * 0.65;
+
+  // Draw background image or placeholder
+  if (imageUrl) {
+    const img = new Image();
+    img.src = imageUrl;
+    await new Promise((resolve) => {
+      img.onload = resolve;
+      img.onerror = resolve;
+    });
+    // object-fit: cover equivalent for canvas
+    const imgRatio = img.width / img.height;
+    const canvasRatio = W / splitY;
+    let renderW = W;
+    let renderH = splitY;
+    let offsetX = 0;
+    let offsetY = 0;
+    if (imgRatio > canvasRatio) {
+      renderW = splitY * imgRatio;
+      offsetX = (W - renderW) / 2;
+    } else {
+      renderH = W / imgRatio;
+      offsetY = (splitY - renderH) / 2;
+    }
+    ctx.drawImage(img, offsetX, offsetY, renderW, renderH);
+  } else {
+    ctx.fillStyle = isDark ? '#1f2937' : '#e2e8f0';
+    ctx.fillRect(0, 0, W, splitY);
+    // Draw placeholder icon/text
+    ctx.fillStyle = isDark ? '#4b5563' : '#94a3b8';
+    ctx.font = 'bold 48px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('אין תמונה', W / 2, splitY / 2);
+  }
+
+  // Draw bottom split
+  ctx.fillStyle = brandColor;
+  ctx.fillRect(0, splitY, W, H - splitY);
+
+  // Draw Text
+  const fontSize = override.fontSize ?? 64;
+  ctx.font = `bold ${fontSize}px sans-serif`;
+  ctx.fillStyle = '#ffffff'; // White text on brand color
+  
+  // Custom Y or default to center of bottom split
+  const defaultTextY = splitY + ((H - splitY) / 2);
+  const textY = override.textY ? (H * (override.textY / 100)) : defaultTextY;
+  
+  drawWrappedText(ctx, text, W / 2, textY, W * 0.85, fontSize * 1.4);
+}

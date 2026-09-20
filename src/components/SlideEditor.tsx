@@ -11,6 +11,7 @@ interface SlideEditorProps {
   override: SlideOverride;
   onOverrideChange: (override: SlideOverride) => void;
   onTextChange: (text: string) => void;
+  onImageUpload?: (base64: string) => void;
   remixingIndex: number | null;
   onRemix: (index: number, text: string) => void;
 }
@@ -25,7 +26,8 @@ export default function SlideEditor({
   onOverrideChange,
   onTextChange,
   remixingIndex,
-  onRemix
+  onRemix,
+  onImageUpload
 }: SlideEditorProps) {
   const currentFontSize = override.fontSize ?? 64;
   const currentTextY = override.textY ?? 50;
@@ -87,7 +89,34 @@ export default function SlideEditor({
         </div>
       )}
 
+      
+      <div className="flex justify-between items-center mb-1">
+        <label className="text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded cursor-pointer transition-colors border">
+          <input 
+            type="file" 
+            accept="image/*" 
+            className="hidden" 
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file && onImageUpload) {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  onImageUpload(reader.result as string);
+                };
+                reader.readAsDataURL(file);
+              }
+            }}
+          />
+          📸 הוסף תמונה (רקע / חצי מסך)
+        </label>
+        {slide.imageUrl && (
+          <span className="text-[10px] text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded border border-green-200">
+            תמונה הועלתה ✓
+          </span>
+        )}
+      </div>
       <div className="flex flex-col gap-2">
+
         <textarea
           value={slide.text}
           onChange={(e) => onTextChange(e.target.value)}

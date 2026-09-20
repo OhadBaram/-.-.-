@@ -8,7 +8,8 @@ import SlideEditor from '@/components/SlideEditor';
 
 import {
   drawMinimal, drawBold, drawGradient, drawDarkLuxury, drawFrame, drawSplit,
-  drawStory, drawQuote, drawNumbered, drawMagazine, drawWaves, drawNeon
+  drawStory, drawQuote, drawNumbered, drawMagazine, drawWaves, drawNeon,
+  drawImageSplit
 } from '@/lib/templates/drawers';
 
 export interface Slide {
@@ -16,6 +17,7 @@ export interface Slide {
   text: string;
   backgroundColor: string;
   textColor: string;
+  imageUrl?: string;
 }
 
 export type TemplateId =
@@ -30,7 +32,8 @@ export type TemplateId =
   | 'numbered'
   | 'magazine'
   | 'waves'
-  | 'neon';
+  | 'neon'
+  | 'image-split';
 
 interface TemplateOption {
   id: TemplateId;
@@ -50,6 +53,7 @@ const TEMPLATES: TemplateOption[] = [
   { id: 'magazine',     label: 'מגזין'        },
   { id: 'waves',        label: 'גלים'         },
   { id: 'neon',         label: 'ניאון'        },
+  { id: 'image-split',  label: 'חצי תמונה'    },
 ];
 
 export interface SlideOverride {
@@ -108,7 +112,7 @@ export default function CarouselRenderer({
   };
 
   const drawSlide = useCallback(
-    (
+    async (
       canvas: HTMLCanvasElement,
       slide: Slide,
       slideIndex: number,
@@ -140,6 +144,7 @@ export default function CarouselRenderer({
         case 'magazine':    drawMagazine   (ctx, W, H, text, brandColor, isDark, currentOverride);              break;
         case 'waves':       drawWaves      (ctx, W, H, text, brandColor, isDark, currentOverride);              break;
         case 'neon':        drawNeon       (ctx, W, H, text, brandColor, isDark, currentOverride);              break;
+        case 'image-split': await drawImageSplit(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl); break;
         default:            drawMinimal    (ctx, W, H, text, brandColor, isDark, currentOverride);
       }
     },
@@ -280,6 +285,12 @@ export default function CarouselRenderer({
               newSlides[index] = { ...newSlides[index], text };
               setLocalSlides(newSlides);
             }}
+            onImageUpload={(base64) => {
+              const newSlides = [...localSlides];
+              newSlides[index] = { ...newSlides[index], imageUrl: base64 };
+              setLocalSlides(newSlides);
+            }}
+
             remixingIndex={remixingIndex}
             onRemix={handleRemix}
           />
