@@ -1,19 +1,13 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import OpenAI from 'openai';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { getTenantDB } from '@/lib/tenant-db';
 import { generateCarouselSchema } from '@/lib/validations';
+import { generateJson } from '@/lib/services/ai.service';
+import { scrapeUrls } from '@/lib/services/scraper.service';
 
 export const maxDuration = 60; // Allow function to run up to 60 seconds
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const openai = new OpenAI({
-  baseURL: 'https://openrouter.ai/api/v1',
-  apiKey: process.env.OPENROUTER_API_KEY || 'dummy_key',
-});
 
 export async function POST(req: Request) {
   try {
@@ -96,7 +90,6 @@ export async function POST(req: Request) {
       }
     }
 
-    let scrapedContext = '';
     let brandIdentityContext = '';
 
     const finalWebsiteUrl = websiteUrl || ws?.websiteUrl;
@@ -109,34 +102,7 @@ export async function POST(req: Request) {
       brandIdentityContext = `\nזהות המותג המוגדרת במערכת: ${finalBrandIdentity}\n`;
     }
 
-    const urlsToScrape = [finalWebsiteUrl, finalRef1, finalRef2, finalRef3].filter(Boolean) as string[];
-      
-    if (urlsToScrape.length > 0) {
-      const scrapePromises = urlsToScrape.map(async (url) => {
-        const controller = new AbortController();
-        const id = setTimeout(() => controller.abort(), 25000); 
-        try {
-          const res = await fetch(`https://r.jina.ai/${url}`, { 
-            signal: controller.signal,
-            next: { revalidate: 86400 } // Cache the scraped result for 24 hours!
-          });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const text = await res.text();
-          return `--- תוכן מתוך ${url} ---\n${text.substring(0, 3000)}\n`;
-        } catch (err) {
-          console.error(`Failed to scrape ${url}:`, err);
-          return '';
-        } finally {
-          clearTimeout(id);
-        }
-      });
-      
-      const results = await Promise.allSettled(scrapePromises);
-      scrapedContext = results
-        .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled')
-        .map(r => r.value)
-        .join('\n');
-    }
+    const scrapedContext = await scrapeUrls([finalWebsiteUrl, finalRef1, finalRef2, finalRef3]);
 
     const prompt = `
 אתה קופירייטר ומעצב קרוסלות לאינסטגרם.
@@ -157,42 +123,8 @@ ${scrapedContext ? `\nלמד על סגנון המותג, הנושאים והטו
 - textColor: קוד צבע HEX (קריא ומתאים לרקע)
 `;
 
-    let text = '';
-
-    if (aiProvider === 'openrouter') {
-      if (!process.env.OPENROUTER_API_KEY) {
-        return NextResponse.json({ error: 'Missing OPENROUTER_API_KEY' }, { status: 500 });
-      }
-      const completion = await openai.chat.completions.create({
-        model: aiModel,
-        messages: [{ role: 'user', content: prompt }],
-        response_format: { type: 'json_object' }
-      });
-      text = completion.choices[0].message.content || '[]';
-    } else {
-      if (!process.env.GEMINI_API_KEY) {
-        return NextResponse.json({ error: 'Missing GEMINI_API_KEY' }, { status: 500 });
-      }
-      const model = genAI.getGenerativeModel({ 
-        model: aiModel,
-        generationConfig: { responseMimeType: "application/json" }
-      });
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      text = response.text();
-    }
-    
-    // Clean up potential markdown wrapping
-    text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    
-    let slides;
-    try {
-      const parsed = JSON.parse(text);
-      slides = Array.isArray(parsed) ? parsed : (parsed.slides || parsed);
-    } catch (e) {
-      console.error('Failed to parse AI response:', text);
-      throw new Error('Invalid JSON format from AI');
-    }
+    const parsedJson = await generateJson({ prompt, provider: aiProvider, model: aiModel });
+    const slides = Array.isArray(parsedJson) ? parsedJson : (parsedJson.slides || parsedJson);
 
     if (workspaceId && session?.user?.email) {
       try {

@@ -41,27 +41,27 @@ export default async function BillingPage() {
   const usagePercent = Math.min(Math.round((workspace.usageCount / usageLimit) * 100), 100);
 
   return (
-    <main className="min-h-screen bg-gray-50 py-12" dir="rtl">
+    <main className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12" dir="rtl">
       <div className="max-w-4xl mx-auto px-4">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">ניהול מנוי וחיובים</h1>
-          <Link href="/dashboard" className="text-indigo-600 hover:text-indigo-800 font-medium">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">ניהול מנוי וחיובים</h1>
+          <Link href="/dashboard" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium">
             &larr; חזור ללוח הבקרה
           </Link>
         </div>
 
-        <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
           <div className="p-6 sm:p-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">התכנית הנוכחית שלך: <span className="text-indigo-600">{planName}</span></h2>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">התכנית הנוכחית שלך: <span className="text-indigo-600 dark:text-indigo-400">{planName}</span></h2>
             
             <div className="mb-8">
               <div className="flex justify-between items-end mb-2">
-                <span className="text-gray-700 font-medium">ניצול מכסת קרוסלות חודשית</span>
-                <span className="text-sm text-gray-500">
+                <span className="text-gray-700 dark:text-gray-200 font-medium">ניצול מכסת קרוסלות חודשית</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
                   {workspace.plan === 'agency' ? 'ללא הגבלה' : `${workspace.usageCount} מתוך ${usageLimit} נוצלו`}
                 </span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-4">
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
                 <div 
                   className={`h-4 rounded-full ${usagePercent > 90 ? 'bg-red-500' : 'bg-indigo-600'}`}
                   style={{ width: `${usagePercent}%` }}
@@ -73,15 +73,15 @@ export default async function BillingPage() {
             </div>
 
             <div className="border-t pt-8">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">שדרוג וניהול תשלומים</h3>
-              <p className="text-gray-600 mb-6">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">שדרוג וניהול תשלומים</h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-6">
                 התשלומים מתבצעים בצורה מאובטחת באמצעות מערכת סליקה. לשינוי אמצעי תשלום, שדרוג מסלול או הורדת חשבוניות, היכנס לאזור האישי.
               </p>
               <div className="flex flex-wrap gap-4">
                 <button className="bg-indigo-600 text-white px-6 py-2 rounded font-bold hover:bg-indigo-700 transition-colors">
                   שדרג מסלול
                 </button>
-                <button className="bg-white border border-gray-300 text-gray-700 px-6 py-2 rounded font-medium hover:bg-gray-50 transition-colors">
+                <button className="bg-white dark:bg-gray-800 border dark:border-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 px-6 py-2 rounded font-medium hover:bg-gray-50 dark:bg-gray-900 transition-colors">
                   עדכון אמצעי תשלום
                 </button>
               </div>

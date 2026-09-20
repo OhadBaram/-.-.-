@@ -8,9 +8,9 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
 
   if (!session?.user?.email) {
     return (
-      <div className="min-h-screen p-8 text-center bg-gray-50 flex flex-col items-center justify-center gap-4">
+      <div className="min-h-screen p-8 text-center bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center gap-4">
         <h1 className="text-2xl font-bold">אנא התחבר כדי לצפות בלוח הבקרה</h1>
-        <Link href="/" className="text-indigo-600 underline">חזרה לדף הבית</Link>
+        <Link href="/" className="text-indigo-600 dark:text-indigo-400 underline">חזרה לדף הבית</Link>
       </div>
     );
   }
@@ -23,7 +23,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
 
   if (!user) {
     return (
-      <div className="min-h-screen p-8 text-center bg-gray-50 flex flex-col items-center justify-center gap-4">
+      <div className="min-h-screen p-8 text-center bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center gap-4">
         <h1 className="text-2xl font-bold">משתמש לא נמצא</h1>
       </div>
     );
@@ -51,9 +51,9 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
 
     if (!workspaceUser) {
       return (
-        <div className="min-h-screen p-8 text-center bg-gray-50 flex flex-col items-center justify-center gap-4">
+        <div className="min-h-screen p-8 text-center bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center gap-4">
           <h1 className="text-2xl font-bold">אין לך גישה למרחב עבודה זה</h1>
-          <Link href="/dashboard" className="text-indigo-600 underline">חזרה ללוח הבקרה</Link>
+          <Link href="/dashboard" className="text-indigo-600 dark:text-indigo-400 underline">חזרה ללוח הבקרה</Link>
         </div>
       );
     }
@@ -97,16 +97,16 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
   const usagePercent = Math.min((usage.usageCount / usage.limit) * 100, 100);
 
   return (
-    <main className="min-h-screen p-8 bg-gray-50" dir="rtl">
+    <main className="min-h-screen p-8 bg-gray-50 dark:bg-gray-900" dir="rtl">
       <header className="mb-8 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">לוח בקרה - {userWorkspace?.name}</h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
             חבילה: <strong>{usage.plan === 'freemium' ? 'חינמית' : usage.plan === 'pro' ? 'Pro' : 'Premium'}</strong>
           </p>
         </div>
         <div className="flex gap-4">
-          <Link href="/dashboard/settings" className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50 font-bold">
+          <Link href="/dashboard/settings" className="px-4 py-2 bg-white dark:bg-gray-800 border dark:border-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-50 dark:bg-gray-900 font-bold">
             הגדרות מותג
           </Link>
           {usage.canGenerate ? (
@@ -122,19 +122,19 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
       </header>
 
       {/* Usage Bar */}
-      <section className="mb-8 bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-3">
+      <section className="mb-8 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border dark:border-gray-700 border-gray-100 dark:border-gray-700 flex flex-col gap-3">
         <div className="flex justify-between items-end">
           <div>
-            <h2 className="text-lg font-bold text-gray-800">ניצול קרדיטים (חודשי)</h2>
+            <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">ניצול קרדיטים (חודשי)</h2>
             {usage.isWelcomeWeek && (
               <p className="text-sm text-green-600 font-bold mt-1">🎁 כולל 5 קרדיטים במתנה לשבוע הראשון!</p>
             )}
           </div>
-          <div className="text-gray-600 font-medium">
+          <div className="text-gray-600 dark:text-gray-300 font-medium">
             {usage.usageCount} / {usage.limit}
           </div>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-3">
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
           <div 
             className={`h-3 rounded-full transition-all duration-500 ${usagePercent > 90 ? 'bg-red-500' : usagePercent > 75 ? 'bg-amber-500' : 'bg-indigo-600'}`}
             style={{ width: `${usagePercent}%` }}
@@ -150,21 +150,21 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
       <section>
         <h2 className="text-xl font-semibold mb-4">היסטוריית קרוסלות</h2>
         {carousels.length === 0 ? (
-          <div className="p-6 bg-white rounded shadow-sm text-gray-500 text-center py-12">
+          <div className="p-6 bg-white dark:bg-gray-800 rounded shadow-sm text-gray-500 dark:text-gray-400 text-center py-12">
             עדיין לא יצרת קרוסלות במרחב העבודה הזה. <br/><br/>
-            <Link href="/dashboard/create" className="text-indigo-600 font-bold underline">צור את הקרוסלה הראשונה שלך!</Link>
+            <Link href="/dashboard/create" className="text-indigo-600 dark:text-indigo-400 font-bold underline">צור את הקרוסלה הראשונה שלך!</Link>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {carousels.map((carousel) => (
-              <div key={carousel.id} className="border p-4 rounded-xl bg-white shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+              <div key={carousel.id} className="border dark:border-gray-700 p-4 rounded-xl bg-white dark:bg-gray-800 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
                 <div>
-                  <h3 className="font-bold text-lg text-gray-900">{carousel.title}</h3>
-                  <p className="text-sm text-gray-600 mb-2 mt-1 line-clamp-2">נושא: {carousel.topic}</p>
+                  <h3 className="font-bold text-lg text-gray-900 dark:text-white">{carousel.title}</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-2 mt-1 line-clamp-2">נושא: {carousel.topic}</p>
                 </div>
-                <div className="text-xs text-gray-400 mt-4 flex justify-between items-center border-t pt-3">
+                <div className="text-xs text-gray-400 dark:text-gray-500 mt-4 flex justify-between items-center border-t pt-3">
                   <span>נוצר ב: {new Date(carousel.createdAt).toLocaleDateString('he-IL')}</span>
-                  <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded">מוכן</span>
+                  <span className="bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200 px-2 py-1 rounded">מוכן</span>
                 </div>
               </div>
             ))}

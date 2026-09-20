@@ -1,16 +1,11 @@
 import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { getTenantDB } from '@/lib/tenant-db';
+import { generateText } from '@/lib/services/ai.service';
+import { scrapeUrls } from '@/lib/services/scraper.service';
 
 export const maxDuration = 60;
-
-const openai = new OpenAI({
-  baseURL: 'https://openrouter.ai/api/v1',
-  apiKey: process.env.OPENROUTER_API_KEY || 'dummy_key',
-});
 
 export async function POST(req: Request) {
   try {
@@ -21,33 +16,7 @@ export async function POST(req: Request) {
 
     const { websiteUrl, referenceLink1 } = await req.json();
 
-    const urlsToScrape = [websiteUrl, referenceLink1].filter(Boolean) as string[];
-    
-    if (urlsToScrape.length === 0) {
-      return NextResponse.json({ brandIdentity: '' });
-    }
-
-    const scrapePromises = urlsToScrape.map(async (url) => {
-      const controller = new AbortController();
-      const id = setTimeout(() => controller.abort(), 20000); 
-      try {
-        const res = await fetch(`https://r.jina.ai/${url}`, { signal: controller.signal });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const text = await res.text();
-        return `--- מידע מהקישור: ${url} ---\n${text.substring(0, 3000)}\n`;
-      } catch (err) {
-        console.error(`Failed to scrape ${url}:`, err);
-        return '';
-      } finally {
-        clearTimeout(id);
-      }
-    });
-    
-    const results = await Promise.allSettled(scrapePromises);
-    const scrapedContext = results
-      .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled')
-      .map(r => r.value)
-      .join('\n');
+    const scrapedContext = await scrapeUrls([websiteUrl, referenceLink1]);
 
     if (!scrapedContext.trim()) {
       return NextResponse.json({ brandIdentity: 'לא הצלחנו למשוך מידע מהקישורים שהוזנו.' });
@@ -70,25 +39,27 @@ ${scrapedContext}
 
     // Try finding user's preferred model or fallback
     let aiModel = 'google/gemini-2.5-flash';
+    let aiProvider = 'openrouter';
     try {
       const user = await prisma.user.findUnique({
         where: { email: session.user.email },
         include: { workspaces: { include: { workspace: true } } }
       });
       if (user && user.workspaces.length > 0) {
-        if (user.workspaces[0].workspace.aiModel) {
-          aiModel = user.workspaces[0].workspace.aiModel;
-          if (aiModel === 'gemini-1.5-flash') aiModel = 'google/gemini-2.5-flash'; // map to openrouter
+        const ws = user.workspaces[0].workspace;
+        if (ws.aiModel) {
+          aiModel = ws.aiModel;
+          if (aiModel === 'gemini-1.5-flash') {
+             aiModel = 'google/gemini-2.5-flash'; // map to openrouter
+          }
+        }
+        if (ws.aiProvider) {
+          aiProvider = ws.aiProvider;
         }
       }
     } catch(e) {}
 
-    const completion = await openai.chat.completions.create({
-      model: aiModel,
-      messages: [{ role: 'user', content: prompt }]
-    });
-
-    const aiText = completion.choices[0].message.content?.trim() || '';
+    const aiText = await generateText({ prompt, provider: aiProvider, model: aiModel });
 
     return NextResponse.json({ brandIdentity: aiText });
   } catch (error) {
@@ -96,3 +67,4 @@ ${scrapedContext}
     return NextResponse.json({ error: 'Failed to analyze brand' }, { status: 500 });
   }
 }
+

@@ -3,6 +3,7 @@
 import React, { useRef, useState, useCallback } from 'react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import { jsPDF } from 'jspdf';
 import SlideEditor from '@/components/SlideEditor';
 
 import {
@@ -189,6 +190,27 @@ export default function CarouselRenderer({
     }
   };
 
+  const handleExportPdf = async () => {
+    setIsExporting(true);
+    try {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'px', format: [1080, 1350] });
+      localSlides.forEach((_, index) => {
+        const canvas = canvasRefs.current[index];
+        if (!canvas) return;
+        const imgData = canvas.toDataURL('image/png');
+        if (index > 0) {
+          doc.addPage([1080, 1350], 'portrait');
+        }
+        doc.addImage(imgData, 'PNG', 0, 0, 1080, 1350);
+      });
+      doc.save('carousel.pdf');
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
 
   return (
@@ -264,14 +286,23 @@ export default function CarouselRenderer({
         ))}
       </div>
 
-      {/* ── Export button ── */}
-      <button
-        onClick={handleExportZip}
-        disabled={isExporting}
-        className="px-6 py-3 bg-blue-600 text-white font-bold rounded hover:bg-blue-700 disabled:opacity-50"
-      >
-        {isExporting ? 'מייצא...' : 'יצא ל-ZIP'}
-      </button>
+      {/* ── Export buttons ── */}
+      <div className="flex gap-4 flex-wrap justify-center w-full pb-8">
+        <button
+          onClick={handleExportZip}
+          disabled={isExporting}
+          className="px-6 py-3 bg-blue-600 text-white font-bold rounded hover:bg-blue-700 disabled:opacity-50"
+        >
+          {isExporting ? 'מייצא...' : 'הורד קרוסלה (ZIP)'}
+        </button>
+        <button
+          onClick={handleExportPdf}
+          disabled={isExporting}
+          className="px-6 py-3 bg-indigo-600 text-white font-bold rounded hover:bg-indigo-700 disabled:opacity-50"
+        >
+          {isExporting ? 'מייצא...' : 'הורד כ-PDF (ללינקדאין)'}
+        </button>
+      </div>
     </div>
   );
 }
