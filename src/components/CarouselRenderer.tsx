@@ -5,6 +5,7 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { jsPDF } from 'jspdf';
 import SlideEditor from '@/components/SlideEditor';
+import CopilotWidget from '@/components/CopilotWidget';
 
 import {
   drawMinimal, drawBold, drawGradient, drawDarkLuxury, drawFrame, drawSplit,
@@ -85,22 +86,20 @@ interface CarouselRendererProps {
   slideOverrides?: Record<number, SlideOverride>;
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 export default function CarouselRenderer({
   slides,
-  brandColor = '#6366f1',
+  brandColor: initialBrandColor = '#6366f1',
   slideOverrides: initialSlideOverrides = {},
 }: CarouselRendererProps) {
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const [isExporting, setIsExporting] = useState(false);
+  const [activeBrandColor, setActiveBrandColor] = useState(initialBrandColor);
   const [localSlides, setLocalSlides] = useState<Slide[]>(slides);
   const [theme,    setTheme]    = useState<'light' | 'dark'>('light');
   const [template, setTemplate] = useState<TemplateId>('minimal');
   const [globalFont, setGlobalFont] = useState('Heebo');
 
+  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [slideOverrides, setSlideOverrides] = useState<Record<number, { fontSize?: number; textY?: number }>>(initialSlideOverrides);
   const [remixingIndex, setRemixingIndex] = useState<number | null>(null);
@@ -151,31 +150,31 @@ export default function CarouselRenderer({
       ctx.globalAlpha = 1;
 
       switch (tpl) {
-        case 'minimal':     drawMinimal    (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);              break;
-        case 'bold':        drawBold       (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);              break;
-        case 'gradient':    drawGradient   (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);              break;
-        case 'dark-luxury': drawDarkLuxury (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);              break;
-        case 'frame':       drawFrame      (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);              break;
-        case 'split':       drawSplit      (ctx, W, H, text, brandColor, isDark, slideIndex, currentOverride, globalFont);  break;
-        case 'story':       drawStory      (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);              break;
-        case 'quote':       drawQuote      (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);              break;
-        case 'numbered':    drawNumbered   (ctx, W, H, text, brandColor, isDark, slideIndex, currentOverride, globalFont);  break;
-        case 'magazine':    drawMagazine   (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);              break;
-        case 'waves':       drawWaves      (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);              break;
-        case 'neon':        drawNeon       (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);              break;
-        case 'image-split': await drawImageSplit(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
-        case 'image-full-dark': await drawImageFullDark(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
-        case 'image-circle-profile': await drawImageCircle(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
-        case 'image-split-bottom': await drawImageSplitBottom(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
-        case 'image-polaroid': await drawImagePolaroid(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
-        case 'image-side': await drawImageSide(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
-        case 'image-magazine': await drawImageMagazine(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
-        case 'image-overlay': await drawImageOverlay(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
-        case 'image-arch': await drawImageArch(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
-        default:            drawMinimal    (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);
+        case 'minimal':     drawMinimal    (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);              break;
+        case 'bold':        drawBold       (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);              break;
+        case 'gradient':    drawGradient   (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);              break;
+        case 'dark-luxury': drawDarkLuxury (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);              break;
+        case 'frame':       drawFrame      (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);              break;
+        case 'split':       drawSplit      (ctx, W, H, text, activeBrandColor, isDark, slideIndex, currentOverride, globalFont);  break;
+        case 'story':       drawStory      (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);              break;
+        case 'quote':       drawQuote      (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);              break;
+        case 'numbered':    drawNumbered   (ctx, W, H, text, activeBrandColor, isDark, slideIndex, currentOverride, globalFont);  break;
+        case 'magazine':    drawMagazine   (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);              break;
+        case 'waves':       drawWaves      (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);              break;
+        case 'neon':        drawNeon       (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);              break;
+        case 'image-split': await drawImageSplit(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
+        case 'image-full-dark': await drawImageFullDark(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
+        case 'image-circle-profile': await drawImageCircle(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
+        case 'image-split-bottom': await drawImageSplitBottom(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
+        case 'image-polaroid': await drawImagePolaroid(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
+        case 'image-side': await drawImageSide(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
+        case 'image-magazine': await drawImageMagazine(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
+        case 'image-overlay': await drawImageOverlay(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
+        case 'image-arch': await drawImageArch(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
+        default:            drawMinimal    (ctx, W, H, text, activeBrandColor, isDark, currentOverride, globalFont);
       }
     },
-    [theme, brandColor, slideOverrides]
+    [theme, activeBrandColor, slideOverrides, globalFont]
   );
 
   React.useEffect(() => {
@@ -246,133 +245,223 @@ export default function CarouselRenderer({
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
 
   return (
-    <div className="flex flex-col items-center gap-6 p-4 w-full">
-
-      {/* ── Top controls ── */}
-      <div className="flex w-full justify-center gap-3">
-        <button
-          onClick={toggleTheme}
-          className={`px-6 py-2 rounded-full font-semibold transition-all duration-300 shadow-sm ${
-            theme === 'light'
-              ? 'bg-gray-900 text-white hover:bg-gray-800'
-              : 'bg-white text-gray-900 hover:bg-gray-100'
-          }`}
-        >
-          {theme === 'light' ? 'מצב כהה' : 'מצב בהיר'}
-        </button>
-      </div>
-
-      {/* ── Template selector ── */}
-      <div
-        className="flex flex-row-reverse overflow-x-auto gap-2 pb-2 w-full"
-        style={{ direction: 'rtl', scrollbarWidth: 'thin' }}
-        dir="rtl"
-      >
-        {TEMPLATES.map(t => (
+    <div className="flex flex-col md:flex-row min-h-screen bg-gray-50 dark:bg-gray-900" dir="rtl">
+      
+      {/* Left Sidebar */}
+      <div className="w-full md:w-80 bg-white dark:bg-gray-800 p-4 border-l border-gray-200 dark:border-gray-700 overflow-y-auto">
+        <div className="flex flex-col gap-4 mb-8">
           <button
-            key={t.id}
-            onClick={() => setTemplate(t.id)}
-            className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 border whitespace-nowrap ${
-              template === t.id
-                ? 'text-white border-transparent shadow-md'
-                : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
-            }`}
-            style={template === t.id ? { backgroundColor: brandColor, borderColor: brandColor } : {}}
+            onClick={handleExportZip}
+            disabled={isExporting}
+            className="w-full px-4 py-2 bg-blue-600 text-white font-bold rounded hover:bg-blue-700 disabled:opacity-50"
           >
-            {t.label}
+            {isExporting ? 'מייצא...' : 'הורד קרוסלה (ZIP)'}
           </button>
-        ))}
-      </div>
+          <button
+            onClick={handleExportPdf}
+            disabled={isExporting}
+            className="w-full px-4 py-2 bg-indigo-600 text-white font-bold rounded hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {isExporting ? 'מייצא...' : 'הורד כ-PDF (ללינקדאין)'}
+          </button>
+        </div>
 
-      {/* ── Slides strip ── */}
-      <div
-        className="flex flex-row overflow-x-auto snap-x snap-mandatory pb-4 w-full max-w-full gap-4"
-        style={{ direction: 'rtl' }}
-      >
-        {localSlides.map((slide, index) => (
-          <SlideEditor
-            key={slide.id}
-            slide={slide}
-            index={index}
-            canvasRef={(el) => { if (el) canvasRefs.current[index] = el; }}
-            isEditing={editingIndex === index}
-            onToggleEdit={() => {
-              if (editingIndex === index) setEditingIndex(null);
-              else {
-                setEditingIndex(index);
-                if (!slideOverrides[index]) {
-                  setSlideOverrides(prev => ({ ...prev, [index]: { fontSize: 64, textY: 50 } }));
-                }
+        <div className="mb-6">
+          <h3 className="font-bold mb-2 text-gray-800 dark:text-gray-200">תבנית עיצוב</h3>
+          <select 
+            value={template} 
+            onChange={(e) => setTemplate(e.target.value as TemplateId)}
+            className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+          >
+            {TEMPLATES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+          </select>
+        </div>
+
+        <div className="mb-6">
+          <h3 className="font-bold mb-2 text-gray-800 dark:text-gray-200">גופן</h3>
+          <select 
+            value={globalFont} 
+            onChange={(e) => setGlobalFont(e.target.value)}
+            className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+          >
+            <option value="Heebo">Heebo</option>
+            <option value="Rubik">Rubik</option>
+            <option value="Assistant">Assistant</option>
+            <option value="Varela Round">Varela Round</option>
+          </select>
+        </div>
+
+        <div className="mb-6">
+          <button
+            onClick={toggleTheme}
+            className={`w-full px-4 py-2 rounded font-semibold transition-all duration-300 shadow-sm ${
+              theme === 'light'
+                ? 'bg-gray-900 text-white hover:bg-gray-800'
+                : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+            }`}
+          >
+            {theme === 'light' ? 'מצב כהה' : 'מצב בהיר'}
+          </button>
+        </div>
+
+        <div className="mb-6">
+          <CopilotWidget 
+            slides={localSlides}
+            template={template}
+            globalFont={globalFont}
+            brandColor={activeBrandColor}
+            theme={theme}
+            onUpdateSlideText={(index, text) => {
+              const newSlides = [...localSlides];
+              if (newSlides[index]) {
+                newSlides[index] = { ...newSlides[index], text };
+                setLocalSlides(newSlides);
               }
             }}
-            override={slideOverrides[index] ?? {}}
-            onOverrideChange={(override) => setSlideOverrides(prev => ({ ...prev, [index]: override }))}
-            onTextChange={(text) => {
-              const newSlides = [...localSlides];
-              newSlides[index] = { ...newSlides[index], text };
-              setLocalSlides(newSlides);
+            onChangeTemplate={(tpl) => setTemplate(tpl)}
+            onChangeFont={(font) => setGlobalFont(font)}
+            onChangeColors={(color, newTheme) => {
+              console.log('Copilot tried to change color:', color, newTheme);
             }}
-            onImageUpload={(base64) => {
-              const newSlides = [...localSlides];
-              newSlides[index] = { ...newSlides[index], imageUrl: base64 };
-              setLocalSlides(newSlides);
-              
-              if (!template.startsWith('image-')) {
-                setTemplate('image-split');
-                
-                // Add a small UX toast/alert using standard DOM to let them know what happened
-                const toast = document.createElement('div');
-                toast.innerText = 'התבנית הוחלפה אוטומטית כדי לתמוך בתמונה!';
-                toast.className = 'fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded-full shadow-lg z-50 text-sm font-bold animate-bounce';
-                document.body.appendChild(toast);
-                setTimeout(() => toast.remove(), 4000);
-              }
-            }}
-
-            remixingIndex={remixingIndex}
-            onRemix={handleRemix}
           />
-        ))}
+        </div>
+
+        <div className="mb-6">
+          <h3 className="font-bold mb-2 text-gray-800 dark:text-gray-200">שקפים</h3>
+          <div className="flex flex-col gap-2">
+            {localSlides.map((slide, i) => (
+              <div 
+                key={slide.id} 
+                onClick={() => setActiveSlideIndex(i)}
+                className={`p-3 border rounded cursor-pointer transition-colors ${
+                  i === activeSlideIndex 
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
+                    : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                }`}
+              >
+                <div className="font-bold text-sm text-gray-600 dark:text-gray-400">שקף {i + 1}</div>
+                <div className="text-sm text-gray-800 dark:text-gray-200 truncate">{slide.text}</div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* ── Export buttons ── */}
-      <div className="flex gap-4 flex-wrap justify-center w-full pb-8">
-        <button
-          onClick={handleExportZip}
-          disabled={isExporting}
-          className="px-6 py-3 bg-blue-600 text-white font-bold rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {isExporting ? 'מייצא...' : 'הורד קרוסלה (ZIP)'}
-        </button>
-        <button
-          onClick={handleExportPdf}
-          disabled={isExporting}
-          className="px-6 py-3 bg-indigo-600 text-white font-bold rounded hover:bg-indigo-700 disabled:opacity-50"
-        >
-          {isExporting ? 'מייצא...' : 'הורד כ-PDF (ללינקדאין)'}
-        </button>
-      </div>
+      {/* Central Stage */}
+      <div className="flex-1 flex flex-col h-screen">
+        {/* Top Bar */}
+        <div className="flex justify-between items-center p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm z-10">
+          <h2 className="font-bold text-xl text-gray-800 dark:text-gray-100">
+            תצוגה מקדימה
+          </h2>
+          <div className="flex gap-4 items-center">
+            <button 
+              disabled={activeSlideIndex === localSlides.length - 1} 
+              onClick={() => setActiveSlideIndex(i => i + 1)}
+              className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
+            >
+              הבא
+            </button>
+            <span className="text-gray-600 dark:text-gray-300 font-medium">שקף {activeSlideIndex + 1} מתוך {localSlides.length}</span>
+            <button 
+              disabled={activeSlideIndex === 0} 
+              onClick={() => setActiveSlideIndex(i => i - 1)}
+              className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
+            >
+              הקודם
+            </button>
+          </div>
+        </div>
 
-      <CopilotWidget 
-        slides={localSlides}
-        template={template}
-        globalFont={globalFont}
-        brandColor={brandColor}
-        theme={theme}
-        onUpdateSlideText={(index, text) => {
-          const newSlides = [...localSlides];
-          if (newSlides[index]) {
-            newSlides[index] = { ...newSlides[index], text };
-            setLocalSlides(newSlides);
-          }
-        }}
-        onChangeTemplate={(tpl) => setTemplate(tpl)}
-        onChangeFont={(font) => setGlobalFont(font)}
-        onChangeColors={(color, newTheme) => {
-          // Parent logic would be needed for brandColor, but for now we just log or we can pass setBrandColor if we have it
-          console.log('Copilot tried to change color:', color, newTheme);
-        }}
-      />
+        {/* Canvas Area */}
+        <div className="flex-1 flex justify-center items-center p-8 overflow-auto bg-gray-100 dark:bg-gray-900 relative">
+          {localSlides.map((slide, i) => (
+            <div key={slide.id} className={`transition-opacity duration-300 ${i === activeSlideIndex ? 'block opacity-100' : 'hidden opacity-0'}`}>
+              <canvas 
+                ref={(el) => { if (el) canvasRefs.current[i] = el; }} 
+                width={1080} 
+                height={1350} 
+                className="max-h-[60vh] max-w-full object-contain shadow-2xl rounded"
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Slide Controls */}
+        <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex justify-center shadow-lg z-10 overflow-y-auto max-h-[35vh]">
+          {localSlides[activeSlideIndex] && (
+            <div className="w-full max-w-xl">
+              
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-bold text-gray-700 dark:text-gray-300">עריכת שקף {activeSlideIndex + 1}</h3>
+            <button 
+              onClick={() => removeSlide(activeSlideIndex)}
+              className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded text-sm transition-colors"
+              disabled={localSlides.length <= 1}
+            >
+              🗑️ מחק שקף זה
+            </button>
+          </div>
+\n          <SlideEditor
+                slide={localSlides[activeSlideIndex]}
+                index={activeSlideIndex}
+                canvasRef={{ current: null }}
+                isEditing={editingIndex === activeSlideIndex}
+                onToggleEdit={() => {
+                  if (editingIndex === activeSlideIndex) setEditingIndex(null);
+                  else {
+                    setEditingIndex(activeSlideIndex);
+                    if (!slideOverrides[activeSlideIndex]) {
+                      setSlideOverrides(prev => ({ ...prev, [activeSlideIndex]: { fontSize: 64, textY: 50 } }));
+                    }
+                  }
+                }}
+                override={slideOverrides[activeSlideIndex] ?? {}}
+                onOverrideChange={(override) => setSlideOverrides(prev => ({ ...prev, [activeSlideIndex]: override }))}
+                onTextChange={(text) => {
+                  const newSlides = [...localSlides];
+                  newSlides[activeSlideIndex] = { ...newSlides[activeSlideIndex], text };
+                  setLocalSlides(newSlides);
+                }}
+                onImageUpload={(base64) => {
+                  const newSlides = [...localSlides];
+                  newSlides[activeSlideIndex] = { ...newSlides[activeSlideIndex], imageUrl: base64 };
+                  setLocalSlides(newSlides);
+                  
+                  if (!template.startsWith('image-')) {
+                    setTemplate('image-split');
+                    
+                    const toast = document.createElement('div');
+                    toast.innerText = 'התבנית הוחלפה אוטומטית כדי לתמוך בתמונה!';
+                    toast.className = 'fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded-full shadow-lg z-50 text-sm font-bold animate-bounce';
+                    document.body.appendChild(toast);
+                    setTimeout(() => toast.remove(), 4000);
+                  }
+                }}
+                remixingIndex={remixingIndex}
+                onRemix={handleRemix}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Filmstrip (Optional) */}
+        <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex gap-3 overflow-x-auto">
+          {localSlides.map((_, i) => (
+            <button 
+              key={i} 
+              onClick={() => setActiveSlideIndex(i)}
+              className={`shrink-0 w-12 h-12 rounded font-bold shadow-sm transition-colors ${
+                i === activeSlideIndex 
+                  ? 'bg-blue-600 text-white border-2 border-blue-600' 
+                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+            >
+              {i + 1}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

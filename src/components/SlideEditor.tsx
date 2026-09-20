@@ -38,7 +38,7 @@ export default function SlideEditor({
         ref={canvasRef}
         width={1080}
         height={1350}
-        className="w-full h-auto rounded"
+        className="hidden w-full h-auto rounded"
         style={{ direction: 'rtl' }}
       />
 
