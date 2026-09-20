@@ -95,7 +95,13 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="py-8 bg-gray-900 text-gray-400 text-center text-sm">
-        <p>© {new Date().getFullYear()} קרוסל. איי. אי מבית בינה לתעשייה. כל הזכויות שמורות.</p>
+        <div className="mb-4">
+          <p>© {new Date().getFullYear()} קרוסל. איי. אי מבית בינה לתעשייה. כל הזכויות שמורות.</p>
+        </div>
+        <div className="flex justify-center gap-6">
+          <Link href="/privacy" className="hover:text-white transition">מדיניות פרטיות</Link>
+          <Link href="/terms" className="hover:text-white transition">תנאי שימוש</Link>
+        </div>
       </footer>
     </main>
   );

@@ -7,7 +7,14 @@ export async function middleware(req: NextRequest) {
   if (!token) {
     return NextResponse.redirect(new URL("/api/auth/signin", req.url));
   }
-  return NextResponse.next();
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-pathname", req.nextUrl.pathname);
+
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
 }
 
 export const config = {
