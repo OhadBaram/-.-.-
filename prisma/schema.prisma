@@ -96,6 +96,7 @@ model Carousel {
   topic          String?
   targetAudience String?
   status         String    @default("draft") // draft, generated
+  slidesData     Json?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 

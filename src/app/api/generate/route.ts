@@ -56,6 +56,7 @@ export async function POST(req: Request) {
       }
     }
 
+    let pastCarouselsContext = '';
     if (workspaceId && session?.user?.email) {
       const user = await prisma.user.findUnique({ where: { email: session.user.email } });
       if (user) {
@@ -65,6 +66,32 @@ export async function POST(req: Request) {
           return NextResponse.json({ 
             error: `הגעת למגבלת היצירה החודשית שלך (${usage.limit} קרוסלות בחודש). אנא שדרג את החבילה שלך.` 
           }, { status: 402 });
+        }
+        
+        try {
+          const tenantDb = await getTenantDB(workspaceId, user.id, ['owner', 'admin', 'member']);
+          const recentCarousels = await tenantDb.carousel.findMany({
+            orderBy: { createdAt: 'desc' },
+            take: 10
+          });
+          const pastCarousels = recentCarousels.filter((c: any) => c.slidesData != null).slice(0, 3);
+          if (pastCarousels.length > 0) {
+            const formatted = pastCarousels.map((c: any, i: number) => {
+              let slidesStr = '';
+              try {
+                if (Array.isArray(c.slidesData)) {
+                  slidesStr = c.slidesData.map((s: any) => s.text).join(' | ');
+                } else if (c.slidesData && Array.isArray((c.slidesData as any).slides)) {
+                  slidesStr = (c.slidesData as any).slides.map((s: any) => s.text).join(' | ');
+                }
+              } catch(e){}
+              return `Past Carousel ${i + 1} (Topic: ${c.topic || 'Unknown'}): [${slidesStr}]`;
+            }).join('\n');
+            
+            pastCarouselsContext = `\nלהלן קרוסלות קודמות שהמשתמש יצר בעבר:\n${formatted}\nלמד מהסגנון והנושאים שהמשתמש אוהב, אך כמומחה שיווק, הקפד *לגוון* את התוכן, הזוויות והמסרים בקרוסלה החדשה כדי שלא יהיו חזרתיים.\n`;
+          }
+        } catch (dbErr) {
+          console.warn('Failed to fetch past carousels:', dbErr);
         }
       }
     }
@@ -119,6 +146,7 @@ export async function POST(req: Request) {
 מטרה: ${goal}
 זהות המותג: ${brand}
 ${brandIdentityContext}
+${pastCarouselsContext}
 ${scrapedContext ? `\nלמד על סגנון המותג, הנושאים והטון מהתוכן הבא שנאסף מהרשת (אופציונלי אך מומלץ להתבסס עליו):\n${scrapedContext}\n` : ''}
 עבור כל שקף, אנא ספק את הטקסט בעברית בלבד. 
 החזר את התשובה בפורמט JSON בלבד, המכיל מערך של אובייקטים או אובייקט JSON המכיל מפתח slides עם המערך (ללא טקסט נוסף).
@@ -177,6 +205,7 @@ ${scrapedContext ? `\nלמד על סגנון המותג, הנושאים והטו
                topic,
                targetAudience: audience,
                status: 'generated',
+               slidesData: slides,
              }
            });
         }
