@@ -45,6 +45,7 @@ export default function CarouselForm({
   const [referenceLink3, setReferenceLink3] = useState(initialReferenceLink3);
 
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [slideCount, setSlideCount] = useState(8);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +59,7 @@ export default function CarouselForm({
       audience: finalAudience, 
       goal: finalGoal, 
       brand: finalBrand,
+      slideCount,
       websiteUrl,
       referenceLink1,
       referenceLink2,

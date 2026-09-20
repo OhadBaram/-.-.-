@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     }
     
     // Fallback schema for new fields if validations.ts hasn't been updated yet
-    const { topic, audience, goal, brand } = validatedFields.data;
+    const { topic, audience, goal, brand, slideCount } = validatedFields.data;
     const websiteUrl = body.websiteUrl || null;
     const referenceLink1 = body.referenceLink1 || null;
     const referenceLink2 = body.referenceLink2 || null;
@@ -114,6 +114,8 @@ export async function POST(req: Request) {
 ${brandIdentityContext}
 ${pastCarouselsContext}
 ${scrapedContext ? `\nלמד על סגנון המותג, הנושאים והטון מהתוכן הבא שנאסף מהרשת (אופציונלי אך מומלץ להתבסס עליו):\n${scrapedContext}\n` : ''}
+
+צור מערך באורך מדויק של ${slideCount || 8} שקפים. (מספר אידיאלי לחשיפה גבוהה באינסטגרם).
 עבור כל שקף, אנא ספק את הטקסט בעברית בלבד. 
 החזר את התשובה בפורמט JSON בלבד, המכיל מערך של אובייקטים או אובייקט JSON המכיל מפתח slides עם המערך (ללא טקסט נוסף).
 כל אובייקט ייצג שקף ויכלול את השדות:

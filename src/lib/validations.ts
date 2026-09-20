@@ -5,6 +5,7 @@ export const generateCarouselSchema = z.object({
   audience: z.string().optional(),
   goal: z.string().optional(),
   brand: z.string().optional(),
+  slideCount: z.number().optional().default(8),
 });
 
 export const workspaceSettingsSchema = z.object({
