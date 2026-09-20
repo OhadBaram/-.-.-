@@ -77,11 +77,23 @@ const TEMPLATES: TemplateOption[] = [
   { id: 'neon',         label: 'ניאון'        },
 ];
 
-const IMAGE_TEMPLATES = TEMPLATES.filter((t) => t.id.startsWith('image-'));
-const TEXT_TEMPLATES = TEMPLATES.filter((t) => !t.id.startsWith('image-'));
+/** תבניות מומלצות קודם — השאר מאחורי «עוד תבניות» */
+const RECOMMENDED_TEMPLATE_IDS: TemplateId[] = [
+  'image-split',
+  'minimal',
+  'bold',
+  'gradient',
+  'image-full-dark',
+];
+const RECOMMENDED_TEMPLATES = RECOMMENDED_TEMPLATE_IDS
+  .map((id) => TEMPLATES.find((t) => t.id === id))
+  .filter((t): t is TemplateOption => Boolean(t));
+const MORE_TEMPLATES = TEMPLATES.filter((t) => !RECOMMENDED_TEMPLATE_IDS.includes(t.id));
 
 const DEFAULT_IMAGE_TEMPLATE: TemplateId = 'image-split';
 const DEFAULT_TEXT_TEMPLATE: TemplateId = 'minimal';
+
+type AdvancedPanelId = 'layout' | 'slide-template' | 'font';
 
 export type CarouselLayoutPresetId =
   | 'first-and-last'
@@ -259,10 +271,14 @@ export default function CarouselRenderer({
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [slideOverrides, setSlideOverrides] = useState<Record<number, { fontSize?: number; textY?: number }>>(initialSlideOverrides);
   const [remixingIndex, setRemixingIndex] = useState<number | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [advancedPanel, setAdvancedPanel] = useState<AdvancedPanelId>('layout');
+  const [showMoreTemplates, setShowMoreTemplates] = useState(false);
 
   const activeSlide = localSlides[activeSlideIndex];
   const activeSlideTemplate = activeSlide ? getSlideTemplate(activeSlide) : DEFAULT_TEXT_TEMPLATE;
   const carouselLayoutPreset = detectCarouselLayoutPreset(localSlides);
+  const activeTemplateIsMore = MORE_TEMPLATES.some((t) => t.id === activeSlideTemplate);
 
   const CANVAS_WIDTH  = 1080;
   const CANVAS_HEIGHT = 1350;
@@ -504,9 +520,10 @@ export default function CarouselRenderer({
   return (
     <div className="flex flex-col md:flex-row h-full min-h-0 w-full bg-gray-50 dark:bg-gray-900 overflow-hidden" dir="rtl">
       
-      {/* Left Sidebar */}
-      <div className="w-full md:w-80 bg-white dark:bg-gray-800 p-4 border-l border-gray-200 dark:border-gray-700 overflow-y-auto order-last md:order-first">
-        <div className="flex flex-col gap-4 mb-8">
+      {/* סיידבר — עריכה מהירה כברירת מחדל */}
+      <div className="w-full md:w-80 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 overflow-y-auto order-last md:order-first flex flex-col min-h-0">
+        {/* ייצוא דביק בראש הסיידבר */}
+        <div className="sticky top-0 z-20 flex flex-col gap-2 p-4 pb-3 bg-white/95 dark:bg-gray-800/95 backdrop-blur border-b border-gray-200 dark:border-gray-700">
           <button
             onClick={handleExportZip}
             disabled={isExporting}
@@ -523,194 +540,295 @@ export default function CarouselRenderer({
           </button>
         </div>
 
-        <div className="mb-6">
-          <h3 className="font-bold mb-1 text-gray-800 dark:text-gray-200">תבנית לקרוסלה</h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-            קובעת באילו שקפים יהיה מקום לתמונה — בלי למחוק את הטקסט
-          </p>
-          <div className="flex flex-col gap-2">
-            {CAROUSEL_LAYOUT_PRESETS.map((preset) => {
-              const isActive = carouselLayoutPreset === preset.id;
-              return (
-                <button
-                  key={preset.id}
-                  type="button"
-                  onClick={() => applyLayoutPreset(preset.id)}
-                  className={`w-full px-3 py-2.5 rounded border text-right transition-colors ${
-                    isActive
-                      ? 'border-blue-500 bg-blue-50 text-blue-800 dark:bg-blue-900/30 dark:text-blue-100 dark:border-blue-400'
-                      : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600'
-                  }`}
-                >
-                  <div className="text-sm font-semibold">{preset.label}</div>
-                  <div className="text-[11px] mt-0.5 opacity-80">{preset.hint}</div>
-                </button>
-              );
-            })}
-            {carouselLayoutPreset === 'custom' && (
-              <div className="text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5">
-                פריסה מותאמת אישית — שינית תבניות לשקפים בודדים
+        <div className="p-4 flex flex-col gap-5">
+          {/* עריכה מהירה */}
+          <section>
+            <h3 className="font-bold mb-1 text-gray-800 dark:text-gray-200">עריכה מהירה</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              טקסט השקף וניווט בין שקפים
+            </p>
+
+            {activeSlide && (
+              <div className="mb-4">
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">
+                  טקסט שקף {activeSlideIndex + 1}
+                </label>
+                <textarea
+                  value={activeSlide.text}
+                  onChange={(e) => {
+                    const newSlides = [...localSlides];
+                    newSlides[activeSlideIndex] = {
+                      ...newSlides[activeSlideIndex],
+                      text: e.target.value,
+                    };
+                    setLocalSlides(newSlides);
+                  }}
+                  className="w-full p-2.5 border border-gray-200 dark:border-gray-600 rounded-lg resize-y bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
+                  rows={4}
+                  dir="rtl"
+                />
               </div>
             )}
-          </div>
-        </div>
 
-        <div className="mb-6">
-          <h3 className="font-bold mb-1 text-gray-800 dark:text-gray-200">
-            תבנית לשקף {activeSlideIndex + 1}
-          </h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-            עיצוב ויזואלי לשקף הנבחר בלבד
-          </p>
-          <div className="flex flex-col gap-4">
-            <div>
-              <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
-                עם תמונה
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {IMAGE_TEMPLATES.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => setSlideTemplate(activeSlideIndex, t.id)}
-                    className={`px-2 py-2 text-sm rounded border text-right transition-colors ${
-                      activeSlideTemplate === t.id
-                        ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-400'
-                        : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600'
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
-                בלי תמונה
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {TEXT_TEMPLATES.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => setSlideTemplate(activeSlideIndex, t.id)}
-                    className={`px-2 py-2 text-sm rounded border text-right transition-colors ${
-                      activeSlideTemplate === t.id
-                        ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-400'
-                        : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600'
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="mb-6">
-          <h3 className="font-bold mb-2 text-gray-800 dark:text-gray-200">גופן</h3>
-          <div className="flex flex-col gap-2">
-            {FONT_OPTIONS.map((font) => (
-              <button
-                key={font.id}
-                type="button"
-                onClick={() => setGlobalFont(font.id)}
-                className={`w-full px-3 py-2.5 rounded border text-right transition-colors flex items-center justify-between gap-3 ${
-                  globalFont === font.id
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 dark:border-blue-400'
-                    : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
-                }`}
-              >
-                <span
-                  className="text-base text-gray-900 dark:text-gray-100"
-                  style={{ fontFamily: `"${font.id}", sans-serif` }}
+            <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">שקפים</h4>
+            <div className="flex flex-col gap-2">
+              {localSlides.map((slide, i) => (
+                <div
+                  key={slide.id}
+                  onClick={() => setActiveSlideIndex(i)}
+                  className={`p-3 border rounded cursor-pointer transition-colors ${
+                    i === activeSlideIndex
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                      : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  }`}
                 >
-                  {font.label}
-                </span>
-                <span
-                  className="text-sm text-gray-500 dark:text-gray-300 shrink-0"
-                  style={{ fontFamily: `"${font.id}", sans-serif` }}
-                >
-                  שלום
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="mb-6">
-          <h3 className="font-bold mb-2 text-gray-800 dark:text-gray-200">ערכת צבעי שקפים</h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-            משנה את רקע וטקסט השקפים בתצוגה ובייצוא (לא את ערכת הנושא של האתר)
-          </p>
-          <button
-            type="button"
-            onClick={toggleTheme}
-            aria-pressed={isCanvasDark}
-            className={`w-full px-4 py-2.5 rounded font-semibold transition-all duration-300 shadow-sm border ${
-              isCanvasDark
-                ? 'bg-gray-100 text-gray-900 border-gray-300 hover:bg-white'
-                : 'bg-gray-900 text-white border-gray-900 hover:bg-gray-800'
-            }`}
-          >
-            {isCanvasDark ? 'עבור למצב בהיר' : 'עבור למצב כהה'}
-          </button>
-          <div className="mt-2 text-center text-xs font-medium text-indigo-600 dark:text-indigo-300">
-            כרגע: {isCanvasDark ? 'שקפים כהים' : 'שקפים בהירים'}
-          </div>
-        </div>
-
-        <div className="mb-6">
-          <CopilotWidget 
-            slides={localSlides}
-            template={activeSlideTemplate}
-            globalFont={globalFont}
-            brandColor={activeBrandColor}
-            theme={theme}
-            onUpdateSlideText={(index, text) => {
-              const newSlides = [...localSlides];
-              if (newSlides[index]) {
-                newSlides[index] = { ...newSlides[index], text };
-                setLocalSlides(newSlides);
-              }
-            }}
-            onChangeTemplate={handleChangeTemplateFromCopilot}
-            onChangeFont={(font) => setGlobalFont(font)}
-            onChangeColors={(color, newTheme) => {
-              if (color) setActiveBrandColor(color);
-              if (newTheme === 'light' || newTheme === 'dark') setTheme(newTheme);
-            }}
-          />
-        </div>
-
-        <div className="mb-6">
-          <h3 className="font-bold mb-2 text-gray-800 dark:text-gray-200">שקפים</h3>
-          <div className="flex flex-col gap-2">
-            {localSlides.map((slide, i) => (
-              <div 
-                key={slide.id} 
-                onClick={() => setActiveSlideIndex(i)}
-                className={`p-3 border rounded cursor-pointer transition-colors ${
-                  i === activeSlideIndex 
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
-                    : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2 mb-0.5">
-                  <div className="font-bold text-sm text-gray-600 dark:text-gray-400">שקף {i + 1}</div>
-                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 shrink-0">
-                    {isImageTemplate(getSlideTemplate(slide))
-                      ? slide.imageUrl
-                        ? 'תמונה הועלתה'
-                        : 'ממתין לתמונה'
-                      : 'טקסט'}
-                  </span>
+                  <div className="flex items-center justify-between gap-2 mb-0.5">
+                    <div className="font-bold text-sm text-gray-600 dark:text-gray-400">שקף {i + 1}</div>
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 shrink-0">
+                      {isImageTemplate(getSlideTemplate(slide))
+                        ? slide.imageUrl
+                          ? 'תמונה הועלתה'
+                          : 'ממתין לתמונה'
+                        : 'טקסט'}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-800 dark:text-gray-200 truncate">{slide.text}</div>
                 </div>
-                <div className="text-sm text-gray-800 dark:text-gray-200 truncate">{slide.text}</div>
+              ))}
+            </div>
+          </section>
+
+          {/* עיצוב מתקדם — מכווץ כברירת מחדל */}
+          <section className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setAdvancedOpen((open) => !open)}
+              aria-expanded={advancedOpen}
+              className="w-full flex items-center justify-between gap-2 px-3 py-3 bg-gray-50 dark:bg-gray-900/40 text-right hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
+            >
+              <span className="font-bold text-gray-800 dark:text-gray-200">עיצוב מתקדם</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
+                {advancedOpen ? 'הסתר ▲' : 'הצג ▼'}
+              </span>
+            </button>
+
+            {advancedOpen && (
+              <div className="p-3 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex flex-col gap-1.5 mb-3" role="tablist" aria-label="פאנלי עיצוב">
+                  {(
+                    [
+                      { id: 'layout' as const, label: 'פריסת קרוסלה' },
+                      { id: 'slide-template' as const, label: 'תבנית שקף' },
+                      { id: 'font' as const, label: 'גופן' },
+                    ] as const
+                  ).map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={advancedPanel === tab.id}
+                      onClick={() => setAdvancedPanel(tab.id)}
+                      className={`w-full px-3 py-2 rounded text-sm font-semibold text-right transition-colors ${
+                        advancedPanel === tab.id
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {advancedPanel === 'layout' && (
+                  <div role="tabpanel">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                      קובעת באילו שקפים יהיה מקום לתמונה — בלי למחוק את הטקסט
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      {CAROUSEL_LAYOUT_PRESETS.map((preset) => {
+                        const isActive = carouselLayoutPreset === preset.id;
+                        return (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() => applyLayoutPreset(preset.id)}
+                            className={`w-full px-3 py-2.5 rounded border text-right transition-colors ${
+                              isActive
+                                ? 'border-blue-500 bg-blue-50 text-blue-800 dark:bg-blue-900/30 dark:text-blue-100 dark:border-blue-400'
+                                : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600'
+                            }`}
+                          >
+                            <div className="text-sm font-semibold">{preset.label}</div>
+                            <div className="text-[11px] mt-0.5 opacity-80">{preset.hint}</div>
+                          </button>
+                        );
+                      })}
+                      {carouselLayoutPreset === 'custom' && (
+                        <div className="text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5">
+                          פריסה מותאמת אישית — שינית תבניות לשקפים בודדים
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                      <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                        ערכת צבעי שקפים
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={toggleTheme}
+                        aria-pressed={isCanvasDark}
+                        className={`w-full px-4 py-2.5 rounded font-semibold transition-all duration-300 shadow-sm border text-sm ${
+                          isCanvasDark
+                            ? 'bg-gray-100 text-gray-900 border-gray-300 hover:bg-white'
+                            : 'bg-gray-900 text-white border-gray-900 hover:bg-gray-800'
+                        }`}
+                      >
+                        {isCanvasDark ? 'עבור למצב בהיר' : 'עבור למצב כהה'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {advancedPanel === 'slide-template' && (
+                  <div role="tabpanel">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                      עיצוב ויזואלי לשקף {activeSlideIndex + 1} בלבד
+                    </p>
+                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                      מומלצות
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      {RECOMMENDED_TEMPLATES.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setSlideTemplate(activeSlideIndex, t.id)}
+                          className={`px-2 py-2 text-sm rounded border text-right transition-colors ${
+                            activeSlideTemplate === t.id
+                              ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-400'
+                              : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {(showMoreTemplates || activeTemplateIsMore) && (
+                      <div className="flex flex-col gap-3 mb-3">
+                        <div>
+                          <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                            עם תמונה
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            {MORE_TEMPLATES.filter((t) => isImageTemplate(t.id)).map((t) => (
+                              <button
+                                key={t.id}
+                                type="button"
+                                onClick={() => setSlideTemplate(activeSlideIndex, t.id)}
+                                className={`px-2 py-2 text-sm rounded border text-right transition-colors ${
+                                  activeSlideTemplate === t.id
+                                    ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-400'
+                                    : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600'
+                                }`}
+                              >
+                                {t.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                            בלי תמונה
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            {MORE_TEMPLATES.filter((t) => !isImageTemplate(t.id)).map((t) => (
+                              <button
+                                key={t.id}
+                                type="button"
+                                onClick={() => setSlideTemplate(activeSlideIndex, t.id)}
+                                className={`px-2 py-2 text-sm rounded border text-right transition-colors ${
+                                  activeSlideTemplate === t.id
+                                    ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-400'
+                                    : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600'
+                                }`}
+                              >
+                                {t.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => setShowMoreTemplates((v) => !v)}
+                      className="w-full px-3 py-2 text-sm font-semibold rounded border border-dashed border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      {showMoreTemplates ? 'הסתר תבניות נוספות' : 'עוד תבניות'}
+                    </button>
+                  </div>
+                )}
+
+                {advancedPanel === 'font' && (
+                  <div role="tabpanel">
+                    <div className="flex flex-col gap-2">
+                      {FONT_OPTIONS.map((font) => (
+                        <button
+                          key={font.id}
+                          type="button"
+                          onClick={() => setGlobalFont(font.id)}
+                          className={`w-full px-3 py-2.5 rounded border text-right transition-colors flex items-center justify-between gap-3 ${
+                            globalFont === font.id
+                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 dark:border-blue-400'
+                              : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          <span
+                            className="text-base text-gray-900 dark:text-gray-100"
+                            style={{ fontFamily: `"${font.id}", sans-serif` }}
+                          >
+                            {font.label}
+                          </span>
+                          <span
+                            className="text-sm text-gray-500 dark:text-gray-300 shrink-0"
+                            style={{ fontFamily: `"${font.id}", sans-serif` }}
+                          >
+                            שלום
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                  <CopilotWidget
+                    slides={localSlides}
+                    template={activeSlideTemplate}
+                    globalFont={globalFont}
+                    brandColor={activeBrandColor}
+                    theme={theme}
+                    onUpdateSlideText={(index, text) => {
+                      const newSlides = [...localSlides];
+                      if (newSlides[index]) {
+                        newSlides[index] = { ...newSlides[index], text };
+                        setLocalSlides(newSlides);
+                      }
+                    }}
+                    onChangeTemplate={handleChangeTemplateFromCopilot}
+                    onChangeFont={(font) => setGlobalFont(font)}
+                    onChangeColors={(color, newTheme) => {
+                      if (color) setActiveBrandColor(color);
+                      if (newTheme === 'light' || newTheme === 'dark') setTheme(newTheme);
+                    }}
+                  />
+                </div>
               </div>
-            ))}
-          </div>
+            )}
+          </section>
         </div>
       </div>
 
