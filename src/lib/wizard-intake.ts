@@ -156,7 +156,7 @@ export function buildIntakeReply(topic: string): string {
         : `• ${d.label} — ${d.hint}`
     ).join('\n'),
     '',
-    'בחרו בכל סעיף (בצ׳אט או בפאנל משמאל), או כתבו «מומלץ» — ואמשיך עם ההמלצות שלי לשני כיווני תוכן.',
+    'אפשר לשנות בפאנל משמאל, או ללחוץ «המשך עם ההמלצות» / לכתוב «מומלץ» — ואציע שני כיווני תוכן.',
   ].join('\n');
 }
 
@@ -235,6 +235,11 @@ export function parseUserOptionPicks(message: string): ParsedUserOptions {
     result.readyForDirections = true;
   }
 
+  // «המשך» לבד — ממשיכים עם ההגדרות הנוכחיות (בלי לאפס להמלצות)
+  if (/^(המשך|קדימה|יאללה|continue|next)[.!]?\s*$/i.test(t)) {
+    result.readyForDirections = true;
+  }
+
   // If message is only option picks (short), stay in awaiting; if says מוכן
   if (/מוכן|סיימתי|נעול|לסגור הגדרות/i.test(t)) {
     result.readyForDirections = true;
@@ -273,7 +278,7 @@ export function buildOptionsAckReply(
   }
 
   if (bits.length) {
-    return `עדכנתי: ${bits.join(' · ')}. אפשר לבחור עוד סעיף, לכוון בפאנל, או לכתוב «מומלץ» / «המשך» כדי לעבור לכיווני תוכן.`;
+    return `עדכנתי: ${bits.join(' · ')}. אפשר לכוון עוד בפאנל, או לכתוב «מומלץ» / «המשך» כדי לעבור לכיווני תוכן.`;
   }
 
   return '';
