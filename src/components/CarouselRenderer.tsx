@@ -272,6 +272,9 @@ export default function CarouselRenderer({
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [slideOverrides, setSlideOverrides] = useState<Record<number, { fontSize?: number; textY?: number }>>(initialSlideOverrides);
   const [remixingIndex, setRemixingIndex] = useState<number | null>(null);
+  const [remixSuggestions, setRemixSuggestions] = useState<
+    Record<number, string>
+  >({});
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [advancedPanel, setAdvancedPanel] = useState<AdvancedPanelId>('layout');
   const [showMoreTemplates, setShowMoreTemplates] = useState(false);
@@ -301,15 +304,38 @@ export default function CarouselRenderer({
       }
       if (!data.newText) throw new Error('Empty remix result');
 
-      const newSlides = [...localSlides];
-      newSlides[index] = { ...newSlides[index], text: data.newText };
-      setLocalSlides(newSlides);
+      // המלצה בלבד — לא מחליפים את הטקסט עד שהמשתמש מאשר
+      setRemixSuggestions((prev) => ({ ...prev, [index]: data.newText }));
     } catch (err) {
       console.error(err);
       alert('אירעה שגיאה בשיכתוב השקף.');
     } finally {
       setRemixingIndex(null);
     }
+  };
+
+  const applyRemixSuggestion = (index: number) => {
+    const suggestion = remixSuggestions[index];
+    if (!suggestion) return;
+    setLocalSlides((prev) => {
+      const next = [...prev];
+      if (!next[index]) return prev;
+      next[index] = { ...next[index], text: suggestion };
+      return next;
+    });
+    setRemixSuggestions((prev) => {
+      const next = { ...prev };
+      delete next[index];
+      return next;
+    });
+  };
+
+  const dismissRemixSuggestion = (index: number) => {
+    setRemixSuggestions((prev) => {
+      const next = { ...prev };
+      delete next[index];
+      return next;
+    });
   };
 
   const drawSlide = useCallback(
@@ -507,18 +533,33 @@ export default function CarouselRenderer({
 
   const toggleTheme = () => setTheme((t) => (t === 'light' ? 'dark' : 'light'));
 
+  const remapIndexRecord = <T,>(
+    prev: Record<number, T>,
+    mapIndex: (i: number) => number | null
+  ): Record<number, T> => {
+    const next: Record<number, T> = {};
+    Object.entries(prev).forEach(([key, value]) => {
+      const mapped = mapIndex(Number(key));
+      if (mapped != null) next[mapped] = value;
+    });
+    return next;
+  };
+
   const removeSlide = (index: number) => {
     if (localSlides.length <= 1) return;
     setLocalSlides((prev) => prev.filter((_, i) => i !== index));
-    setSlideOverrides((prev) => {
-      const next: Record<number, { fontSize?: number; textY?: number }> = {};
-      Object.entries(prev).forEach(([key, value]) => {
-        const i = Number(key);
-        if (i < index) next[i] = value;
-        else if (i > index) next[i - 1] = value;
-      });
-      return next;
-    });
+    setSlideOverrides((prev) =>
+      remapIndexRecord(prev, (i) => {
+        if (i === index) return null;
+        return i > index ? i - 1 : i;
+      })
+    );
+    setRemixSuggestions((prev) =>
+      remapIndexRecord(prev, (i) => {
+        if (i === index) return null;
+        return i > index ? i - 1 : i;
+      })
+    );
     setActiveSlideIndex((i) => Math.max(0, Math.min(i, localSlides.length - 2)));
     setEditingIndex(null);
   };
@@ -540,15 +581,12 @@ export default function CarouselRenderer({
       next.splice(insertAt, 0, newSlide);
       return next;
     });
-    setSlideOverrides((prev) => {
-      const next: Record<number, { fontSize?: number; textY?: number }> = {};
-      Object.entries(prev).forEach(([key, value]) => {
-        const i = Number(key);
-        if (i < insertAt) next[i] = value;
-        else next[i + 1] = value;
-      });
-      return next;
-    });
+    setSlideOverrides((prev) =>
+      remapIndexRecord(prev, (i) => (i >= insertAt ? i + 1 : i))
+    );
+    setRemixSuggestions((prev) =>
+      remapIndexRecord(prev, (i) => (i >= insertAt ? i + 1 : i))
+    );
     setActiveSlideIndex(insertAt);
     setEditingIndex(null);
   };
@@ -571,16 +609,19 @@ export default function CarouselRenderer({
       return next;
     });
 
-    setSlideOverrides((prev) => {
+    const remapOverrideArray = <T,>(prev: Record<number, T>) => {
       const ordered = localSlides.map((_, i) => prev[i]);
       const [moved] = ordered.splice(fromIndex, 1);
       ordered.splice(toIndex, 0, moved);
-      const next: Record<number, { fontSize?: number; textY?: number }> = {};
+      const next: Record<number, T> = {};
       ordered.forEach((value, i) => {
-        if (value) next[i] = value;
+        if (value !== undefined) next[i] = value;
       });
       return next;
-    });
+    };
+
+    setSlideOverrides((prev) => remapOverrideArray(prev));
+    setRemixSuggestions((prev) => remapOverrideArray(prev));
 
     setActiveSlideIndex((current) => {
       if (current === fromIndex) return toIndex;
@@ -1088,7 +1129,10 @@ export default function CarouselRenderer({
                 onImageUpload={handleSlideImageUpload}
                 onImageClear={handleSlideImageClear}
                 remixingIndex={remixingIndex}
+                remixSuggestion={remixSuggestions[activeSlideIndex]}
                 onRemix={handleRemix}
+                onApplyRemix={applyRemixSuggestion}
+                onDismissRemix={dismissRemixSuggestion}
               />
             </div>
           )}
