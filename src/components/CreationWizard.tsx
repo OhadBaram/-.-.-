@@ -8,9 +8,15 @@ import {
   MIN_SLIDE_COUNT,
   RECOMMENDED_SLIDE_COUNT,
   VISUAL_STYLE_OPTIONS,
+  type DensityId,
   type NarrativeDirection,
+  type VisualStyleId,
   type WizardOptions,
 } from '@/lib/wizard';
+import {
+  buildIntakeSuggestions,
+  recommendedSlideCountForTopic,
+} from '@/lib/wizard-intake';
 
 export interface CreationWizardSubmitPayload {
   topic: string;
@@ -47,10 +53,38 @@ interface ChatMessage {
 type WizardPhase = 'topic' | 'styles';
 
 const QUICK_PROMPTS = [
+  '5 טיפים לעבודה חכמה עם Cursor',
   'טיפים לקרוסלת אינסטגרם שמביאה שמירות',
-  'איך לבנות משפך לידים לעסק מקומי',
   'טעויות נפוצות בניהול זמן ליזמים',
 ];
+
+function ChatBubbleText({ text }: { text: string }) {
+  const lines = text.split('\n');
+  return (
+    <div className="space-y-1.5 whitespace-pre-wrap">
+      {lines.map((line, idx) => {
+        if (line.startsWith('## ')) {
+          return (
+            <p
+              key={idx}
+              className="pt-2 first:pt-0 font-black text-indigo-200 text-[15px]"
+            >
+              {line.replace(/^##\s+/, '')}
+            </p>
+          );
+        }
+        if (!line.trim()) {
+          return <div key={idx} className="h-1" />;
+        }
+        return (
+          <p key={idx} className="leading-relaxed">
+            {line}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function CreationWizard({
   userName,
@@ -67,6 +101,7 @@ export default function CreationWizard({
   const [chatLoading, setChatLoading] = useState(false);
   const [stylesLoading, setStylesLoading] = useState(false);
   const [showClassicHint, setShowClassicHint] = useState(false);
+  const [intakeReady, setIntakeReady] = useState(false);
   const [phase, setPhase] = useState<WizardPhase>('topic');
   const [researchNote, setResearchNote] = useState('');
   const [directions, setDirections] = useState<NarrativeDirection[]>([]);
@@ -77,13 +112,15 @@ export default function CreationWizard({
     {
       role: 'assistant',
       text: userName
-        ? `היי ${userName}! נושא אחד מספיק — נציע שני כיווני תוכן, תבחרו, ותקבלו חבילה מלאה: שער, שקפים, הוכחה, סיום, כיתוב והאשטאגים.`
-        : 'היי! נושא אחד מספיק — נציע שני כיווני תוכן, תבחרו, ותקבלו חבילה מלאה: שער, שקפים, הוכחה, סיום, כיתוב והאשטאגים.',
+        ? `היי ${userName}! שלחו נושא אחד — אכין קליטת הגדרות (עמודים, סטייל, צפיפות). אחר כך «מומלץ» או בחירה ידנית, ואז שני כיווני תוכן וחבילה מלאה.`
+        : 'היי! שלחו נושא אחד — אכין קליטת הגדרות (עמודים, סטייל, צפיפות). אחר כך «מומלץ» או בחירה ידנית, ואז שני כיווני תוכן וחבילה מלאה.',
     },
   ]);
 
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
 
   useEffect(() => {
     listRef.current?.scrollTo({
@@ -96,16 +133,64 @@ export default function CreationWizard({
     setOptions((prev) => ({ ...prev, ...partial }));
   };
 
+  const applyChatSuggestions = (data: {
+    suggestedSlideCount?: number | null;
+    suggestedDensity?: string | null;
+    suggestedVisualStyle?: string | null;
+    suggestedVisualStyleCustom?: string | null;
+    useRecommendedStructure?: boolean | null;
+    applyRecommendedAll?: boolean;
+    topic?: string;
+  }) => {
+    const topic = (data.topic || topicDraft).trim();
+    if (data.applyRecommendedAll && topic) {
+      const s = buildIntakeSuggestions(topic);
+      patchOptions(s);
+      return s;
+    }
+
+    const next: Partial<WizardOptions> = {};
+    if (typeof data.suggestedSlideCount === 'number') {
+      next.slideCount = data.suggestedSlideCount;
+    }
+    if (typeof data.useRecommendedStructure === 'boolean') {
+      next.useRecommendedStructure = data.useRecommendedStructure;
+    }
+    if (data.suggestedDensity) {
+      next.density = data.suggestedDensity as DensityId;
+    }
+    if (data.suggestedVisualStyle) {
+      next.visualStyle = data.suggestedVisualStyle as VisualStyleId;
+    }
+    if (typeof data.suggestedVisualStyleCustom === 'string') {
+      next.visualStyleCustom = data.suggestedVisualStyleCustom;
+    }
+    if (Object.keys(next).length) patchOptions(next);
+    return next;
+  };
+
   const setRecommended = () => {
+    const count = topicDraft
+      ? recommendedSlideCountForTopic(topicDraft)
+      : RECOMMENDED_SLIDE_COUNT;
     patchOptions({
-      slideCount: RECOMMENDED_SLIDE_COUNT,
+      slideCount: count,
       useRecommendedStructure: true,
+      density: 'standard',
+      visualStyle: topicDraft
+        ? buildIntakeSuggestions(topicDraft).visualStyle
+        : options.visualStyle,
     });
   };
 
-  const fetchStyleDirections = async (topic: string) => {
+  const fetchStyleDirections = async (
+    topic: string,
+    optsOverride?: Partial<WizardOptions>
+  ) => {
     const cleanTopic = topic.trim();
     if (!cleanTopic || stylesLoading || isLoading) return;
+
+    const liveOptions = { ...optionsRef.current, ...optsOverride };
 
     setStylesLoading(true);
     setPhase('styles');
@@ -119,8 +204,8 @@ export default function CreationWizard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           topic: cleanTopic,
-          audience: options.audience,
-          goal: options.goal,
+          audience: liveOptions.audience,
+          goal: liveOptions.goal,
         }),
       });
       const data = await res.json();
@@ -148,7 +233,7 @@ export default function CreationWizard({
         ...prev,
         {
           role: 'assistant',
-          text: 'לא הצלחתי להציע כיוונים עכשיו. נסו שוב בעוד רגע, או שלחו את הנושא שוב.',
+          text: 'לא הצלחתי להציע כיוונים עכשיו. נסו שוב בעוד רגע, או שלחו «מומלץ» שוב.',
         },
       ]);
       setPhase('topic');
@@ -188,8 +273,11 @@ export default function CreationWizard({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'שגיאת סוכן');
 
-      const nextTopic = (data.topic || message).trim();
-      if (nextTopic) setTopicDraft(nextTopic);
+      const nextTopic = (data.topic || topicDraft).trim();
+      if (nextTopic) {
+        setTopicDraft(nextTopic);
+      }
+
       if (data.suggestedAudience) {
         patchOptions({ audience: data.suggestedAudience });
       }
@@ -197,9 +285,18 @@ export default function CreationWizard({
         patchOptions({ goal: data.suggestedGoal });
       }
 
+      const applied = applyChatSuggestions({
+        ...data,
+        topic: nextTopic || topicDraft,
+      });
+
+      if (data.phase === 'intake' || (data.reply || '').includes('## מספר עמודים')) {
+        setIntakeReady(true);
+      }
+
       const reply =
         data.reply ||
-        'מעולה. כשיש נושא ברור — נציע שני כיווני תוכן לבחירה.';
+        'מעולה. כשיש נושא ברור — אכין קליטת הגדרות.';
 
       setMessages([
         ...nextHistory,
@@ -209,24 +306,43 @@ export default function CreationWizard({
         },
       ]);
 
-      if (data.readyToGenerate && nextTopic) {
+      const topicForDirections = (data.topic || nextTopic || topicDraft).trim();
+      if (data.readyForDirections && topicForDirections) {
         setChatLoading(false);
-        await fetchStyleDirections(nextTopic);
+        await fetchStyleDirections(topicForDirections, applied);
         return;
       }
     } catch (err) {
       console.error(err);
-      setTopicDraft(message);
+      setTopicDraft((prev) => prev || message);
       setMessages([
         ...nextHistory,
         {
           role: 'assistant',
-          text: 'שמרתי את הנושא. לחצו «הצע כיווני תוכן» כדי לבחור כיוון ולהמשיך.',
+          text: 'שמרתי את הנושא. לחצו «מומלץ» או «הצע כיווני תוכן» כדי להמשיך.',
         },
       ]);
+      setIntakeReady(true);
     } finally {
       setChatLoading(false);
     }
+  };
+
+  const handleRecommendedAll = () => {
+    const topic = (topicDraft || inputText).trim();
+    if (!topic) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          text: 'קודם נושא אחד — ואז «מומלץ» ינעל את כל ההגדרות.',
+        },
+      ]);
+      inputRef.current?.focus();
+      return;
+    }
+    if (!topicDraft) setTopicDraft(topic);
+    void sendChat('מומלץ');
   };
 
   const handleProposeStyles = () => {
@@ -301,10 +417,13 @@ export default function CreationWizard({
     });
   };
 
+  const topicRecommendedCount = topicDraft
+    ? recommendedSlideCountForTopic(topicDraft)
+    : RECOMMENDED_SLIDE_COUNT;
+
   const pageHint =
-    options.useRecommendedStructure &&
-    options.slideCount === RECOMMENDED_SLIDE_COUNT
-      ? 'שער + תוכן + הוכחה + סיום'
+    options.useRecommendedStructure
+      ? `שער + תוכן + הוכחה + סיום (${options.slideCount})`
       : `${options.slideCount} שקפים מותאמים`;
 
   const busy = isLoading || chatLoading || stylesLoading;
@@ -342,13 +461,12 @@ export default function CreationWizard({
               קרוסל. איי. אי
             </h1>
             <p className="mt-2 max-w-xl text-zinc-400 text-base md:text-lg animate-[wizardRise_0.85s_ease-out]">
-              בוחרים כיוון תוכן, מקבלים שער שעוצר גלילה, שקפי ערך, הוכחה, קריאה
-              לפעולה — ועוד כיתוב והאשטאגים להדבקה.
+              נושא → קליטת הגדרות → כיוון תוכן → חבילה מלאה עם כיתוב והאשטאגים.
             </p>
             <ol className="mt-4 flex flex-wrap gap-2 text-xs text-zinc-500">
               <li
                 className={`rounded-full border px-3 py-1 ${
-                  phase === 'topic'
+                  phase === 'topic' && !intakeReady
                     ? 'border-indigo-400/50 text-indigo-200 bg-indigo-500/10'
                     : 'border-white/10'
                 }`}
@@ -357,15 +475,24 @@ export default function CreationWizard({
               </li>
               <li
                 className={`rounded-full border px-3 py-1 ${
+                  phase === 'topic' && intakeReady
+                    ? 'border-violet-400/50 text-violet-100 bg-violet-500/10'
+                    : 'border-white/10'
+                }`}
+              >
+                2 · הגדרות
+              </li>
+              <li
+                className={`rounded-full border px-3 py-1 ${
                   phase === 'styles'
                     ? 'border-sky-400/50 text-sky-100 bg-sky-500/10'
                     : 'border-white/10'
                 }`}
               >
-                2 · כיוון תוכן
+                3 · כיוון תוכן
               </li>
               <li className="rounded-full border border-white/10 px-3 py-1">
-                3 · חבילה מלאה
+                4 · חבילה
               </li>
             </ol>
           </header>
@@ -383,7 +510,11 @@ export default function CreationWizard({
                     : 'bg-indigo-600/90 text-white self-end'
                 }`}
               >
-                {msg.text}
+                {msg.role === 'assistant' ? (
+                  <ChatBubbleText text={msg.text} />
+                ) : (
+                  msg.text
+                )}
               </div>
             ))}
 
@@ -442,6 +573,16 @@ export default function CreationWizard({
           {phase === 'topic' ? (
             <>
               <div className="px-5 md:px-8 pb-3 flex flex-wrap gap-2">
+                {intakeReady && topicDraft ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={handleRecommendedAll}
+                    className="text-xs md:text-sm px-3 py-1.5 rounded-full border border-indigo-400/50 bg-indigo-500/20 text-indigo-100 font-bold hover:bg-indigo-500/30 transition disabled:opacity-40"
+                  >
+                    מומלץ — נעל הכל והמשך
+                  </button>
+                ) : null}
                 {QUICK_PROMPTS.map((prompt) => (
                   <button
                     key={prompt}
@@ -468,7 +609,7 @@ export default function CreationWizard({
                       }
                     }}
                     rows={2}
-                    placeholder="נושא אחד לקרוסלה — למשל: טיפים ללידים מעסק מקומי"
+                    placeholder="נושא אחד — למשל: 5 טיפים לעבודה עם Cursor"
                     className="flex-1 resize-none bg-transparent border-0 text-zinc-100 placeholder:text-zinc-500 px-3 py-2 focus:outline-none focus:ring-0 text-[15px]"
                     disabled={busy}
                   />
@@ -535,17 +676,19 @@ export default function CreationWizard({
               type="button"
               onClick={setRecommended}
               className={`w-full text-right rounded-xl border px-4 py-3 transition ${
-                options.useRecommendedStructure &&
-                options.slideCount === RECOMMENDED_SLIDE_COUNT
+                options.useRecommendedStructure
                   ? 'border-indigo-400/60 bg-indigo-500/15 text-indigo-100'
                   : 'border-white/10 bg-white/5 text-zinc-300 hover:bg-white/8'
               }`}
             >
               <div className="font-bold">
-                מומלץ — {RECOMMENDED_SLIDE_COUNT} שקפים
+                מומלץ — {topicRecommendedCount} שקפים
               </div>
               <div className="text-sm opacity-80 mt-0.5">
                 שער + תוכן + הוכחה + סיום
+                {topicDraft && topicRecommendedCount !== RECOMMENDED_SLIDE_COUNT
+                  ? ` · מותאם לרשימת ${topicRecommendedCount - 2} פריטים`
+                  : ''}
               </div>
             </button>
             <div>
@@ -561,7 +704,7 @@ export default function CreationWizard({
                   patchOptions({
                     slideCount: Number(e.target.value),
                     useRecommendedStructure:
-                      Number(e.target.value) === RECOMMENDED_SLIDE_COUNT,
+                      Number(e.target.value) === topicRecommendedCount,
                   })
                 }
                 className="w-full accent-indigo-500 cursor-pointer"
@@ -637,7 +780,10 @@ export default function CreationWizard({
                         : 'border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/5'
                     }`}
                   >
-                    <span className="font-bold">{d.label}</span>
+                    <span className="font-bold">
+                      {d.label}
+                      {d.id === 'standard' ? ' ⭐' : ''}
+                    </span>
                     <span className="text-sm opacity-75 mr-2">— {d.hint}</span>
                   </button>
                 );
@@ -672,14 +818,30 @@ export default function CreationWizard({
 
           <div className="mt-auto pt-2 space-y-3 sticky bottom-0 pb-1">
             {phase === 'topic' ? (
-              <button
-                type="button"
-                onClick={handleProposeStyles}
-                disabled={busy}
-                className="w-full rounded-2xl bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white font-black text-lg py-4 shadow-[0_0_40px_-12px_rgba(99,102,241,0.8)] transition transform hover:-translate-y-0.5 active:translate-y-0"
-              >
-                {stylesLoading ? 'מציע כיוונים…' : 'הצע 2 כיווני תוכן'}
-              </button>
+              <div className="space-y-2">
+                {intakeReady && topicDraft ? (
+                  <button
+                    type="button"
+                    onClick={handleRecommendedAll}
+                    disabled={busy}
+                    className="w-full rounded-2xl bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white font-black text-lg py-4 shadow-[0_0_40px_-12px_rgba(99,102,241,0.8)] transition transform hover:-translate-y-0.5 active:translate-y-0"
+                  >
+                    מומלץ — המשך לכיווני תוכן
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={handleProposeStyles}
+                  disabled={busy}
+                  className={`w-full rounded-2xl disabled:opacity-50 text-white font-black text-lg py-4 transition ${
+                    intakeReady && topicDraft
+                      ? 'bg-white/10 hover:bg-white/15 border border-white/15'
+                      : 'bg-indigo-500 hover:bg-indigo-400 shadow-[0_0_40px_-12px_rgba(99,102,241,0.8)] transform hover:-translate-y-0.5 active:translate-y-0'
+                  }`}
+                >
+                  {stylesLoading ? 'מציע כיוונים…' : 'הצע 2 כיווני תוכן'}
+                </button>
+              </div>
             ) : (
               <button
                 type="button"
