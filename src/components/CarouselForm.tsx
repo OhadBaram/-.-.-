@@ -27,7 +27,7 @@ export default function CarouselForm({ onSubmit, isLoading }: CarouselFormProps)
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           required
-          className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full text-gray-900 border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           placeholder="לדוגמה: 5 טיפים לניהול זמן"
         />
       </div>
@@ -39,7 +39,7 @@ export default function CarouselForm({ onSubmit, isLoading }: CarouselFormProps)
           value={audience}
           onChange={(e) => setAudience(e.target.value)}
           required
-          className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full text-gray-900 border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           placeholder="לדוגמה: עצמאיים ובעלי עסקים"
         />
       </div>
@@ -51,7 +51,7 @@ export default function CarouselForm({ onSubmit, isLoading }: CarouselFormProps)
           value={goal}
           onChange={(e) => setGoal(e.target.value)}
           required
-          className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full text-gray-900 border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           placeholder="לדוגמה: יצירת מעורבות ומכירות"
         />
       </div>
@@ -63,7 +63,7 @@ export default function CarouselForm({ onSubmit, isLoading }: CarouselFormProps)
           value={brand}
           onChange={(e) => setBrand(e.target.value)}
           required
-          className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full text-gray-900 border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           placeholder="לדוגמה: מקצועי, חדשני, ישיר"
         />
       </div>

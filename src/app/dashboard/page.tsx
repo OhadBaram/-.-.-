@@ -100,7 +100,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
           <Link href="/dashboard/settings" className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50">
             הגדרות מותג
           </Link>
-          <Link href="/" className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+          <Link href="/dashboard/create" className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
             צור קרוסלה חדשה +
           </Link>
         </div>
