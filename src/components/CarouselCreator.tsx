@@ -103,7 +103,7 @@ export default function CarouselCreator({
     setIsLoading(true);
     setShowWizardOverDraft(false);
     setWizardMeta(metaFromSubmit(data));
-    if (data.brandColors?.length) {
+    if (data.brandColors) {
       setBrandPalette(clampPalette(data.brandColors));
     }
 

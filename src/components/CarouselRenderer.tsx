@@ -11,6 +11,7 @@ import { MAX_SLIDE_COUNT } from '@/lib/wizard';
 import {
   clampPalette,
   colorForSlide,
+  backgroundForSlide,
   parseBrandPalette,
   primaryBrandColor,
   type BrandPalette,
@@ -249,6 +250,7 @@ function detectCarouselLayoutPreset(slides: Slide[]): CarouselLayoutPresetId {
 export interface SlideOverride {
   fontSize?: number;
   textY?: number;
+  surfaceBg?: string;
 }
 
 interface CarouselRendererProps {
@@ -273,9 +275,7 @@ export default function CarouselRenderer({
   const [isExporting, setIsExporting] = useState(false);
   const [brandPalette, setBrandPaletteState] = useState<BrandPalette>(() =>
     clampPalette(
-      initialBrandPalette?.length
-        ? initialBrandPalette
-        : parseBrandPalette(initialBrandColor)
+      initialBrandPalette ?? parseBrandPalette(initialBrandColor)
     )
   );
   const setBrandPalette = (next: BrandPalette | ((prev: BrandPalette) => BrandPalette)) => {
@@ -297,7 +297,7 @@ export default function CarouselRenderer({
 
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [slideOverrides, setSlideOverrides] = useState<Record<number, { fontSize?: number; textY?: number }>>(initialSlideOverrides);
+  const [slideOverrides, setSlideOverrides] = useState<Record<number, SlideOverride>>(initialSlideOverrides);
   const [remixingIndex, setRemixingIndex] = useState<number | null>(null);
   const [remixSuggestions, setRemixSuggestions] = useState<
     Record<number, string>
@@ -380,16 +380,21 @@ export default function CarouselRenderer({
         generation !== undefined && generation !== drawGenerationRef.current;
       if (isStale()) return;
 
-      const currentOverride = override ?? slideOverrides[slideIndex] ?? {};
-      const isDark          = theme === 'dark';
-      const W               = CANVAS_WIDTH;
-      const H               = CANVAS_HEIGHT;
-      const text            = slide.text;
+      const isDark = theme === 'dark';
+      const W = CANVAS_WIDTH;
+      const H = CANVAS_HEIGHT;
+      const text = slide.text;
       // Quote family names so multi-word fonts (e.g. Playpen Sans Hebrew) work in canvas.
-      const fontFamily      = `"${globalFont}", sans-serif`;
+      const fontFamily = `"${globalFont}", sans-serif`;
       // רק תמונת השקף הנוכחי — אין נפילה לתמונה של שקף אחר
-      const slideImageUrl   = slide.imageUrl;
+      const slideImageUrl = slide.imageUrl;
       const slideBrandColor = colorForSlide(brandPalette, slideIndex);
+      const currentOverride = {
+        ...(override ?? slideOverrides[slideIndex] ?? {}),
+        surfaceBg:
+          backgroundForSlide(brandPalette, slideIndex, isDark) ||
+          (override ?? slideOverrides[slideIndex] ?? {}).surfaceBg,
+      };
 
       if (typeof document !== 'undefined' && document.fonts?.load) {
         try {
@@ -1048,7 +1053,10 @@ export default function CarouselRenderer({
                     onChangeColors={(color, newTheme) => {
                       if (color) {
                         setBrandPalette((prev) =>
-                          clampPalette([color, ...prev.slice(1)])
+                          clampPalette({
+                            ...prev,
+                            accents: [color, ...prev.accents.slice(1)],
+                          })
                         );
                       }
                       if (newTheme === 'light' || newTheme === 'dark') setTheme(newTheme);

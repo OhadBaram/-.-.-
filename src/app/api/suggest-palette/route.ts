@@ -20,12 +20,17 @@ export async function POST(req: Request) {
     const topic = typeof body.topic === 'string' ? body.topic : '';
     const visualStyle =
       typeof body.visualStyle === 'string' ? body.visualStyle : 'minimal';
-    const seedColors = Array.isArray(body.seedColors) ? body.seedColors : [];
+    const seedPalette = clampPalette(
+      body.seedPalette ||
+        (Array.isArray(body.seedColors)
+          ? { accents: body.seedColors, backgrounds: [] }
+          : null)
+    );
 
     const local = recommendPaletteLocal({
       topic,
       visualStyle,
-      seedColor: seedColors[0],
+      seedColor: seedPalette.accents[0],
     });
 
     const aiProvider = process.env.DEFAULT_AI_PROVIDER || 'gemini';
@@ -33,6 +38,8 @@ export async function POST(req: Request) {
 
     try {
       const result = await generateJson<{
+        accents?: string[];
+        backgrounds?: string[];
         colors?: string[];
         reason?: string;
       }>({
@@ -40,37 +47,43 @@ export async function POST(req: Request) {
 אתה מעצב מותג לקרוסלות אינסטגרם בעברית.
 החזר JSON בלבד:
 {
-  "colors": ["#hex", "#hex", "#hex"],
-  "reason": "משפט קצר בעברית למה השילוב מתאים"
+  "accents": ["#hex", "..."],
+  "backgrounds": ["#hex", "..."],
+  "reason": "משפט קצר בעברית"
 }
 
 כללים:
-- בדיוק 3 צבעי HEX תקינים (#rrggbb).
-- צבע 1 = ראשי (אקסנט/כפתורים), 2 = משני, 3 = תומך/כהה או ניגודי.
-- התאם לנושא ולסגנון.
-- ניגודיות טובה לטקסט לבן/כהה על רקע מותג.
+- accents: 3–6 צבעי HEX לאקסנטים (כפתורים, קווים, הדגשות).
+- backgrounds: 2–4 צבעי HEX לרקעי שקפים (לפחות אחד בהיר ואחד כהה).
+- התאם לנושא ולסגנון. ניגודיות טובה לטקסט.
 
 נושא: ${topic || '(כללי)'}
 סגנון: ${visualStyle}
-צבעי בסיס קיימים: ${seedColors.join(', ') || '(אין)'}
-המלצה מקומית להשוואה: ${local.join(', ')}
+פלטה נוכחית: ${JSON.stringify(seedPalette)}
+המלצה מקומית: ${JSON.stringify(local)}
 `,
         provider: aiProvider,
         model: aiModel,
       });
 
-      const colors = clampPalette(result.colors || local);
+      const palette = clampPalette({
+        accents: result.accents || result.colors || local.accents,
+        backgrounds: result.backgrounds || local.backgrounds,
+      });
+
       return NextResponse.json({
-        colors,
+        ...palette,
+        colors: palette.accents,
         reason:
           result.reason ||
-          'שילוב מומלץ לפי הנושא והסגנון — אפשר לערוך.',
+          'שילוב מומלץ לפי הנושא והסגנון — אפשר להוסיף ולערוך.',
         source: 'ai',
       });
     } catch (err) {
       console.warn('suggest-palette AI fallback', err);
       return NextResponse.json({
-        colors: local,
+        ...local,
+        colors: local.accents,
         reason: 'המלצה מקומית לפי סגנון ונושא — אפשר לערוך.',
         source: 'local',
       });

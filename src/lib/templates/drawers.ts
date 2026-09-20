@@ -9,6 +9,18 @@ export function darkenHex(hex: string, amount = 60): string {
 export interface SlideOverride {
   fontSize?: number;
   textY?: number;
+  /** רקע שקף מפלטת המשתמש — גובר על ברירת בהיר/כהה */
+  surfaceBg?: string;
+}
+
+export function resolveSurfaceBg(
+  isDark: boolean,
+  override?: SlideOverride,
+  light = '#ffffff',
+  dark = '#111827'
+): string {
+  if (override?.surfaceBg) return override.surfaceBg;
+  return isDark ? dark : light;
 }
 
 /**
@@ -96,7 +108,7 @@ export function drawMinimal(
   override?: SlideOverride,
   fontFamily: string = 'Heebo, sans-serif'
 ) {
-  const bg = isDark ? '#111827' : '#ffffff';
+  const bg = resolveSurfaceBg(isDark, override, '#ffffff', '#111827');
   const fg = isDark ? '#f9fafb' : '#111827';
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
@@ -142,7 +154,7 @@ export function drawBold(
   override?: SlideOverride,
   fontFamily: string = 'Heebo, sans-serif'
 ) {
-  const bg = isDark ? '#111827' : '#f9fafb';
+  const bg = resolveSurfaceBg(isDark, override, '#f9fafb', '#111827');
   const fg = isDark ? '#ffffff' : '#111827';
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
@@ -217,7 +229,7 @@ export function drawDarkLuxury(
   fontFamily: string = 'Heebo, sans-serif'
 ) {
   const gold = '#D4AF37';
-  const bg = isDark ? '#0a0a0a' : '#f7f3e8';
+  const bg = resolveSurfaceBg(isDark, override, '#f7f3e8', '#0a0a0a');
   const fg = isDark ? '#ffffff' : '#1a1a1a';
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
@@ -257,7 +269,7 @@ export function drawFrame(
   override?: SlideOverride,
   fontFamily: string = 'Heebo, sans-serif'
 ) {
-  const bg = isDark ? '#111827' : '#ffffff';
+  const bg = resolveSurfaceBg(isDark, override, '#ffffff', '#111827');
   const fg = isDark ? '#f9fafb' : '#111827';
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
@@ -349,7 +361,7 @@ export function drawQuote(
   override?: SlideOverride,
   fontFamily: string = 'Heebo, sans-serif'
 ) {
-  const bg = isDark ? '#111827' : '#ffffff';
+  const bg = resolveSurfaceBg(isDark, override, '#ffffff', '#111827');
   const fg = isDark ? '#f9fafb' : '#111827';
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
@@ -384,7 +396,7 @@ export function drawNumbered(
   override?: SlideOverride,
   fontFamily: string = 'Heebo, sans-serif'
 ) {
-  const bg = isDark ? '#111827' : '#ffffff';
+  const bg = resolveSurfaceBg(isDark, override, '#ffffff', '#111827');
   const fg = isDark ? '#f9fafb' : '#111827';
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
@@ -425,7 +437,7 @@ export function drawMagazine(
   override?: SlideOverride,
   fontFamily: string = 'Heebo, sans-serif'
 ) {
-  const bg = isDark ? '#111827' : '#ffffff';
+  const bg = resolveSurfaceBg(isDark, override, '#ffffff', '#111827');
   const fg = isDark ? '#f9fafb' : '#111827';
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
@@ -477,7 +489,7 @@ export function drawWaves(
   override?: SlideOverride,
   fontFamily: string = 'Heebo, sans-serif'
 ) {
-  const bg = isDark ? '#111827' : '#ffffff';
+  const bg = resolveSurfaceBg(isDark, override, '#ffffff', '#111827');
   const fg = isDark ? '#f9fafb' : '#111827';
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
@@ -851,7 +863,7 @@ export async function drawImagePolaroid(
   override: SlideOverride = {},
   imageUrl?: string, fontFamily: string = 'Heebo, sans-serif', shouldAbort?: () => boolean
 ): Promise<void> {
-  const bg = isDark ? '#111827' : '#f9fafb';
+  const bg = resolveSurfaceBg(isDark, override, '#f9fafb', '#111827');
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
@@ -924,7 +936,7 @@ export async function drawImageMagazine(
 ): Promise<void> {
   const splitY = H * 0.8;
   
-  const bg = isDark ? '#111827' : '#ffffff';
+  const bg = resolveSurfaceBg(isDark, override, '#ffffff', '#111827');
   ctx.fillStyle = bg;
   ctx.fillRect(0, splitY, W, H - splitY);
 
@@ -979,7 +991,7 @@ export async function drawImageArch(
   override: SlideOverride = {},
   imageUrl?: string, fontFamily: string = 'Heebo, sans-serif', shouldAbort?: () => boolean
 ): Promise<void> {
-  const bg = isDark ? '#111827' : '#f9fafb';
+  const bg = resolveSurfaceBg(isDark, override, '#f9fafb', '#111827');
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 

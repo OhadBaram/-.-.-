@@ -180,8 +180,12 @@ ${densityHint}
 הנחיות סגנון ויזואלי (צבעים וטון):
 ${visualHint}
 ${
-  brandColors && brandColors.length
-    ? `\nפלטת מותג לבחירת המשתמש (העדף אותם ברקעים/אקסנטים): ${brandColors.join(', ')}`
+  brandColors
+    ? `\nפלטת מותג דינמית (העדף ברקעים/אקסנטים):\n${JSON.stringify(
+        typeof brandColors === 'object' && !Array.isArray(brandColors)
+          ? brandColors
+          : { accents: brandColors, backgrounds: [] }
+      )}`
     : ''
 }
 

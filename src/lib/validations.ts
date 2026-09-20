@@ -13,7 +13,15 @@ export const generateCarouselSchema = z.object({
   audience: z.string().optional(),
   goal: z.string().optional(),
   brand: z.string().optional(),
-  brandColors: z.array(z.string()).min(1).max(3).optional(),
+  brandColors: z
+    .union([
+      z.array(z.string()).min(1).max(8),
+      z.object({
+        accents: z.array(z.string()).min(1).max(8),
+        backgrounds: z.array(z.string()).max(8).optional().default([]),
+      }),
+    ])
+    .optional(),
   slideCount: z.number().int().min(3).max(15).optional().default(7),
   density: z.enum(['light', 'standard', 'rich']).optional().default('standard'),
   visualStyle: z

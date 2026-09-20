@@ -107,11 +107,12 @@ export default function SettingsForm({
           variant="default"
         />
         <p className="text-sm text-gray-500 mt-3">
-          💡 עד 3 צבעים. הצבע הראשי (
+          💡 פלטה דינמית: אקסנטים להדגשות + רקעים לשקפים. אפשר להוסיף עד 8 מכל סוג,
+          והמערכת ממליצה שילובים — תמיד אפשר לערוך. הצבע הראשי (
           <span className="font-mono" dir="ltr">
             {primaryBrandColor(brandPalette)}
           </span>
-          ) ישמש כברירת מחדל ביצירה — ותמיד אפשר לשנות גם באשף וגם בעורך.
+          ) הוא ברירת המחדל ליצירה.
         </p>
       </div>
 
