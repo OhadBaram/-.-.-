@@ -61,7 +61,8 @@ export function drawMinimal(
   text: string,
   brandColor: string,
   isDark: boolean,
-  override?: SlideOverride
+  override?: SlideOverride,
+  fontFamily: string = 'Heebo, sans-serif'
 ) {
   const bg = isDark ? '#111827' : '#ffffff';
   const fg = isDark ? '#f9fafb' : '#111827';
@@ -106,7 +107,8 @@ export function drawBold(
   text: string,
   brandColor: string,
   isDark: boolean,
-  override?: SlideOverride
+  override?: SlideOverride,
+  fontFamily: string = 'Heebo, sans-serif'
 ) {
   const bg = isDark ? '#111827' : '#f9fafb';
   const fg = isDark ? '#ffffff' : '#111827';
@@ -151,7 +153,8 @@ export function drawGradient(
   text: string,
   brandColor: string,
   _isDark: boolean,
-  override?: SlideOverride
+  override?: SlideOverride,
+  fontFamily: string = 'Heebo, sans-serif'
 ) {
   const darker = darkenHex(brandColor, 70);
   const grad = ctx.createLinearGradient(0, 0, 0, H);
@@ -177,7 +180,8 @@ export function drawDarkLuxury(
   text: string,
   _brandColor: string,
   _isDark: boolean,
-  override?: SlideOverride
+  override?: SlideOverride,
+  fontFamily: string = 'Heebo, sans-serif'
 ) {
   const gold = '#D4AF37';
   ctx.fillStyle = '#0a0a0a';
@@ -215,7 +219,8 @@ export function drawFrame(
   text: string,
   brandColor: string,
   isDark: boolean,
-  override?: SlideOverride
+  override?: SlideOverride,
+  fontFamily: string = 'Heebo, sans-serif'
 ) {
   const bg = isDark ? '#111827' : '#ffffff';
   const fg = isDark ? '#f9fafb' : '#111827';
@@ -245,7 +250,8 @@ export function drawSplit(
   brandColor: string,
   isDark: boolean,
   slideIndex: number,
-  override?: SlideOverride
+  override?: SlideOverride,
+  fontFamily: string = 'Heebo, sans-serif'
 ) {
   const splitY = H * 0.4;
   ctx.fillStyle = brandColor;
@@ -276,7 +282,8 @@ export function drawStory(
   text: string,
   brandColor: string,
   _isDark: boolean,
-  override?: SlideOverride
+  override?: SlideOverride,
+  fontFamily: string = 'Heebo, sans-serif'
 ) {
   ctx.fillStyle = brandColor;
   ctx.fillRect(0, 0, W, H);
@@ -304,7 +311,8 @@ export function drawQuote(
   text: string,
   brandColor: string,
   isDark: boolean,
-  override?: SlideOverride
+  override?: SlideOverride,
+  fontFamily: string = 'Heebo, sans-serif'
 ) {
   const bg = isDark ? '#111827' : '#ffffff';
   const fg = isDark ? '#f9fafb' : '#111827';
@@ -378,7 +386,8 @@ export function drawMagazine(
   text: string,
   brandColor: string,
   isDark: boolean,
-  override?: SlideOverride
+  override?: SlideOverride,
+  fontFamily: string = 'Heebo, sans-serif'
 ) {
   const bg = isDark ? '#111827' : '#ffffff';
   const fg = isDark ? '#f9fafb' : '#111827';
@@ -429,7 +438,8 @@ export function drawWaves(
   text: string,
   brandColor: string,
   isDark: boolean,
-  override?: SlideOverride
+  override?: SlideOverride,
+  fontFamily: string = 'Heebo, sans-serif'
 ) {
   const bg = isDark ? '#111827' : '#ffffff';
   const fg = isDark ? '#f9fafb' : '#111827';
@@ -470,7 +480,8 @@ export function drawNeon(
   text: string,
   brandColor: string,
   _isDark: boolean,
-  override?: SlideOverride
+  override?: SlideOverride,
+  fontFamily: string = 'Heebo, sans-serif'
 ) {
   ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, W, H);

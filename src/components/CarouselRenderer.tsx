@@ -245,7 +245,7 @@ export default function CarouselRenderer({
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-gray-50 dark:bg-gray-900" dir="rtl">
+    <div className="flex flex-col md:flex-row h-[100dvh] w-full bg-gray-50 dark:bg-gray-900 overflow-hidden" dir="rtl">
       
       {/* Left Sidebar */}
       <div className="w-full md:w-80 bg-white dark:bg-gray-800 p-4 border-l border-gray-200 dark:border-gray-700 overflow-y-auto order-last md:order-first">
@@ -348,12 +348,19 @@ export default function CarouselRenderer({
       </div>
 
       {/* Central Stage */}
-      <div className="flex-1 flex flex-col h-screen">
+      <div className="flex-1 flex flex-col h-screen md:h-screen min-h-[100dvh] overflow-hidden">
         {/* Top Bar */}
-        <div className="flex justify-between items-center p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm z-10">
-          <h2 className="font-bold text-xl text-gray-800 dark:text-gray-100">
-            תצוגה מקדימה
-          </h2>
+        <div className="flex justify-between items-center p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm z-10 shrink-0">
+          <div className="flex items-center gap-4">
+            {onGoBack && (
+              <button onClick={onGoBack} className="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white transition px-2">
+                ← חזור
+              </button>
+            )}
+            <h2 className="font-bold text-xl text-gray-800 dark:text-gray-100">
+              תצוגה מקדימה
+            </h2>
+          </div>
           <div className="flex gap-4 items-center">
             <button 
               disabled={activeSlideIndex === localSlides.length - 1} 

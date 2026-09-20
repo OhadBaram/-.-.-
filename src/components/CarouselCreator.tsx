@@ -102,13 +102,7 @@ export default function CarouselCreator({
 
   return (
     <div className="w-full h-screen fixed inset-0 z-50 bg-white dark:bg-gray-900">
-      <button 
-        onClick={() => { setSlides(null); setExplanation(null); setIsApproved(false); }}
-        className="absolute top-4 right-4 z-[60] px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-200 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 font-bold"
-      >
-        חזור ליצירת קרוסלה
-      </button>
-      <CarouselRenderer slides={slides} brandColor={brandColor} />
+      <CarouselRenderer slides={slides} brandColor={brandColor} onGoBack={() => { setSlides(null); setExplanation(null); setIsApproved(false); }} />
     </div>
   );
 }
