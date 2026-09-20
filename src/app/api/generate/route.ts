@@ -206,10 +206,19 @@ ${visualHint}
           .map((tag: string) => (tag.startsWith('#') ? tag : `#${tag}`))
       : [];
 
+    const wizardMeta = {
+      slideCount: wizardOptions.slideCount,
+      density: wizardOptions.density,
+      visualStyle: wizardOptions.visualStyle,
+      visualStyleCustom: wizardOptions.visualStyleCustom || '',
+      directionTitle: narrativeDirection?.title || null,
+    };
+
     const packagePayload = {
       slides,
       caption,
       hashtags,
+      wizardMeta,
       narrativeDirection: narrativeDirection
         ? {
             id: narrativeDirection.id,
@@ -243,6 +252,7 @@ ${visualHint}
       explanation,
       caption,
       hashtags,
+      wizardMeta,
       narrativeDirection: packagePayload.narrativeDirection,
     });
   } catch (error) {

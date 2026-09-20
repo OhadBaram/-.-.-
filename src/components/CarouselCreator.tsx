@@ -6,6 +6,11 @@ import CreationWizard, {
   type CreationWizardSubmitPayload,
 } from '@/components/CreationWizard';
 import SkeletonLoader from '@/components/SkeletonLoader';
+import WizardSummaryBar from '@/components/WizardSummaryBar';
+import {
+  formatWizardSummaryLine,
+  type WizardPackageMeta,
+} from '@/lib/wizard';
 
 interface CarouselCreatorProps {
   userName?: string;
@@ -14,6 +19,18 @@ interface CarouselCreatorProps {
   initialReferenceLink2: string;
   initialReferenceLink3: string;
   brandColor: string;
+}
+
+function metaFromSubmit(
+  data: CreationWizardSubmitPayload
+): WizardPackageMeta {
+  return {
+    slideCount: data.slideCount,
+    density: data.density,
+    visualStyle: data.visualStyle,
+    visualStyleCustom: data.visualStyleCustom,
+    directionTitle: data.narrativeDirection?.title || null,
+  };
 }
 
 export default function CarouselCreator({
@@ -31,6 +48,7 @@ export default function CarouselCreator({
   const [hashtags, setHashtags] = useState<string[]>([]);
   const [copyFeedback, setCopyFeedback] = useState('');
   const [isApproved, setIsApproved] = useState(false);
+  const [wizardMeta, setWizardMeta] = useState<WizardPackageMeta | null>(null);
 
   const resetPackage = () => {
     setSlides(null);
@@ -39,10 +57,12 @@ export default function CarouselCreator({
     setHashtags([]);
     setCopyFeedback('');
     setIsApproved(false);
+    setWizardMeta(null);
   };
 
   const handleGenerate = async (data: CreationWizardSubmitPayload) => {
     setIsLoading(true);
+    setWizardMeta(metaFromSubmit(data));
 
     try {
       const res = await fetch('/api/generate', {
@@ -60,6 +80,22 @@ export default function CarouselCreator({
       setSlides(result.slides);
       setCaption(typeof result.caption === 'string' ? result.caption : '');
       setHashtags(Array.isArray(result.hashtags) ? result.hashtags : []);
+      if (result.wizardMeta && typeof result.wizardMeta === 'object') {
+        setWizardMeta({
+          slideCount:
+            result.wizardMeta.slideCount ?? data.slideCount,
+          density: result.wizardMeta.density ?? data.density,
+          visualStyle:
+            result.wizardMeta.visualStyle ?? data.visualStyle,
+          visualStyleCustom:
+            result.wizardMeta.visualStyleCustom ??
+            data.visualStyleCustom,
+          directionTitle:
+            result.wizardMeta.directionTitle ??
+            data.narrativeDirection?.title ??
+            null,
+        });
+      }
       if (result.explanation) setExplanation(result.explanation);
       else setIsApproved(true);
     } catch (error: unknown) {
@@ -67,6 +103,7 @@ export default function CarouselCreator({
       const message =
         error instanceof Error ? error.message : 'שגיאה לא ידועה';
       alert(`אירעה שגיאה ביצירת הקרוסלה: ${message}`);
+      setWizardMeta(null);
     } finally {
       setIsLoading(false);
     }
@@ -112,6 +149,11 @@ export default function CarouselCreator({
         <h2 className="text-2xl md:text-3xl font-black mb-5 text-indigo-300">
           החבילה מוכנה
         </h2>
+        {wizardMeta ? (
+          <p className="text-sm text-zinc-400 mb-4">
+            {formatWizardSummaryLine(wizardMeta)}
+          </p>
+        ) : null}
         <div className="text-zinc-300 text-lg leading-relaxed mb-6 bg-indigo-500/10 p-6 rounded-2xl border border-indigo-400/20">
           {explanation}
         </div>
@@ -183,12 +225,22 @@ export default function CarouselCreator({
   }
 
   return (
-    <div className="w-full h-screen fixed inset-0 z-50 bg-white dark:bg-gray-900">
-      <CarouselRenderer
-        slides={slides}
-        brandColor={brandColor}
-        onGoBack={resetPackage}
-      />
+    <div className="w-full h-[100dvh] fixed inset-0 z-50 bg-white dark:bg-gray-900 flex flex-col">
+      {wizardMeta ? (
+        <WizardSummaryBar
+          meta={wizardMeta}
+          onChangeSettings={resetPackage}
+          caption={caption}
+          hashtags={hashtags}
+        />
+      ) : null}
+      <div className="flex-1 min-h-0 relative">
+        <CarouselRenderer
+          slides={slides}
+          brandColor={brandColor}
+          onGoBack={resetPackage}
+        />
+      </div>
     </div>
   );
 }

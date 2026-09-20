@@ -122,6 +122,46 @@ export function buildDensityPrompt(density: DensityId): string {
   );
 }
 
+/** Metadata from the creation wizard, stored alongside slides in slidesData */
+export interface WizardPackageMeta {
+  slideCount: number;
+  density: DensityId;
+  visualStyle: VisualStyleId;
+  visualStyleCustom?: string;
+  directionTitle?: string | null;
+}
+
+export function densityLabel(density: DensityId): string {
+  return DENSITY_OPTIONS.find((d) => d.id === density)?.label || 'סטנדרטי';
+}
+
+export function visualStyleLabel(
+  visualStyle: VisualStyleId,
+  visualStyleCustom?: string
+): string {
+  if (visualStyle === 'custom' && visualStyleCustom?.trim()) {
+    return visualStyleCustom.trim().slice(0, 40);
+  }
+  return (
+    VISUAL_STYLE_OPTIONS.find((o) => o.id === visualStyle)?.label || 'מינימליסטי'
+  );
+}
+
+/** One-line RTL summary for the editor top bar */
+export function formatWizardSummaryLine(meta: WizardPackageMeta): string {
+  const parts = [
+    `${meta.slideCount} שקפים`,
+    densityLabel(meta.density),
+  ];
+  const direction = meta.directionTitle?.trim();
+  if (direction) {
+    parts.push(`כיוון: ${direction}`);
+  } else {
+    parts.push(visualStyleLabel(meta.visualStyle, meta.visualStyleCustom));
+  }
+  return parts.join(' · ');
+}
+
 export interface NarrativeDirection {
   id: string;
   title: string;
