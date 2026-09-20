@@ -97,8 +97,6 @@ export default function Home() {
         </div>
       </section>
 
-      </section>
-
       {/* CTA / Pricing Section */}
       <section id="pricing" className="py-20 bg-indigo-600 text-white text-center">
         <div className="max-w-4xl mx-auto px-4">
