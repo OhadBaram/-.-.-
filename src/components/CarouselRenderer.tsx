@@ -9,7 +9,9 @@ import SlideEditor from '@/components/SlideEditor';
 import {
   drawMinimal, drawBold, drawGradient, drawDarkLuxury, drawFrame, drawSplit,
   drawStory, drawQuote, drawNumbered, drawMagazine, drawWaves, drawNeon,
-  drawImageSplit
+  drawImageSplit,
+  drawImageFullDark, drawImageCircle, drawImageSplitBottom, drawImagePolaroid,
+  drawImageSide, drawImageMagazine, drawImageOverlay, drawImageArch
 } from '@/lib/templates/drawers';
 
 export interface Slide {
@@ -33,7 +35,15 @@ export type TemplateId =
   | 'magazine'
   | 'waves'
   | 'neon'
-  | 'image-split';
+  | 'image-split'
+  | 'image-full-dark'
+  | 'image-circle-profile'
+  | 'image-split-bottom'
+  | 'image-polaroid'
+  | 'image-side'
+  | 'image-magazine'
+  | 'image-overlay'
+  | 'image-arch';
 
 interface TemplateOption {
   id: TemplateId;
@@ -54,6 +64,14 @@ const TEMPLATES: TemplateOption[] = [
   { id: 'waves',        label: 'גלים'         },
   { id: 'neon',         label: 'ניאון'        },
   { id: 'image-split',  label: 'חצי תמונה'    },
+  { id: 'image-full-dark',      label: 'תמונת רקע כהה' },
+  { id: 'image-circle-profile', label: 'תמונת פרופיל' },
+  { id: 'image-split-bottom',   label: 'פיצול תחתון' },
+  { id: 'image-polaroid',       label: 'פולארויד' },
+  { id: 'image-side',           label: 'חצי רוחב' },
+  { id: 'image-magazine',       label: 'שער מגזין' },
+  { id: 'image-overlay',        label: 'תמונה עם שכבה' },
+  { id: 'image-arch',           label: 'מסגרת קשת' },
 ];
 
 export interface SlideOverride {
@@ -145,6 +163,14 @@ export default function CarouselRenderer({
         case 'waves':       drawWaves      (ctx, W, H, text, brandColor, isDark, currentOverride);              break;
         case 'neon':        drawNeon       (ctx, W, H, text, brandColor, isDark, currentOverride);              break;
         case 'image-split': await drawImageSplit(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl); break;
+        case 'image-full-dark': await drawImageFullDark(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl); break;
+        case 'image-circle-profile': await drawImageCircle(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl); break;
+        case 'image-split-bottom': await drawImageSplitBottom(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl); break;
+        case 'image-polaroid': await drawImagePolaroid(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl); break;
+        case 'image-side': await drawImageSide(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl); break;
+        case 'image-magazine': await drawImageMagazine(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl); break;
+        case 'image-overlay': await drawImageOverlay(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl); break;
+        case 'image-arch': await drawImageArch(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl); break;
         default:            drawMinimal    (ctx, W, H, text, brandColor, isDark, currentOverride);
       }
     },

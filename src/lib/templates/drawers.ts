@@ -554,3 +554,312 @@ export async function drawImageSplit(
   
   drawWrappedText(ctx, text, W / 2, textY, W * 0.85, fontSize * 1.4);
 }
+
+export async function drawImageOrPlaceholder(
+  ctx: CanvasRenderingContext2D,
+  imageUrl: string | undefined,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  isDark: boolean,
+  clipPath?: () => void
+) {
+  ctx.save();
+  if (clipPath) {
+    clipPath();
+  } else {
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+  }
+
+  if (imageUrl) {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = imageUrl;
+    await new Promise((resolve) => {
+      img.onload = resolve;
+      img.onerror = resolve;
+    });
+    
+    let renderW = w;
+    let renderH = h;
+    let offsetX = 0;
+    let offsetY = 0;
+    if (img.width && img.height) {
+      const imgRatio = img.width / img.height;
+      const canvasRatio = w / h;
+      if (imgRatio > canvasRatio) {
+        renderW = h * imgRatio;
+        offsetX = (w - renderW) / 2;
+      } else {
+        renderH = w / imgRatio;
+        offsetY = (h - renderH) / 2;
+      }
+    }
+    ctx.drawImage(img, x + offsetX, y + offsetY, renderW, renderH);
+  } else {
+    ctx.fillStyle = isDark ? '#1f2937' : '#e2e8f0';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = isDark ? '#4b5563' : '#94a3b8';
+    ctx.font = 'bold 48px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('אין תמונה', x + w / 2, y + h / 2);
+  }
+  ctx.restore();
+}
+
+export async function drawImageFullDark(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  text: string,
+  brandColor: string,
+  isDark: boolean,
+  override: SlideOverride,
+  imageUrl?: string
+): Promise<void> {
+  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, H, isDark);
+  
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.8)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  const fontSize = override.fontSize ?? 64;
+  ctx.font = `bold ${fontSize}px sans-serif`;
+  ctx.fillStyle = '#ffffff';
+  ctx.textBaseline = 'middle';
+  const defaultTextY = H * 0.75;
+  const textY = override.textY !== undefined ? (H * (override.textY / 100)) : defaultTextY;
+  
+  drawWrappedText(ctx, text, W / 2, textY, W * 0.85, fontSize * 1.4);
+}
+
+export async function drawImageCircle(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  text: string,
+  brandColor: string,
+  isDark: boolean,
+  override: SlideOverride,
+  imageUrl?: string
+): Promise<void> {
+  ctx.fillStyle = brandColor;
+  ctx.fillRect(0, 0, W, H);
+
+  const radius = 250;
+  const cx = W / 2;
+  const cy = H * 0.35;
+
+  await drawImageOrPlaceholder(ctx, imageUrl, cx - radius, cy - radius, radius * 2, radius * 2, isDark, () => {
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.clip();
+  });
+
+  const fontSize = override.fontSize ?? 64;
+  ctx.font = `bold ${fontSize}px sans-serif`;
+  ctx.fillStyle = '#ffffff';
+  ctx.textBaseline = 'middle';
+  const defaultTextY = cy + radius + 100;
+  const textY = override.textY !== undefined ? (H * (override.textY / 100)) : defaultTextY;
+  
+  drawWrappedText(ctx, text, W / 2, textY, W * 0.85, fontSize * 1.4);
+}
+
+export async function drawImageSplitBottom(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  text: string,
+  brandColor: string,
+  isDark: boolean,
+  override: SlideOverride,
+  imageUrl?: string
+): Promise<void> {
+  const splitY = H * 0.35;
+  
+  ctx.fillStyle = brandColor;
+  ctx.fillRect(0, 0, W, splitY);
+  
+  await drawImageOrPlaceholder(ctx, imageUrl, 0, splitY, W, H - splitY, isDark);
+
+  const fontSize = override.fontSize ?? 64;
+  ctx.font = `bold ${fontSize}px sans-serif`;
+  ctx.fillStyle = '#ffffff';
+  ctx.textBaseline = 'middle';
+  const defaultTextY = splitY / 2;
+  const textY = override.textY !== undefined ? (H * (override.textY / 100)) : defaultTextY;
+  
+  drawWrappedText(ctx, text, W / 2, textY, W * 0.85, fontSize * 1.4);
+}
+
+export async function drawImagePolaroid(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  text: string,
+  brandColor: string,
+  isDark: boolean,
+  override: SlideOverride,
+  imageUrl?: string
+): Promise<void> {
+  const bg = isDark ? '#111827' : '#f9fafb';
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const pw = W * 0.8;
+  const ph = H * 0.75;
+  const px = (W - pw) / 2;
+  const py = (H - ph) / 2;
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.2)';
+  ctx.shadowBlur = 30;
+  ctx.shadowOffsetY = 15;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(px, py, pw, ph);
+  ctx.restore();
+
+  const margin = 40;
+  const bottomMargin = 250;
+  const imgW = pw - margin * 2;
+  const imgH = ph - margin - bottomMargin;
+  
+  await drawImageOrPlaceholder(ctx, imageUrl, px + margin, py + margin, imgW, imgH, isDark);
+
+  const fontSize = override.fontSize ?? 48;
+  ctx.font = `bold ${fontSize}px sans-serif`;
+  ctx.fillStyle = '#111827';
+  ctx.textBaseline = 'middle';
+  const defaultTextY = py + margin + imgH + (bottomMargin / 2);
+  const textY = override.textY !== undefined ? (H * (override.textY / 100)) : defaultTextY;
+  
+  drawWrappedText(ctx, text, W / 2, textY, imgW * 0.9, fontSize * 1.4);
+}
+
+export async function drawImageSide(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  text: string,
+  brandColor: string,
+  isDark: boolean,
+  override: SlideOverride,
+  imageUrl?: string
+): Promise<void> {
+  ctx.fillStyle = brandColor;
+  ctx.fillRect(0, 0, W / 2, H);
+
+  await drawImageOrPlaceholder(ctx, imageUrl, W / 2, 0, W / 2, H, isDark);
+
+  const fontSize = override.fontSize ?? 54;
+  ctx.font = `bold ${fontSize}px sans-serif`;
+  ctx.fillStyle = '#ffffff';
+  ctx.textBaseline = 'middle';
+  const defaultTextY = H / 2;
+  const textY = override.textY !== undefined ? (H * (override.textY / 100)) : defaultTextY;
+  
+  drawWrappedText(ctx, text, W / 4, textY, (W / 2) * 0.8, fontSize * 1.4);
+}
+
+export async function drawImageMagazine(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  text: string,
+  brandColor: string,
+  isDark: boolean,
+  override: SlideOverride,
+  imageUrl?: string
+): Promise<void> {
+  const splitY = H * 0.8;
+  
+  const bg = isDark ? '#111827' : '#ffffff';
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, splitY, W, H - splitY);
+
+  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, splitY, isDark);
+
+  const fontSize = override.fontSize ?? 90;
+  ctx.font = `bold ${fontSize}px sans-serif`;
+  ctx.fillStyle = brandColor;
+  ctx.textBaseline = 'middle';
+  const defaultTextY = splitY;
+  const textY = override.textY !== undefined ? (H * (override.textY / 100)) : defaultTextY;
+  
+  drawWrappedText(ctx, text, W / 2, textY, W * 0.9, fontSize * 1.2);
+}
+
+export async function drawImageOverlay(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  text: string,
+  brandColor: string,
+  isDark: boolean,
+  override: SlideOverride,
+  imageUrl?: string
+): Promise<void> {
+  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, H, isDark);
+  
+  ctx.globalAlpha = 0.6;
+  ctx.fillStyle = brandColor;
+  ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = 1.0;
+
+  const fontSize = override.fontSize ?? 72;
+  ctx.font = `bold ${fontSize}px sans-serif`;
+  ctx.fillStyle = '#ffffff';
+  ctx.textBaseline = 'middle';
+  const defaultTextY = H / 2;
+  const textY = override.textY !== undefined ? (H * (override.textY / 100)) : defaultTextY;
+  
+  drawWrappedText(ctx, text, W / 2, textY, W * 0.85, fontSize * 1.4);
+}
+
+export async function drawImageArch(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  text: string,
+  brandColor: string,
+  isDark: boolean,
+  override: SlideOverride,
+  imageUrl?: string
+): Promise<void> {
+  const bg = isDark ? '#111827' : '#f9fafb';
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const archW = W * 0.7;
+  const archH = H * 0.6;
+  const ax = (W - archW) / 2;
+  const ay = H * 0.1;
+  const radius = archW / 2;
+
+  await drawImageOrPlaceholder(ctx, imageUrl, ax, ay, archW, archH, isDark, () => {
+    ctx.beginPath();
+    ctx.moveTo(ax, ay + radius);
+    ctx.arcTo(ax, ay, ax + radius, ay, radius);
+    ctx.arcTo(ax + archW, ay, ax + archW, ay + radius, radius);
+    ctx.lineTo(ax + archW, ay + archH);
+    ctx.lineTo(ax, ay + archH);
+    ctx.closePath();
+    ctx.clip();
+  });
+
+  const fontSize = override.fontSize ?? 60;
+  ctx.font = `bold ${fontSize}px sans-serif`;
+  ctx.fillStyle = isDark ? '#f9fafb' : '#111827';
+  ctx.textBaseline = 'middle';
+  const defaultTextY = ay + archH + 100;
+  const textY = override.textY !== undefined ? (H * (override.textY / 100)) : defaultTextY;
+  
+  drawWrappedText(ctx, text, W / 2, textY, W * 0.85, fontSize * 1.4);
+}
