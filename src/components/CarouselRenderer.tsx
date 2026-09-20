@@ -502,7 +502,7 @@ export default function CarouselRenderer({
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-[100dvh] w-full bg-gray-50 dark:bg-gray-900 overflow-hidden" dir="rtl">
+    <div className="flex flex-col md:flex-row h-full min-h-0 w-full bg-gray-50 dark:bg-gray-900 overflow-hidden" dir="rtl">
       
       {/* Left Sidebar */}
       <div className="w-full md:w-80 bg-white dark:bg-gray-800 p-4 border-l border-gray-200 dark:border-gray-700 overflow-y-auto order-last md:order-first">
@@ -715,7 +715,7 @@ export default function CarouselRenderer({
       </div>
 
       {/* Central Stage */}
-      <div className="flex-1 flex flex-col h-screen md:h-screen min-h-[100dvh] overflow-hidden">
+      <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
         {/* Top Bar */}
         <div className="flex justify-between items-center p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm z-10 shrink-0">
           <div className="flex items-center gap-4">
