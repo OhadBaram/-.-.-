@@ -32,6 +32,7 @@ export async function POST(req: Request) {
       audience,
       goal,
       brand,
+      brandColors,
       slideCount,
       density,
       visualStyle,
@@ -178,6 +179,11 @@ ${densityHint}
 
 הנחיות סגנון ויזואלי (צבעים וטון):
 ${visualHint}
+${
+  brandColors && brandColors.length
+    ? `\nפלטת מותג לבחירת המשתמש (העדף אותם ברקעים/אקסנטים): ${brandColors.join(', ')}`
+    : ''
+}
 
 צור מערך באורך מדויק של ${count} שקפים בלבד — לא יותר ולא פחות.
 עבור כל שקף, אנא ספק את הטקסט בעברית בלבד.

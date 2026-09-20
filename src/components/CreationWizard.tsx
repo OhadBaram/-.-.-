@@ -17,12 +17,20 @@ import {
   buildIntakeSuggestions,
   recommendedSlideCountForTopic,
 } from '@/lib/wizard-intake';
+import BrandPalettePicker from '@/components/BrandPalettePicker';
+import {
+  clampPalette,
+  parseBrandPalette,
+  recommendPaletteLocal,
+  type BrandPalette,
+} from '@/lib/brand-palette';
 
 export interface CreationWizardSubmitPayload {
   topic: string;
   audience: string;
   goal: string;
   brand: string;
+  brandColors: BrandPalette;
   slideCount: number;
   density: WizardOptions['density'];
   visualStyle: WizardOptions['visualStyle'];
@@ -43,6 +51,7 @@ interface CreationWizardProps {
   initialReferenceLink1?: string;
   initialReferenceLink2?: string;
   initialReferenceLink3?: string;
+  initialBrandPalette?: BrandPalette | string;
 }
 
 interface ChatMessage {
@@ -94,8 +103,18 @@ export default function CreationWizard({
   initialReferenceLink1 = '',
   initialReferenceLink2 = '',
   initialReferenceLink3 = '',
+  initialBrandPalette,
 }: CreationWizardProps) {
   const [options, setOptions] = useState<WizardOptions>(DEFAULT_WIZARD_OPTIONS);
+  const [brandPalette, setBrandPalette] = useState<BrandPalette>(() => {
+    if (Array.isArray(initialBrandPalette)) {
+      return clampPalette(initialBrandPalette);
+    }
+    if (typeof initialBrandPalette === 'string') {
+      return parseBrandPalette(initialBrandPalette);
+    }
+    return recommendPaletteLocal({ visualStyle: 'minimal' });
+  });
   const [topicDraft, setTopicDraft] = useState('');
   const [inputText, setInputText] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
@@ -430,6 +449,7 @@ export default function CreationWizard({
       audience: options.audience,
       goal: options.goal,
       brand: brandParts,
+      brandColors: clampPalette(brandPalette),
       slideCount: options.slideCount,
       density: options.density,
       visualStyle: options.visualStyle,
@@ -897,6 +917,17 @@ export default function CreationWizard({
                 className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-400/40"
               />
             ) : null}
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+            <BrandPalettePicker
+              value={brandPalette}
+              onChange={setBrandPalette}
+              visualStyle={options.visualStyle}
+              topic={topicDraft}
+              variant="default"
+              className="[&_h3]:text-zinc-100 [&_p]:text-zinc-500 [&_button]:border-white/15"
+            />
           </div>
 
           <div className="space-y-3">

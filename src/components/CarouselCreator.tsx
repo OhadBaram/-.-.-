@@ -11,6 +11,12 @@ import {
   formatWizardSummaryLine,
   type WizardPackageMeta,
 } from '@/lib/wizard';
+import {
+  clampPalette,
+  parseBrandPalette,
+  primaryBrandColor,
+  type BrandPalette,
+} from '@/lib/brand-palette';
 
 interface CarouselCreatorProps {
   userName?: string;
@@ -49,8 +55,10 @@ export default function CarouselCreator({
   const [copyFeedback, setCopyFeedback] = useState('');
   const [isApproved, setIsApproved] = useState(false);
   const [wizardMeta, setWizardMeta] = useState<WizardPackageMeta | null>(null);
-  /** חזרה לאשף בלי למחוק את הקרוסלה שבעריכה */
   const [showWizardOverDraft, setShowWizardOverDraft] = useState(false);
+  const [brandPalette, setBrandPalette] = useState<BrandPalette>(() =>
+    parseBrandPalette(brandColor)
+  );
 
   const hasDraft = Boolean(slides && slides.length > 0);
 
@@ -95,6 +103,9 @@ export default function CarouselCreator({
     setIsLoading(true);
     setShowWizardOverDraft(false);
     setWizardMeta(metaFromSubmit(data));
+    if (data.brandColors?.length) {
+      setBrandPalette(clampPalette(data.brandColors));
+    }
 
     try {
       const res = await fetch('/api/generate', {
@@ -191,15 +202,16 @@ export default function CarouselCreator({
         </div>
       ) : null}
 
-      <CreationWizard
-        userName={userName}
-        onSubmit={handleGenerate}
-        isLoading={isLoading}
-        initialWebsiteUrl={initialWebsiteUrl}
-        initialReferenceLink1={initialReferenceLink1}
-        initialReferenceLink2={initialReferenceLink2}
-        initialReferenceLink3={initialReferenceLink3}
-      />
+        <CreationWizard
+          userName={userName}
+          onSubmit={handleGenerate}
+          isLoading={isLoading}
+          initialWebsiteUrl={initialWebsiteUrl}
+          initialReferenceLink1={initialReferenceLink1}
+          initialReferenceLink2={initialReferenceLink2}
+          initialReferenceLink3={initialReferenceLink3}
+          initialBrandPalette={brandPalette}
+        />
     </div>
   );
 
@@ -315,7 +327,8 @@ export default function CarouselCreator({
       <div className="flex-1 min-h-0 relative">
         <CarouselRenderer
           slides={slides!}
-          brandColor={brandColor}
+          brandColor={primaryBrandColor(brandPalette)}
+          brandPalette={brandPalette}
           onGoBack={goToWizardKeepDraft}
         />
       </div>

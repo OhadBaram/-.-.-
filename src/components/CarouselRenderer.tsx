@@ -6,7 +6,15 @@ import { saveAs } from 'file-saver';
 import { jsPDF } from 'jspdf';
 import SlideEditor from '@/components/SlideEditor';
 import CopilotWidget from '@/components/CopilotWidget';
+import BrandPalettePicker from '@/components/BrandPalettePicker';
 import { MAX_SLIDE_COUNT } from '@/lib/wizard';
+import {
+  clampPalette,
+  colorForSlide,
+  parseBrandPalette,
+  primaryBrandColor,
+  type BrandPalette,
+} from '@/lib/brand-palette';
 
 import {
   drawMinimal, drawBold, drawGradient, drawDarkLuxury, drawFrame, drawSplit,
@@ -246,6 +254,7 @@ export interface SlideOverride {
 interface CarouselRendererProps {
   slides: Slide[];
   brandColor?: string;
+  brandPalette?: BrandPalette;
   slideOverrides?: Record<number, SlideOverride>;
   onGoBack?: () => void;
 }
@@ -253,13 +262,21 @@ interface CarouselRendererProps {
 export default function CarouselRenderer({
   slides,
   brandColor: initialBrandColor = '#6366f1',
+  brandPalette: initialBrandPalette,
   slideOverrides: initialSlideOverrides = {},
   onGoBack,
 }: CarouselRendererProps) {
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const drawGenerationRef = useRef(0);
   const [isExporting, setIsExporting] = useState(false);
-  const [activeBrandColor, setActiveBrandColor] = useState(initialBrandColor);
+  const [brandPalette, setBrandPalette] = useState<BrandPalette>(() =>
+    clampPalette(
+      initialBrandPalette?.length
+        ? initialBrandPalette
+        : parseBrandPalette(initialBrandColor)
+    )
+  );
+  const activeBrandColor = primaryBrandColor(brandPalette);
   const [localSlides, setLocalSlides] = useState<Slide[]>(() => withDefaultTemplates(slides));
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window === 'undefined') return 'light';
@@ -362,6 +379,7 @@ export default function CarouselRenderer({
       const fontFamily      = `"${globalFont}", sans-serif`;
       // רק תמונת השקף הנוכחי — אין נפילה לתמונה של שקף אחר
       const slideImageUrl   = slide.imageUrl;
+      const slideBrandColor = colorForSlide(brandPalette, slideIndex);
 
       if (typeof document !== 'undefined' && document.fonts?.load) {
         try {
@@ -377,33 +395,33 @@ export default function CarouselRenderer({
       ctx.globalAlpha = 1;
 
       switch (tpl) {
-        case 'minimal':     drawMinimal    (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
-        case 'bold':        drawBold       (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
-        case 'gradient':    drawGradient   (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
-        case 'dark-luxury': drawDarkLuxury (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
-        case 'frame':       drawFrame      (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
-        case 'split':       drawSplit      (ctx, W, H, text, activeBrandColor, isDark, slideIndex, currentOverride, fontFamily);  break;
-        case 'story':       drawStory      (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
-        case 'quote':       drawQuote      (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
-        case 'numbered':    drawNumbered   (ctx, W, H, text, activeBrandColor, isDark, slideIndex, currentOverride, fontFamily);  break;
-        case 'magazine':    drawMagazine   (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
-        case 'waves':       drawWaves      (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
-        case 'neon':        drawNeon       (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
-        case 'image-split': await drawImageSplit(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
-        case 'image-full-dark': await drawImageFullDark(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
-        case 'image-circle-profile': await drawImageCircle(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
-        case 'image-split-bottom': await drawImageSplitBottom(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
-        case 'image-polaroid': await drawImagePolaroid(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
-        case 'image-side': await drawImageSide(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
-        case 'image-magazine': await drawImageMagazine(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
-        case 'image-overlay': await drawImageOverlay(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
-        case 'image-arch': await drawImageArch(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
-        default:            drawMinimal    (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);
+        case 'minimal':     drawMinimal    (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'bold':        drawBold       (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'gradient':    drawGradient   (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'dark-luxury': drawDarkLuxury (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'frame':       drawFrame      (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'split':       drawSplit      (ctx, W, H, text, slideBrandColor, isDark, slideIndex, currentOverride, fontFamily);  break;
+        case 'story':       drawStory      (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'quote':       drawQuote      (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'numbered':    drawNumbered   (ctx, W, H, text, slideBrandColor, isDark, slideIndex, currentOverride, fontFamily);  break;
+        case 'magazine':    drawMagazine   (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'waves':       drawWaves      (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'neon':        drawNeon       (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'image-split': await drawImageSplit(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-full-dark': await drawImageFullDark(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-circle-profile': await drawImageCircle(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-split-bottom': await drawImageSplitBottom(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-polaroid': await drawImagePolaroid(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-side': await drawImageSide(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-magazine': await drawImageMagazine(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-overlay': await drawImageOverlay(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-arch': await drawImageArch(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        default:            drawMinimal    (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);
       }
 
       if (isStale()) return;
     },
-    [theme, activeBrandColor, slideOverrides, globalFont]
+    [theme, brandPalette, slideOverrides, globalFont]
   );
 
   React.useEffect(() => {
@@ -705,6 +723,14 @@ export default function CarouselRenderer({
               </div>
             )}
 
+            <div className="mb-4 pb-4 border-b border-gray-100 dark:border-gray-700">
+              <BrandPalettePicker
+                value={brandPalette}
+                onChange={setBrandPalette}
+                variant="compact"
+              />
+            </div>
+
             <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
               שקפים
             </h4>
@@ -854,9 +880,14 @@ export default function CarouselRenderer({
                       )}
                     </div>
 
-                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 space-y-3">
+                      <BrandPalettePicker
+                        value={brandPalette}
+                        onChange={setBrandPalette}
+                        variant="compact"
+                      />
                       <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
-                        ערכת צבעי שקפים
+                        מצב בהיר / כהה
                       </h4>
                       <button
                         type="button"
@@ -1005,7 +1036,11 @@ export default function CarouselRenderer({
                     onChangeTemplate={handleChangeTemplateFromCopilot}
                     onChangeFont={(font) => setGlobalFont(font)}
                     onChangeColors={(color, newTheme) => {
-                      if (color) setActiveBrandColor(color);
+                      if (color) {
+                        setBrandPalette((prev) =>
+                          clampPalette([color, ...prev.slice(1)])
+                        );
+                      }
                       if (newTheme === 'light' || newTheme === 'dark') setTheme(newTheme);
                     }}
                   />
