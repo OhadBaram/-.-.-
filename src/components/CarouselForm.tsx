@@ -21,7 +21,7 @@ interface CarouselFormProps {
   initialReferenceLink3?: string;
 }
 
-const SLIDE_COUNT_OPTIONS = [3, 4, 5, 6, 7, 8, 9, 10] as const;
+const SLIDE_COUNT_OPTIONS = [3, 5, 7, 8, 10, 12, 15] as const;
 
 export default function CarouselForm({ 
   onSubmit, 
@@ -96,14 +96,14 @@ export default function CarouselForm({
         <input
           type="range"
           min={3}
-          max={10}
+          max={15}
           step={1}
           value={slideCount}
           onChange={(e) => setSlideCount(Number(e.target.value))}
           className="w-full accent-indigo-600 cursor-pointer"
           aria-label="מספר שקפים בקרוסלה"
         />
-        <div className="mt-3 flex flex-wrap gap-2 justify-between">
+        <div className="mt-3 flex flex-wrap gap-2">
           {SLIDE_COUNT_OPTIONS.map((n) => (
             <button
               key={n}
@@ -119,7 +119,7 @@ export default function CarouselForm({
             </button>
           ))}
         </div>
-        <p className="text-xs text-gray-500 mt-2">בחרו כמה שקפים לייצר לפני יצירת הקרוסלה (3–10).</p>
+        <p className="text-xs text-gray-500 mt-2">בחרו כמה שקפים לייצר לפני יצירת הקרוסלה (3–15).</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

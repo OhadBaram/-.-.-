@@ -32,9 +32,8 @@ export default async function CreateCarouselPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-900" dir="rtl">
-      
-      <CarouselCreator 
+    <main className="min-h-screen bg-[#0c0f14]" dir="rtl">
+      <CarouselCreator
         userName={user?.name || session.user.name || ''}
         initialWebsiteUrl={workspace?.websiteUrl || ''}
         initialReferenceLink1={workspace?.referenceLink1 || ''}

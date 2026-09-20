@@ -6,6 +6,14 @@ import { getTenantDB } from '@/lib/tenant-db';
 import { generateCarouselSchema } from '@/lib/validations';
 import { generateJson } from '@/lib/services/ai.service';
 import { scrapeUrls } from '@/lib/services/scraper.service';
+import {
+  buildDensityPrompt,
+  buildStructurePrompt,
+  buildVisualStylePrompt,
+  type DensityId,
+  type VisualStyleId,
+  type WizardOptions,
+} from '@/lib/wizard';
 
 export const maxDuration = 60; // Allow function to run up to 60 seconds
 
@@ -19,12 +27,37 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid input', details: validatedFields.error.format() }, { status: 400 });
     }
     
-    // Fallback schema for new fields if validations.ts hasn't been updated yet
-    const { topic, audience, goal, brand, slideCount } = validatedFields.data;
+    const {
+      topic,
+      audience,
+      goal,
+      brand,
+      slideCount,
+      density,
+      visualStyle,
+      visualStyleCustom,
+      useRecommendedStructure,
+    } = validatedFields.data;
     const websiteUrl = body.websiteUrl || null;
     const referenceLink1 = body.referenceLink1 || null;
     const referenceLink2 = body.referenceLink2 || null;
     const referenceLink3 = body.referenceLink3 || null;
+
+    const wizardOptions: WizardOptions = {
+      slideCount: slideCount || 7,
+      useRecommendedStructure: useRecommendedStructure ?? true,
+      visualStyle: (visualStyle || 'minimal') as VisualStyleId,
+      visualStyleCustom: visualStyleCustom || '',
+      density: (density || 'standard') as DensityId,
+      audience: audience || '',
+      goal: goal || '',
+    };
+    const densityHint = buildDensityPrompt(wizardOptions.density);
+    const visualHint = buildVisualStylePrompt(wizardOptions);
+    const structureHint = buildStructurePrompt(
+      wizardOptions.slideCount,
+      wizardOptions.useRecommendedStructure
+    );
 
     let aiProvider = process.env.DEFAULT_AI_PROVIDER || 'gemini';
     let aiModel = process.env.DEFAULT_AI_MODEL || 'gemini-3.8-flash';
@@ -104,26 +137,36 @@ export async function POST(req: Request) {
 
     const scrapedContext = await scrapeUrls([finalWebsiteUrl, finalRef1, finalRef2, finalRef3]);
 
+    const count = wizardOptions.slideCount;
     const prompt = `
 אתה קופירייטר ומעצב קרוסלות לאינסטגרם.
-צור קרוסלה בת בדיוק ${slideCount || 8} שקפים עבור אינסטגרם בהתבסס על הנתונים הבאים:
-נושא: ${topic}
-קהל יעד: ${audience}
-מטרה: ${goal}
-זהות המותג: ${brand}
+צור קרוסלה בת בדיוק ${count} שקפים עבור אינסטגרם בהתבסס על הנתונים הבאים:
+נושא / טקסט מקור: ${topic}
+קהל יעד: ${audience || 'כללי'}
+מטרה: ${goal || 'מתן ערך ומעורבות'}
+זהות המותג / טון: ${brand || 'טבעי וברור בעברית'}
 ${brandIdentityContext}
 ${pastCarouselsContext}
 ${scrapedContext ? `\nלמד על סגנון המותג, הנושאים והטון מהתוכן הבא שנאסף מהרשת (אופציונלי אך מומלץ להתבסס עליו):\n${scrapedContext}\n` : ''}
 
-צור מערך באורך מדויק של ${slideCount || 8} שקפים בלבד — לא יותר ולא פחות.
-עבור כל שקף, אנא ספק את הטקסט בעברית בלבד. 
+הנחיות מבנה:
+${structureHint}
+
+הנחיות צפיפות מידע:
+${densityHint}
+
+הנחיות סגנון ויזואלי (צבעים וטון):
+${visualHint}
+
+צור מערך באורך מדויק של ${count} שקפים בלבד — לא יותר ולא פחות.
+עבור כל שקף, אנא ספק את הטקסט בעברית בלבד.
 החזר את התשובה בפורמט JSON בלבד המכיל 2 מפתחות:
-1. "explanation": טקסט הסבר בעברית (כ-3 משפטים) למשתמש, שמתאר מה הבנת מהלינקים ומהעסק שלו, ומה התוכנית והאסטרטגיה של הקרוסלה שיצרת.
+1. "explanation": טקסט הסבר בעברית (כ-3 משפטים) למשתמש, שמתאר מה הבנת מהנושא/לינקים, ומה התוכנית והאסטרטגיה של הקרוסלה שיצרת.
 2. "slides": מערך השקפים.
 כל אובייקט ייצג שקף ויכלול את השדות:
 - id: מחרוזת מזהה (לדוגמה "1")
-- text: טקסט השקף (קצר וקולע, מקסימום 15 מילים לשקף)
-- backgroundColor: קוד צבע HEX (רך ונעים לעין שמתאים למותג)
+- text: טקסט השקף בעברית לפי צפיפות המידע שנבחרה
+- backgroundColor: קוד צבע HEX שמתאים לסגנון הוויזואלי שנבחר
 - textColor: קוד צבע HEX (קריא ומתאים לרקע)
 `;
 
