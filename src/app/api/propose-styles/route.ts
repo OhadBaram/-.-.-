@@ -1,0 +1,122 @@
+import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
+import { proposeStylesSchema } from '@/lib/validations';
+import { generateJson } from '@/lib/services/ai.service';
+import {
+  buildFallbackNarrativeDirections,
+  type NarrativeDirection,
+} from '@/lib/wizard';
+
+export const maxDuration = 30;
+
+function normalizeDirections(
+  raw: unknown,
+  topic: string
+): NarrativeDirection[] {
+  const fallback = buildFallbackNarrativeDirections(topic);
+  if (!Array.isArray(raw) || raw.length < 2) return fallback;
+
+  const cleaned = raw
+    .slice(0, 3)
+    .map((item: any, index: number): NarrativeDirection | null => {
+      const title = String(item?.title || '').trim();
+      if (!title) return null;
+      return {
+        id: String(item?.id || `dir-${index + 1}`).trim() || `dir-${index + 1}`,
+        title,
+        summary: String(item?.summary || '').trim() || fallback[index % 2].summary,
+        whyItWorks:
+          String(item?.whyItWorks || '').trim() ||
+          fallback[index % 2].whyItWorks,
+        structureHint:
+          String(item?.structureHint || '').trim() ||
+          fallback[index % 2].structureHint,
+      };
+    })
+    .filter(Boolean) as NarrativeDirection[];
+
+  if (cleaned.length < 2) return fallback;
+  return cleaned.slice(0, 2);
+}
+
+export async function POST(req: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const parsed = proposeStylesSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid input', details: parsed.error.format() },
+        { status: 400 }
+      );
+    }
+
+    const { topic, audience, goal } = parsed.data;
+    const aiProvider = process.env.DEFAULT_AI_PROVIDER || 'gemini';
+    const aiModel = process.env.DEFAULT_AI_MODEL || 'gemini-3.8-flash';
+
+    const prompt = `
+אתה אסטרטג תוכן לקרוסלות אינסטגרם בעברית (פורמט אנכי 1080×1350).
+המשתמש נתן נושא אחד. הצע בדיוק 2 כיווני סגנון נרטיביים שונים — לא סגנון ויזואלי, אלא מבנה תוכן.
+
+נושא: ${topic}
+קהל: ${audience || 'לא צוין'}
+מטרה: ${goal || 'לא צוינה'}
+
+הסתמך על ידע כללי של מה שעובד בנישה (שמירות, שיתופים, גלילה עד הסוף). אין צורך בסריקת אינסטגרם אמיתית — נמק מהיגיון שיווקי.
+
+שני הכיוונים צריכים להיות מובחנים, למשל:
+- רשימה חינוכית / טיפים ממוספרים
+- קשת סיפור אישית / מסע שינוי
+אפשר גם זוויות אחרות שמתאימות לנושא (מיתוס מול מציאות, לפני־אחרי, שאלות ותשובות) — כל עוד יש בדיוק 2.
+
+החזר JSON בלבד:
+{
+  "researchNote": "משפט־שניים בעברית: למה כיוונים כאלה מתאימים לנושא",
+  "directions": [
+    {
+      "id": "slug-באנגלית-קצר",
+      "title": "כותרת כיוון בעברית",
+      "summary": "משפט אחד מה הקרוסלה תעשה",
+      "whyItWorks": "משפט אחד למה זה עובד בנישה",
+      "structureHint": "הנחיית מבנה קצרה לקופירייטר (שער / תוכן / הוכחה / CTA)"
+    }
+  ]
+}
+`;
+
+    try {
+      const result = await generateJson<{
+        researchNote?: string;
+        directions?: unknown;
+      }>({ prompt, provider: aiProvider, model: aiModel });
+
+      const directions = normalizeDirections(result.directions, topic);
+      return NextResponse.json({
+        researchNote:
+          result.researchNote?.trim() ||
+          'בחרתי שני כיוונים שונים שעובדים טוב לקרוסלות שמירה ושיתוף בנושא הזה.',
+        directions,
+      });
+    } catch (aiError) {
+      console.warn('Propose styles AI fallback:', aiError);
+      return NextResponse.json({
+        researchNote:
+          'הנה שני כיוונים מוכחים לקרוסלות — אפשר לבחור ולהמשיך ליצירה.',
+        directions: buildFallbackNarrativeDirections(topic),
+        offline: true,
+      });
+    }
+  } catch (error) {
+    console.error('Propose styles error:', error);
+    return NextResponse.json(
+      { error: 'Failed to propose styles' },
+      { status: 500 }
+    );
+  }
+}

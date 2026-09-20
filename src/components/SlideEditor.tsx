@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Slide } from '@/components/CarouselRenderer';
 import { SlideOverride } from '@/lib/templates/drawers';
 
@@ -11,7 +11,9 @@ interface SlideEditorProps {
   override: SlideOverride;
   onOverrideChange: (override: SlideOverride) => void;
   onTextChange: (text: string) => void;
-  onImageUpload?: (base64: string) => void;
+  /** תמיד מעביר את אינדקס השקף — כדי שלא יישמר לתמונה של שקף אחר */
+  onImageUpload?: (slideIndex: number, base64: string) => void;
+  onImageClear?: (slideIndex: number) => void;
   remixingIndex: number | null;
   onRemix: (index: number, text: string) => void;
 }
@@ -27,10 +29,13 @@ export default function SlideEditor({
   onTextChange,
   remixingIndex,
   onRemix,
-  onImageUpload
+  onImageUpload,
+  onImageClear,
 }: SlideEditorProps) {
   const currentFontSize = override.fontSize ?? 64;
   const currentTextY = override.textY ?? 50;
+  // ננעל את אינדקס השקף בזמן בחירת הקובץ — גם אם המשתמש מחליף שקף בזמן הקריאה
+  const slideIndexForUpload = index;
 
   return (
     <div className="shrink-0 snap-center border p-2 rounded-lg shadow-sm flex flex-col gap-2 w-[80vw] max-w-sm">
@@ -91,27 +96,31 @@ export default function SlideEditor({
 
       
       
-      <div className="flex justify-between items-center mb-1 gap-2">
+      <div className="flex flex-wrap justify-between items-center mb-1 gap-2">
         <label className="text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded cursor-pointer transition-colors border flex-1 text-center">
-          <input 
-            type="file" 
-            accept="image/*" 
-            className="hidden" 
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
             onChange={(e) => {
-              const file = e.target.files?.[0];
+              const input = e.target;
+              const file = input.files?.[0];
               if (file && onImageUpload) {
                 const reader = new FileReader();
+                const lockedIndex = slideIndexForUpload;
                 reader.onloadend = () => {
-                  onImageUpload(reader.result as string);
+                  onImageUpload(lockedIndex, reader.result as string);
+                  input.value = '';
                 };
                 reader.readAsDataURL(file);
               }
             }}
           />
-          📸 העלאת תמונה
+          📸 העלאת תמונה לשקף זה
         </label>
-        
-        <button 
+
+        <button
+          type="button"
           onClick={() => alert("פיצ'ר יצירת תמונות ב-AI (כמו Midjourney/DALL-E) נמצא בבטא סגורה וזמין למנויי פרימיום בלבד.\n\nלקבלת גישה, אנא פנה לתמיכה.")}
           className="text-xs font-semibold text-white bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 px-2 py-1 rounded cursor-pointer transition-colors border border-transparent shadow-sm flex-1 text-center"
         >
@@ -119,9 +128,20 @@ export default function SlideEditor({
         </button>
 
         {slide.imageUrl && (
-          <span className="text-[10px] text-green-600 font-bold bg-green-50 px-2 py-1 rounded border border-green-200 whitespace-nowrap">
-            ✓ תמונה הועלתה
-          </span>
+          <>
+            <span className="text-[10px] text-green-600 font-bold bg-green-50 px-2 py-1 rounded border border-green-200 whitespace-nowrap">
+              ✓ תמונה בשקף {index + 1}
+            </span>
+            {onImageClear && (
+              <button
+                type="button"
+                onClick={() => onImageClear(index)}
+                className="text-[10px] font-bold text-red-600 bg-red-50 hover:bg-red-100 px-2 py-1 rounded border border-red-200 whitespace-nowrap"
+              >
+                הסר תמונה
+              </button>
+            )}
+          </>
         )}
       </div>
       <div className="flex flex-col gap-2">

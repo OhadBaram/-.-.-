@@ -12,10 +12,41 @@ function getEmailFrom() {
   return from;
 }
 
+function smtpErrorSummary(error: unknown): { code: string; responseCode: number | null; message: string } {
+  const err = error as {
+    code?: string;
+    responseCode?: number;
+    message?: string;
+  };
+  const code = typeof err?.code === 'string' ? err.code : 'SMTP_ERROR';
+  const responseCode = typeof err?.responseCode === 'number' ? err.responseCode : null;
+  // הודעה קצרה בלי סיסמאות / כתובות חיבור
+  const raw = typeof err?.message === 'string' ? err.message : 'SMTP send failed';
+  const message = raw
+    .replace(/pass(?:word)?[=:]\S+/gi, 'pass=***')
+    .replace(/\/\/[^@\s]+@/g, '//***@')
+    .slice(0, 180);
+  return { code, responseCode, message };
+}
+
 function getSmtpTransport() {
   const server = process.env.EMAIL_SERVER?.trim();
   if (server) {
-    return nodemailer.createTransport(server);
+    // מחרוזת חיבור מלאה בלבד (smtp://...); אחרת ננסה את משתני הפיצול אם קיימים
+    if (/^smtps?:\/\//i.test(server)) {
+      try {
+        return nodemailer.createTransport(server);
+      } catch (error) {
+        const summary = smtpErrorSummary(error);
+        console.error('[auth] invalid EMAIL_SERVER URL', summary);
+        throw new Error(
+          `EMAIL_SERVER URL is invalid (${summary.code}). Prefer EMAIL_SERVER_HOST/USER/PASSWORD.`
+        );
+      }
+    }
+    console.error(
+      '[auth] EMAIL_SERVER is set but is not a smtp:// URL; falling back to EMAIL_SERVER_HOST/USER/PASSWORD if present'
+    );
   }
 
   const host = process.env.EMAIL_SERVER_HOST?.trim();
@@ -30,6 +61,12 @@ function getSmtpTransport() {
       secure: port === 465,
       auth: { user, pass },
     });
+  }
+
+  if (server) {
+    throw new Error(
+      'EMAIL_SERVER must be a full SMTP URL (smtp://user:pass@host:587), or set EMAIL_SERVER_HOST/USER/PASSWORD.'
+    );
   }
 
   return null;
@@ -102,16 +139,30 @@ async function sendVerificationRequest({
       );
     }
 
-    await transport.sendMail({
-      to: identifier,
-      from,
-      subject,
-      text,
-      html,
-    });
+    try {
+      await transport.sendMail({
+        to: identifier,
+        from,
+        subject,
+        text,
+        html,
+      });
+    } catch (smtpError) {
+      const summary = smtpErrorSummary(smtpError);
+      console.error('[auth] SMTP sendMail failed', summary);
+      // שגיאה נקייה — בלי אובייקט nodemailer ובלי סודות — כדי ש-NextAuth יחזיר EmailSignin ולא 500 ריק
+      throw new Error(
+        `SMTP send failed (${summary.code}${summary.responseCode ? `/${summary.responseCode}` : ''}). Check Gmail App Password / EMAIL_SERVER.`
+      );
+    }
   } catch (error) {
-    console.error('[auth] sendVerificationRequest failed', error);
-    throw error;
+    const summary = smtpErrorSummary(error);
+    console.error('[auth] sendVerificationRequest failed', summary);
+    // תמיד לזרוק Error רגיל (לא אובייקט ספק) כדי למנוע 500 עם גוף ריק ב-App Router
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(summary.message || 'Email send failed');
   }
 }
 

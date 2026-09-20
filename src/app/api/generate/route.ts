@@ -6,6 +6,14 @@ import { getTenantDB } from '@/lib/tenant-db';
 import { generateCarouselSchema } from '@/lib/validations';
 import { generateJson } from '@/lib/services/ai.service';
 import { scrapeUrls } from '@/lib/services/scraper.service';
+import {
+  buildDensityPrompt,
+  buildStructurePrompt,
+  buildVisualStylePrompt,
+  type DensityId,
+  type VisualStyleId,
+  type WizardOptions,
+} from '@/lib/wizard';
 
 export const maxDuration = 60; // Allow function to run up to 60 seconds
 
@@ -19,12 +27,47 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid input', details: validatedFields.error.format() }, { status: 400 });
     }
     
-    // Fallback schema for new fields if validations.ts hasn't been updated yet
-    const { topic, audience, goal, brand, slideCount } = validatedFields.data;
+    const {
+      topic,
+      audience,
+      goal,
+      brand,
+      slideCount,
+      density,
+      visualStyle,
+      visualStyleCustom,
+      useRecommendedStructure,
+      narrativeDirection,
+    } = validatedFields.data;
     const websiteUrl = body.websiteUrl || null;
     const referenceLink1 = body.referenceLink1 || null;
     const referenceLink2 = body.referenceLink2 || null;
     const referenceLink3 = body.referenceLink3 || null;
+
+    const wizardOptions: WizardOptions = {
+      slideCount: slideCount || 7,
+      useRecommendedStructure: useRecommendedStructure ?? true,
+      visualStyle: (visualStyle || 'minimal') as VisualStyleId,
+      visualStyleCustom: visualStyleCustom || '',
+      density: (density || 'standard') as DensityId,
+      audience: audience || '',
+      goal: goal || '',
+    };
+    const densityHint = buildDensityPrompt(wizardOptions.density);
+    const visualHint = buildVisualStylePrompt(wizardOptions);
+    const structureHint = buildStructurePrompt(
+      wizardOptions.slideCount,
+      wizardOptions.useRecommendedStructure,
+      narrativeDirection
+        ? {
+            title: narrativeDirection.title,
+            structureHint:
+              narrativeDirection.structureHint ||
+              narrativeDirection.summary ||
+              '',
+          }
+        : null
+    );
 
     let aiProvider = process.env.DEFAULT_AI_PROVIDER || 'gemini';
     let aiModel = process.env.DEFAULT_AI_MODEL || 'gemini-3.8-flash';
@@ -104,34 +147,76 @@ export async function POST(req: Request) {
 
     const scrapedContext = await scrapeUrls([finalWebsiteUrl, finalRef1, finalRef2, finalRef3]);
 
+    const count = wizardOptions.slideCount;
+    const narrativeLine = narrativeDirection
+      ? `כיוון נרטיבי שנבחר: ${narrativeDirection.title}${
+          narrativeDirection.summary ? ` — ${narrativeDirection.summary}` : ''
+        }`
+      : 'כיוון נרטיבי: לא נבחר במפורש — בחר מבנה חזק לנושא.';
+
     const prompt = `
-אתה קופירייטר ומעצב קרוסלות לאינסטגרם.
-צור קרוסלה בת בדיוק ${slideCount || 8} שקפים עבור אינסטגרם בהתבסס על הנתונים הבאים:
-נושא: ${topic}
-קהל יעד: ${audience}
-מטרה: ${goal}
-זהות המותג: ${brand}
+אתה קופירייטר ומעצב קרוסלות לאינסטגרם בפורמט אנכי 1080×1350.
+צור חבילת קרוסלה מלאה: שקפים + כיתוב פוסט + חבילת האשטאגים.
+נושא / טקסט מקור: ${topic}
+קהל יעד: ${audience || 'כללי'}
+מטרה: ${goal || 'מתן ערך ומעורבות'}
+זהות המותג / טון: ${brand || 'טבעי וברור בעברית'}
+${narrativeLine}
 ${brandIdentityContext}
 ${pastCarouselsContext}
 ${scrapedContext ? `\nלמד על סגנון המותג, הנושאים והטון מהתוכן הבא שנאסף מהרשת (אופציונלי אך מומלץ להתבסס עליו):\n${scrapedContext}\n` : ''}
 
-צור מערך באורך מדויק של ${slideCount || 8} שקפים בלבד — לא יותר ולא פחות.
-עבור כל שקף, אנא ספק את הטקסט בעברית בלבד. 
-החזר את התשובה בפורמט JSON בלבד המכיל 2 מפתחות:
-1. "explanation": טקסט הסבר בעברית (כ-3 משפטים) למשתמש, שמתאר מה הבנת מהלינקים ומהעסק שלו, ומה התוכנית והאסטרטגיה של הקרוסלה שיצרת.
-2. "slides": מערך השקפים.
-כל אובייקט ייצג שקף ויכלול את השדות:
-- id: מחרוזת מזהה (לדוגמה "1")
-- text: טקסט השקף (קצר וקולע, מקסימום 15 מילים לשקף)
-- backgroundColor: קוד צבע HEX (רך ונעים לעין שמתאים למותג)
-- textColor: קוד צבע HEX (קריא ומתאים לרקע)
+הנחיות מבנה (חובה):
+${structureHint}
+- שער = הוק שעוצר גלילה
+- כל שקף תוכן = רעיון אחד בלבד
+- כלול שקף הוכחה כשיש מקום במבנה
+- שקף אחרון = CTA ברור
+
+הנחיות צפיפות מידע:
+${densityHint}
+
+הנחיות סגנון ויזואלי (צבעים וטון):
+${visualHint}
+
+צור מערך באורך מדויק של ${count} שקפים בלבד — לא יותר ולא פחות.
+עבור כל שקף, אנא ספק את הטקסט בעברית בלבד.
+החזר JSON בלבד עם המפתחות:
+1. "explanation": הסבר קצר בעברית (כ-3 משפטים) על האסטרטגיה והמבנה.
+2. "slides": מערך השקפים. כל אובייקט:
+   - id: מחרוזת מזהה (לדוגמה "1")
+   - role: אחד מתוך cover | content | proof | cta (שקף ראשון cover, אחרון cta, הוכחה proof אם קיימת)
+   - text: טקסט השקף בעברית לפי צפיפות המידע שנבחרה
+   - backgroundColor: קוד צבע HEX שמתאים לסגנון הוויזואלי שנבחר
+   - textColor: קוד צבע HEX (קריא ומתאים לרקע)
+3. "caption": כיתוב פוסט מלא בעברית (3–6 שורות), כולל פתיח, ערך קצר, וקריאה לפעולה — בלי האשטאגים בתוך הכיתוב.
+4. "hashtags": מערך של 8–15 האשטאגים רלוונטיים בעברית ו/או באנגלית (עם #), מותאמים לנושא.
 `;
 
 
     const parsedJson = await generateJson({ prompt, provider: aiProvider, model: aiModel });
     const slides = Array.isArray(parsedJson) ? parsedJson : (parsedJson.slides || parsedJson);
     const explanation = parsedJson.explanation || '';
+    const caption =
+      typeof parsedJson.caption === 'string' ? parsedJson.caption.trim() : '';
+    const hashtags = Array.isArray(parsedJson.hashtags)
+      ? parsedJson.hashtags
+          .map((tag: unknown) => String(tag || '').trim())
+          .filter(Boolean)
+          .map((tag: string) => (tag.startsWith('#') ? tag : `#${tag}`))
+      : [];
 
+    const packagePayload = {
+      slides,
+      caption,
+      hashtags,
+      narrativeDirection: narrativeDirection
+        ? {
+            id: narrativeDirection.id,
+            title: narrativeDirection.title,
+          }
+        : null,
+    };
 
     if (workspaceId && session?.user?.email) {
       try {
@@ -144,7 +229,7 @@ ${scrapedContext ? `\nלמד על סגנון המותג, הנושאים והטו
                topic,
                targetAudience: audience,
                status: 'generated',
-               slidesData: slides,
+               slidesData: packagePayload,
              }
            });
         }
@@ -153,7 +238,13 @@ ${scrapedContext ? `\nלמד על סגנון המותג, הנושאים והטו
       }
     }
 
-    return NextResponse.json({ slides, explanation });
+    return NextResponse.json({
+      slides,
+      explanation,
+      caption,
+      hashtags,
+      narrativeDirection: packagePayload.narrativeDirection,
+    });
   } catch (error) {
     console.error('Error generating carousel:', error);
     return NextResponse.json({ error: error?.message || 'Failed to generate carousel' }, { status: 500 });
