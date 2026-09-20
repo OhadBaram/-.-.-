@@ -2,32 +2,34 @@
 
 import { useSession, signIn, signOut } from 'next-auth/react';
 import Link from 'next/link';
+import ThemeToggle from '@/components/ThemeToggle';
 
 export default function Home() {
   const { data: session } = useSession();
 
   return (
-    <main className="min-h-screen bg-gray-50 font-sans" dir="rtl">
+    <main className="min-h-screen bg-gray-50 dark:bg-gray-900 font-sans transition-colors duration-300" dir="rtl">
       {/* Navbar */}
-      <nav className="w-full bg-white shadow-sm py-4 px-8 flex justify-between items-center relative z-10">
+      <nav className="w-full bg-white dark:bg-gray-900 shadow-sm py-4 px-4 md:px-8 flex justify-between items-center relative z-10 transition-colors duration-300">
         <div className="flex items-center gap-2">
-          <span className="text-2xl font-black text-indigo-700">קרוסל. איי. אי</span>
+          <span className="text-xl md:text-2xl font-black text-indigo-700 dark:text-indigo-400">קרוסל. איי. אי</span>
         </div>
-        <div className="flex items-center gap-6">
-          <a href="#features" className="text-gray-600 hover:text-indigo-600 font-medium hidden md:block">פיצ'רים</a>
-          <a href="#pricing" className="text-gray-600 hover:text-indigo-600 font-medium hidden md:block">מחירים</a>
+        <div className="flex items-center gap-3 md:gap-6">
+          <a href="#features" className="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium hidden md:block">פיצ'רים</a>
+          <a href="#pricing" className="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium hidden md:block">מחירים</a>
+          <ThemeToggle />
           {session ? (
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-700 font-medium hidden md:block">שלום, {session.user?.name}</span>
-              <button onClick={() => signOut()} className="text-sm font-medium text-gray-500 hover:text-gray-700">התנתק</button>
-              <Link href="/dashboard/create" className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition">
+            <div className="flex items-center gap-2 md:gap-4">
+              <span className="text-sm text-gray-700 dark:text-gray-300 font-medium hidden md:block">שלום, {session.user?.name}</span>
+              <button onClick={() => signOut()} className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hidden sm:block">התנתק</button>
+              <Link href="/dashboard/create" className="px-3 md:px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold text-sm md:text-base hover:bg-indigo-700 transition">
                 ליצירת קרוסלה
               </Link>
             </div>
           ) : (
-            <div className="flex items-center gap-4">
-              <button onClick={() => signIn()} className="font-medium text-indigo-600 hover:text-indigo-800">התחברות</button>
-              <button onClick={() => signIn()} className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition">
+            <div className="flex items-center gap-2 md:gap-4">
+              <button onClick={() => signIn()} className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 text-sm md:text-base hidden sm:block">התחברות</button>
+              <button onClick={() => signIn()} className="px-3 md:px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold text-sm md:text-base hover:bg-indigo-700 transition">
                 התחל בחינם
               </button>
             </div>
