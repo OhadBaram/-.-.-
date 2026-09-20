@@ -8,7 +8,7 @@ interface CopilotWidgetProps {
   brandColor: string;
   theme: string;
   onUpdateSlideText: (index: number, text: string) => void;
-  onChangeTemplate: (tpl: TemplateId) => void;
+  onChangeTemplate: (tpl: TemplateId, slideIndex?: number) => void;
   onChangeFont: (font: string) => void;
   onChangeColors: (color: string, theme: string) => void;
 }
@@ -103,7 +103,18 @@ export default function CopilotWidget({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           command,
-          currentState: { slides, template, globalFont, brandColor, theme }
+          currentState: {
+            slides: slides.map((s) => ({
+              id: s.id,
+              text: s.text,
+              template: s.template ?? 'minimal',
+              hasImage: Boolean(s.imageUrl),
+            })),
+            activeSlideTemplate: template,
+            globalFont,
+            brandColor,
+            theme,
+          }
         })
       });
       const data = await res.json();
@@ -117,7 +128,7 @@ export default function CopilotWidget({
           if (action.name === 'update_slide_text') {
             onUpdateSlideText(action.args.slideIndex, action.args.newText);
           } else if (action.name === 'change_template') {
-            onChangeTemplate(action.args.templateId);
+            onChangeTemplate(action.args.templateId, action.args.slideIndex);
           } else if (action.name === 'change_font') {
             onChangeFont(action.args.fontFamily);
           } else if (action.name === 'update_colors') {
