@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     const mimeType = file.type || 'audio/webm';
 
     // Using Gemini 1.5 Flash for fast audio transcription
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
     
     const result = await model.generateContent([
       "תמלל במדויק את ההקלטה הבאה לעברית. החזר אך ורק את הטקסט המילולי בלי שום הקדמות או תוספות.",
