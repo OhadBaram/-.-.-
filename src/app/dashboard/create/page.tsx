@@ -1,41 +1,26 @@
-'use client';
-
-import { useState } from 'react';
-import { useSession } from 'next-auth/react';
-import CarouselRenderer, { Slide } from '@/components/CarouselRenderer';
-import CarouselForm from '@/components/CarouselForm';
-import SkeletonLoader from '@/components/SkeletonLoader';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
+import prisma from '@/lib/prisma';
 import Link from 'next/link';
+import CarouselCreator from '@/components/CarouselCreator';
 
-export default function CreateCarouselPage() {
-  const { data: session } = useSession();
-  const [slides, setSlides] = useState<Slide[] | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+export default async function CreateCarouselPage() {
+  const session = await getServerSession(authOptions);
 
-  const handleGenerate = async (data: any) => {
-    setIsLoading(true);
-    
-    try {
-      const res = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
+  if (!session?.user?.email) {
+    return (
+      <div className="min-h-screen p-8 text-center bg-gray-50 flex items-center justify-center">
+        <h1 className="text-2xl font-bold">אנא התחבר</h1>
+      </div>
+    );
+  }
 
-      const result = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(result.error || 'API error');
-      }
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email },
+    include: { workspaces: { include: { workspace: true } } }
+  });
 
-      setSlides(result.slides);
-    } catch (error: any) {
-      console.error(error);
-      alert(`אירעה שגיאה ביצירת הקרוסלה: ${error.message}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const workspace = user?.workspaces[0]?.workspace;
 
   return (
     <main className="min-h-screen p-8 bg-gradient-to-br from-indigo-50 via-white to-purple-50" dir="rtl">
@@ -49,23 +34,13 @@ export default function CreateCarouselPage() {
         <p className="text-gray-600 text-lg md:text-xl font-medium">הזן פרטים וקבל קרוסלה מוכנה תוך שניות</p>
       </header>
       
-      {!slides ? (
-        isLoading ? (
-          <SkeletonLoader />
-        ) : (
-          <CarouselForm onSubmit={handleGenerate} isLoading={isLoading} />
-        )
-      ) : (
-        <div className="flex flex-col items-center">
-          <button 
-            onClick={() => setSlides(null)}
-            className="mb-6 px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-          >
-            חזור ליצירת קרוסלה חדשה
-          </button>
-          <CarouselRenderer slides={slides} brandColor="#6366f1" />
-        </div>
-      )}
+      <CarouselCreator 
+        initialWebsiteUrl={workspace?.websiteUrl || ''}
+        initialReferenceLink1={workspace?.referenceLink1 || ''}
+        initialReferenceLink2={workspace?.referenceLink2 || ''}
+        initialReferenceLink3={workspace?.referenceLink3 || ''}
+        brandColor={workspace?.brandColor || '#6366f1'}
+      />
     </main>
   );
 }

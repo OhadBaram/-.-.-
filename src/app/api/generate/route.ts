@@ -7,6 +7,8 @@ import prisma from '@/lib/prisma';
 import { getTenantDB } from '@/lib/tenant-db';
 import { generateCarouselSchema } from '@/lib/validations';
 
+export const maxDuration = 60; // Allow function to run up to 60 seconds
+
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const openai = new OpenAI({
   baseURL: 'https://openrouter.ai/api/v1',
@@ -66,13 +68,15 @@ export async function POST(req: Request) {
     if (urlsToScrape.length > 0) {
       const scrapePromises = urlsToScrape.map(async (url) => {
         const controller = new AbortController();
-        const id = setTimeout(() => controller.abort(), 6000); // 6 sec timeout to prevent vercel function death
+        const id = setTimeout(() => controller.abort(), 25000); 
         try {
-          const res = await fetch(`https://r.jina.ai/${url}`, { signal: controller.signal });
+          const res = await fetch(`https://r.jina.ai/${url}`, { 
+            signal: controller.signal,
+            next: { revalidate: 86400 } // Cache the scraped result for 24 hours!
+          });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const text = await res.text();
-          // limit text length to avoid token limits
-          return `--- תוכן מתוך ${url} ---\n${text.substring(0, 1500)}\n`;
+          return `--- תוכן מתוך ${url} ---\n${text.substring(0, 3000)}\n`;
         } catch (err) {
           console.error(`Failed to scrape ${url}:`, err);
           return '';

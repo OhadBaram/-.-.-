@@ -14,9 +14,20 @@ interface CarouselFormProps {
     referenceLink3?: string;
   }) => void;
   isLoading: boolean;
+  initialWebsiteUrl?: string;
+  initialReferenceLink1?: string;
+  initialReferenceLink2?: string;
+  initialReferenceLink3?: string;
 }
 
-export default function CarouselForm({ onSubmit, isLoading }: CarouselFormProps) {
+export default function CarouselForm({ 
+  onSubmit, 
+  isLoading,
+  initialWebsiteUrl = '',
+  initialReferenceLink1 = '',
+  initialReferenceLink2 = '',
+  initialReferenceLink3 = ''
+}: CarouselFormProps) {
   const [topic, setTopic] = useState('');
   
   const [audienceSelect, setAudienceSelect] = useState('');
@@ -28,10 +39,10 @@ export default function CarouselForm({ onSubmit, isLoading }: CarouselFormProps)
   const [brandSelect, setBrandSelect] = useState('');
   const [brandCustom, setBrandCustom] = useState('');
 
-  const [websiteUrl, setWebsiteUrl] = useState('');
-  const [referenceLink1, setReferenceLink1] = useState('');
-  const [referenceLink2, setReferenceLink2] = useState('');
-  const [referenceLink3, setReferenceLink3] = useState('');
+  const [websiteUrl, setWebsiteUrl] = useState(initialWebsiteUrl);
+  const [referenceLink1, setReferenceLink1] = useState(initialReferenceLink1);
+  const [referenceLink2, setReferenceLink2] = useState(initialReferenceLink2);
+  const [referenceLink3, setReferenceLink3] = useState(initialReferenceLink3);
 
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -143,9 +154,10 @@ export default function CarouselForm({ onSubmit, isLoading }: CarouselFormProps)
         
         {showAdvanced && (
           <div className="mt-4 p-4 bg-indigo-50/50 rounded-xl space-y-4 border border-indigo-100">
-            <p className="text-sm text-gray-600 mb-2">
-              ספק קישורים והבינה המלאכותית שלנו תסרוק אותם בזמן אמת כדי ללמוד את השפה, המוצרים והעיצוב שלך.
-            </p>
+            <div className="bg-white p-3 rounded border border-indigo-200 text-sm text-indigo-800 font-medium">
+              הקישורים למטה נמשכו מתוך <strong>הגדרות מרחב העבודה</strong> שלך, ואנו זוכרים אותם (Cache) כדי לייצר לך קרוסלות מיד. <br/>
+              אתה יכול לשנות או למחוק אותם כאן באופן חד-פעמי אם הקרוסלה הזו מיועדת לעסק אחר!
+            </div>
             <div>
               <label className="block text-gray-700 text-sm font-bold mb-1">כתובת אתר העסק</label>
               <input type="url" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} placeholder="https://your-website.com" className={inputClasses} />
