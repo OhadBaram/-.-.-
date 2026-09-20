@@ -123,11 +123,19 @@ export default function CreationWizard({
   optionsRef.current = options;
 
   useEffect(() => {
-    listRef.current?.scrollTo({
-      top: listRef.current.scrollHeight,
-      behavior: 'smooth',
-    });
-  }, [messages, chatLoading, phase, directions]);
+    const el = listRef.current;
+    if (!el) return;
+    const scroll = () => {
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior: 'smooth',
+      });
+    };
+    scroll();
+    // אחרי רינדור של «הסוכן חושב…» / כיוונים
+    const t = window.setTimeout(scroll, 50);
+    return () => window.clearTimeout(t);
+  }, [messages, chatLoading, stylesLoading, phase, directions, researchNote]);
 
   const patchOptions = (partial: Partial<WizardOptions>) => {
     setOptions((prev) => ({ ...prev, ...partial }));
