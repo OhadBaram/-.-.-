@@ -6,8 +6,11 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
 const ERROR_MESSAGES: Record<string, string> = {
+  Default: 'שליחת קישור ההתחברות נכשלה. בדקו ב-Vercel את EMAIL_FROM ואת RESEND_API_KEY (או EMAIL_SERVER), וגם DATABASE_URL.',
   EmailSignin: 'שליחת המייל נכשלה. בדקו ב-Vercel את RESEND_API_KEY או EMAIL_SERVER, וגם EMAIL_FROM.',
   Configuration: 'הגדרות האימות בשרת לא הושלמו. בדקו NEXTAUTH_SECRET, DATABASE_URL ומשתני המייל.',
+  AccessDenied: 'הגישה נדחתה.',
+  Verification: 'קישור האימות אינו תקף או שפג תוקפו. נסו שוב.',
 };
 
 function SignInForm() {
@@ -25,20 +28,29 @@ function SignInForm() {
     setLoading(true);
     setError('');
 
-    const result = await signIn('email', {
-      email: email.trim(),
-      callbackUrl,
-      redirect: false,
-    });
+    try {
+      const result = await signIn('email', {
+        email: email.trim(),
+        callbackUrl,
+        redirect: false,
+      });
 
-    setLoading(false);
+      if (result?.error) {
+        setError(ERROR_MESSAGES[result.error] || ERROR_MESSAGES.Default);
+        return;
+      }
 
-    if (result?.error) {
-      setError(ERROR_MESSAGES[result.error] || ERROR_MESSAGES.Default);
-      return;
+      if (!result?.ok && result?.url?.includes('error=')) {
+        setError(ERROR_MESSAGES.Default);
+        return;
+      }
+
+      window.location.href = `/auth/verify-request?email=${encodeURIComponent(email.trim())}`;
+    } catch {
+      setError(ERROR_MESSAGES.Default);
+    } finally {
+      setLoading(false);
     }
-
-    window.location.href = `/auth/verify-request?email=${encodeURIComponent(email.trim())}`;
   }
 
   return (
