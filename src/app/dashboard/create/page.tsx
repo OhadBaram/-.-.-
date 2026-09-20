@@ -12,7 +12,7 @@ export default function CreateCarouselPage() {
   const [slides, setSlides] = useState<Slide[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleGenerate = async (data: { topic: string; audience: string; goal: string; brand: string }) => {
+  const handleGenerate = async (data: any) => {
     setIsLoading(true);
     
     try {

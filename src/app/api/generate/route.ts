@@ -23,12 +23,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid input', details: validatedFields.error.format() }, { status: 400 });
     }
     
+    // Fallback schema for new fields if validations.ts hasn't been updated yet
     const { topic, audience, goal, brand } = validatedFields.data;
+    const websiteUrl = body.websiteUrl || null;
+    const referenceLink1 = body.referenceLink1 || null;
+    const referenceLink2 = body.referenceLink2 || null;
+    const referenceLink3 = body.referenceLink3 || null;
 
     let aiProvider = process.env.DEFAULT_AI_PROVIDER || 'gemini';
     let aiModel = process.env.DEFAULT_AI_MODEL || 'gemini-1.5-flash';
     let workspaceId = null;
-    let ws = null;
+    let ws: any = null;
 
     if (session?.user?.email) {
       const user = await prisma.user.findUnique({
@@ -46,36 +51,41 @@ export async function POST(req: Request) {
     let scrapedContext = '';
     let brandIdentityContext = '';
 
-    if (ws) {
-      if (ws.brandIdentity) {
-        brandIdentityContext = `\nזהות המותג המוגדרת במערכת: ${ws.brandIdentity}\n`;
-      }
+    const finalWebsiteUrl = websiteUrl || ws?.websiteUrl;
+    const finalRef1 = referenceLink1 || ws?.referenceLink1;
+    const finalRef2 = referenceLink2 || ws?.referenceLink2;
+    const finalRef3 = referenceLink3 || ws?.referenceLink3;
+    const finalBrandIdentity = brand || ws?.brandIdentity;
 
-      const urlsToScrape = [ws.websiteUrl, ws.referenceLink1, ws.referenceLink2, ws.referenceLink3].filter(Boolean) as string[];
+    if (finalBrandIdentity) {
+      brandIdentityContext = `\nזהות המותג המוגדרת במערכת: ${finalBrandIdentity}\n`;
+    }
+
+    const urlsToScrape = [finalWebsiteUrl, finalRef1, finalRef2, finalRef3].filter(Boolean) as string[];
       
-      if (urlsToScrape.length > 0) {
-        const scrapePromises = urlsToScrape.map(async (url) => {
-          const controller = new AbortController();
-          const id = setTimeout(() => controller.abort(), 10000);
-          try {
-            const res = await fetch(`https://r.jina.ai/${url}`, { signal: controller.signal });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const text = await res.text();
-            return `--- תוכן מתוך ${url} ---\n${text}\n`;
-          } catch (err) {
-            console.error(`Failed to scrape ${url}:`, err);
-            return '';
-          } finally {
-            clearTimeout(id);
-          }
-        });
-        
-        const results = await Promise.allSettled(scrapePromises);
-        scrapedContext = results
-          .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled')
-          .map(r => r.value)
-          .join('\n');
-      }
+    if (urlsToScrape.length > 0) {
+      const scrapePromises = urlsToScrape.map(async (url) => {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), 6000); // 6 sec timeout to prevent vercel function death
+        try {
+          const res = await fetch(`https://r.jina.ai/${url}`, { signal: controller.signal });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const text = await res.text();
+          // limit text length to avoid token limits
+          return `--- תוכן מתוך ${url} ---\n${text.substring(0, 1500)}\n`;
+        } catch (err) {
+          console.error(`Failed to scrape ${url}:`, err);
+          return '';
+        } finally {
+          clearTimeout(id);
+        }
+      });
+      
+      const results = await Promise.allSettled(scrapePromises);
+      scrapedContext = results
+        .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled')
+        .map(r => r.value)
+        .join('\n');
     }
 
     const prompt = `

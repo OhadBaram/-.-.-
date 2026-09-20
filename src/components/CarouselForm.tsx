@@ -3,77 +3,171 @@
 import React, { useState } from 'react';
 
 interface CarouselFormProps {
-  onSubmit: (data: { topic: string; audience: string; goal: string; brand: string }) => void;
+  onSubmit: (data: { 
+    topic: string; 
+    audience: string; 
+    goal: string; 
+    brand: string;
+    websiteUrl?: string;
+    referenceLink1?: string;
+    referenceLink2?: string;
+    referenceLink3?: string;
+  }) => void;
   isLoading: boolean;
 }
 
 export default function CarouselForm({ onSubmit, isLoading }: CarouselFormProps) {
   const [topic, setTopic] = useState('');
-  const [audience, setAudience] = useState('');
-  const [goal, setGoal] = useState('');
-  const [brand, setBrand] = useState('');
+  
+  const [audienceSelect, setAudienceSelect] = useState('');
+  const [audienceCustom, setAudienceCustom] = useState('');
+  
+  const [goalSelect, setGoalSelect] = useState('');
+  const [goalCustom, setGoalCustom] = useState('');
+  
+  const [brandSelect, setBrandSelect] = useState('');
+  const [brandCustom, setBrandCustom] = useState('');
+
+  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [referenceLink1, setReferenceLink1] = useState('');
+  const [referenceLink2, setReferenceLink2] = useState('');
+  const [referenceLink3, setReferenceLink3] = useState('');
+
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ topic, audience, goal, brand });
+    
+    const finalAudience = audienceSelect === 'other' ? audienceCustom : audienceSelect;
+    const finalGoal = goalSelect === 'other' ? goalCustom : goalSelect;
+    const finalBrand = brandSelect === 'other' ? brandCustom : brandSelect;
+
+    onSubmit({ 
+      topic, 
+      audience: finalAudience, 
+      goal: finalGoal, 
+      brand: finalBrand,
+      websiteUrl,
+      referenceLink1,
+      referenceLink2,
+      referenceLink3
+    });
   };
 
+  const inputClasses = "w-full text-gray-900 bg-white border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-sm";
+
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full max-w-lg mx-auto bg-white/70 backdrop-blur-lg p-8 rounded-2xl shadow-2xl border border-white/40">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-6 w-full max-w-xl mx-auto bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
+      
       <div>
-        <label className="block text-gray-800 font-bold mb-2">נושא הפוסט</label>
+        <label className="block text-gray-800 font-bold mb-2">נושא הפוסט (חובה)</label>
         <input 
           type="text"
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           required
-          className="w-full text-gray-900 bg-white/60 border border-white/50 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm"
-          placeholder="לדוגמה: 5 טיפים לניהול זמן"
+          className={inputClasses}
+          placeholder="לדוגמה: 5 טיפים לניהול זמן אפקטיבי"
         />
+        <p className="text-xs text-gray-500 mt-1">ככל שתהיה ספציפי יותר, כך ה-AI יכתוב תוכן מדויק יותר.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-gray-700 font-bold mb-2 text-sm">מטרת הפוסט (אופציונלי)</label>
+          <select 
+            value={goalSelect} 
+            onChange={(e) => setGoalSelect(e.target.value)}
+            className={inputClasses}
+          >
+            <option value="">בחר מטרה...</option>
+            <option value="חינוך ומתן ערך">חינוך ומתן ערך</option>
+            <option value="מעורבות ותגובות (Engagement)">מעורבות ותגובות (Engagement)</option>
+            <option value="מכירות והמרות (Sales)">מכירות והמרות (Sales)</option>
+            <option value="חשיפה ומיתוג (Awareness)">חשיפה ומיתוג (Awareness)</option>
+            <option value="other">מטרה אחרת (הזן ידנית)</option>
+          </select>
+          {goalSelect === 'other' && (
+            <input type="text" value={goalCustom} onChange={(e) => setGoalCustom(e.target.value)} placeholder="הקלד מטרה..." className={`mt-2 ${inputClasses}`} required />
+          )}
+        </div>
+
+        <div>
+          <label className="block text-gray-700 font-bold mb-2 text-sm">קהל יעד (אופציונלי)</label>
+          <select 
+            value={audienceSelect} 
+            onChange={(e) => setAudienceSelect(e.target.value)}
+            className={inputClasses}
+          >
+            <option value="">בחר קהל...</option>
+            <option value="עסקים קטנים ובינוניים (B2B)">עסקים קטנים (B2B)</option>
+            <option value="צרכנים פרטיים (B2C)">צרכנים (B2C)</option>
+            <option value="יזמים וסטארטאפים">יזמים וסטארטאפים</option>
+            <option value="יוצרי תוכן ומשפיענים">יוצרי תוכן</option>
+            <option value="other">קהל אחר (הזן ידנית)</option>
+          </select>
+          {audienceSelect === 'other' && (
+            <input type="text" value={audienceCustom} onChange={(e) => setAudienceCustom(e.target.value)} placeholder="הקלד קהל יעד..." className={`mt-2 ${inputClasses}`} required />
+          )}
+        </div>
       </div>
 
       <div>
-        <label className="block text-gray-800 font-bold mb-2">קהל יעד</label>
-        <input 
-          type="text"
-          value={audience}
-          onChange={(e) => setAudience(e.target.value)}
-          required
-          className="w-full text-gray-900 bg-white/60 border border-white/50 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm"
-          placeholder="לדוגמה: עצמאיים ובעלי עסקים"
-        />
+        <label className="block text-gray-700 font-bold mb-2 text-sm">סגנון וטון דיבור (אופציונלי)</label>
+        <select 
+          value={brandSelect} 
+          onChange={(e) => setBrandSelect(e.target.value)}
+          className={inputClasses}
+        >
+          <option value="">בחר סגנון...</option>
+          <option value="מקצועי, רשמי וסמכותי">מקצועי ורשמי</option>
+          <option value="קליל, בגובה העיניים והומוריסטי">קליל והומוריסטי</option>
+          <option value="חדשני, טכנולוגי ופורץ דרך">חדשני וטכנולוגי</option>
+          <option value="אישי, אותנטי ומרגש">אישי ואותנטי</option>
+          <option value="other">סגנון אחר (הזן ידנית)</option>
+        </select>
+        {brandSelect === 'other' && (
+          <input type="text" value={brandCustom} onChange={(e) => setBrandCustom(e.target.value)} placeholder="הקלד סגנון..." className={`mt-2 ${inputClasses}`} required />
+        )}
       </div>
 
-      <div>
-        <label className="block text-gray-800 font-bold mb-2">מטרת הפוסט</label>
-        <input 
-          type="text"
-          value={goal}
-          onChange={(e) => setGoal(e.target.value)}
-          required
-          className="w-full text-gray-900 bg-white/60 border border-white/50 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm"
-          placeholder="לדוגמה: יצירת מעורבות ומכירות"
-        />
-      </div>
-
-      <div>
-        <label className="block text-gray-800 font-bold mb-2">זהות המותג</label>
-        <input 
-          type="text"
-          value={brand}
-          onChange={(e) => setBrand(e.target.value)}
-          required
-          className="w-full text-gray-900 bg-white/60 border border-white/50 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm"
-          placeholder="לדוגמה: מקצועי, חדשני, ישיר"
-        />
+      <div className="border-t border-gray-200 pt-4 mt-2">
+        <button 
+          type="button"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="flex items-center text-indigo-600 font-bold hover:text-indigo-800 transition"
+        >
+          <span>🧠 למידת מותג אוטומטית ע"י AI (מתקדם)</span>
+          <span className="ml-2">{showAdvanced ? '▼' : '◀'}</span>
+        </button>
+        
+        {showAdvanced && (
+          <div className="mt-4 p-4 bg-indigo-50/50 rounded-xl space-y-4 border border-indigo-100">
+            <p className="text-sm text-gray-600 mb-2">
+              ספק קישורים והבינה המלאכותית שלנו תסרוק אותם בזמן אמת כדי ללמוד את השפה, המוצרים והעיצוב שלך.
+            </p>
+            <div>
+              <label className="block text-gray-700 text-sm font-bold mb-1">כתובת אתר העסק</label>
+              <input type="url" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} placeholder="https://your-website.com" className={inputClasses} />
+            </div>
+            <div>
+              <label className="block text-gray-700 text-sm font-bold mb-1">קישור לפוסט/קרוסלה שאהבת 1</label>
+              <input type="url" value={referenceLink1} onChange={(e) => setReferenceLink1(e.target.value)} placeholder="לינק לאינסטגרם..." className={inputClasses} />
+            </div>
+            <div>
+              <label className="block text-gray-700 text-sm font-bold mb-1">קישור לפוסט/קרוסלה שאהבת 2</label>
+              <input type="url" value={referenceLink2} onChange={(e) => setReferenceLink2(e.target.value)} placeholder="לינק לאינסטגרם..." className={inputClasses} />
+            </div>
+          </div>
+        )}
       </div>
 
       <button 
         type="submit" 
         disabled={isLoading}
-        className="mt-8 w-full px-6 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-xl hover:from-indigo-700 hover:to-purple-700 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none disabled:shadow-none transition-all duration-200"
+        className="mt-4 w-full px-6 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-xl hover:from-indigo-700 hover:to-purple-700 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none disabled:shadow-none transition-all duration-200"
       >
-        {isLoading ? 'מייצר קרוסלה...' : 'צור קרוסלה'}
+        {isLoading ? 'מייצר קרוסלה (זה עשוי לקחת חצי דקה)...' : '✨ צור קרוסלה'}
       </button>
     </form>
   );
