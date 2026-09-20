@@ -81,8 +81,10 @@ export async function POST(req: Request) {
       .find((m) => m.role === 'assistant')?.text;
     const intakeAlreadyShown = Boolean(
       lastAssistant &&
-        lastAssistant.includes('## מספר עמודים') &&
-        lastAssistant.includes('## סטייל ויזואלי')
+        (lastAssistant.includes('מספר עמודים') ||
+          lastAssistant.includes('המלצה · מספר עמודים')) &&
+        (lastAssistant.includes('סטייל ויזואלי') ||
+          lastAssistant.includes('המלצה · סטייל'))
     );
 
     const localPicks = parseUserOptionPicks(message);
@@ -96,7 +98,7 @@ export async function POST(req: Request) {
       const suggestions = buildIntakeSuggestions(topic);
       const reply =
         buildOptionsAckReply(localPicks, topic) ||
-        'עדכנתי. לחצו «המשך עם ההמלצות» או כתבו «מומלץ» / «המשך».';
+        'עדכנתי. לחצו «המשך עם ההגדרות הסופיות» או כתבו «מומלץ» / «המשך».';
 
       return NextResponse.json({
         reply,
@@ -143,24 +145,27 @@ export async function POST(req: Request) {
 אתה סוכן יצירת קרוסלות בעברית במוצר «קרוסל. איי. אי».
 קול: מקצועי, נלהב בקצרה, בלי להתחנף יתר על המידה. אל תעתיק ניסוחים ממוצרים אחרים.
 
+כלל זהב ל־UI: הצ׳אט הוא ייעוץ בלבד. מה שקובע את הקרוסלה — רק פאנל «הגדרות סופיות».
+לעולם אל תכתוב «נעלתי», «קבעתי», «כך תהיה הקרוסלה» כאילו הצ׳אט מחליט. כתוב «ממליץ», «הצעה», «אפשר לשנות בפאנל».
+
 זרימה:
 1) כשמגיע נושא ברור בפעם הראשונה — החזר תשובת קליטה מובנית (intake), אל תעבור ליצירת שקפים.
-2) אחרי קליטה — המשתמש יכול לשנות בפאנל או ללחוץ «המשך עם ההמלצות» / לכתוב «מומלץ».
+2) אחרי קליטה — המשתמש משנה בפאנל (מקור האמת) או לוחץ «המשך עם ההגדרות הסופיות» / כותב «מומלץ».
 3) רק אז phase=ready_for_directions. המערכת תציע שני כיווני תוכן בנפרד.
 
 מבנה חובה לתשובת intake (reply) בעברית, עם כותרות בדיוק כך:
-- פתיח קצר נלהב + התאמה לנישה
-- ## מספר עמודים
+- פתיח קצר + התאמה לנישה + משפט אחד: «זה ייעוץ — ההגדרות הסופיות בפאנל קובעות»
+- ## המלצה · מספר עמודים
   המלץ 7 (שער+תוכן+סיום) כברירת מחדל; אם בנושא יש N טיפים/פריטים — המלץ N+2 (בין ${MIN_SLIDE_COUNT}–${MAX_SLIDE_COUNT}). ציין שאפשר מותאם.
-- ## סטייל ויזואלי
+- ## המלצה · סטייל ויזואלי
   הצג את האפשרויות: ${styleOptionsList}
   תן המלצה מודעת-נישה (למשל לטק/AI: נועז / כהה ניגודיות גבוהה). ציין שצילומי מסך כהשראה — בקרוב, ואפשר תיאור חופשי.
-- ## צפיפות מידע
+- ## המלצה · צפיפות מידע
   קליל / סטנדרטי ⭐ / עשיר (${densityOptionsList})
-- סיום: אפשר לשנות בפאנל או לכתוב «מומלץ» / «המשך» כדי לעבור לכיווני תוכן.
+- סיום: שנו בפאנל מה שרוצים, ואז «המשך עם ההגדרות הסופיות».
 
 אם זו תשובת intake — readyForDirections=false.
-אם המשתמש כתב «מומלץ» או נעל הגדרות — readyForDirections=true ו-applyRecommendedAll בהתאם.
+אם המשתמש כתב «מומלץ» או ביקש להמשיך עם ההגדרות — readyForDirections=true ו-applyRecommendedAll בהתאם.
 אם חסר נושא — שאל שאלה אחת קצרה, phase=clarify.
 
 הגדרות נוכחיות מהאשף:
@@ -253,8 +258,8 @@ ${message}
       if (needsIntake) {
         const localIntake = buildIntakeReply(topic);
         if (
-          !reply.includes('## מספר עמודים') ||
-          !reply.includes('## סטייל ויזואלי')
+          !reply.includes('מספר עמודים') ||
+          !reply.includes('סטייל ויזואלי')
         ) {
           reply = localIntake;
         }
@@ -310,7 +315,7 @@ ${message}
       return NextResponse.json({
         reply:
           reply ||
-          'ספרו לי נושא אחד לקרוסלה — ואכין לכם קליטת הגדרות מסודרת.',
+          'ספרו לי נושא אחד לקרוסלה — ואכין לכם המלצות מסודרות (ייעוץ בלבד).',
         topic,
         phase,
         readyForDirections,
@@ -390,7 +395,7 @@ ${message}
       }
 
       return NextResponse.json({
-        reply: 'ספרו לי נושא אחד לקרוסלה — למשל «5 טיפים ל…» — ואכין קליטת הגדרות.',
+        reply: 'ספרו לי נושא אחד לקרוסלה — למשל «5 טיפים ל…» — ואכין המלצות (ייעוץ בלבד).',
         topic: '',
         phase: 'clarify' as WizardChatPhase,
         readyForDirections: false,

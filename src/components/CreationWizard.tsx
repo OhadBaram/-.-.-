@@ -112,8 +112,8 @@ export default function CreationWizard({
     {
       role: 'assistant',
       text: userName
-        ? `היי ${userName}! שלחו נושא אחד — אכין קליטת הגדרות (עמודים, סטייל, צפיפות). אחר כך אפשר לשנות בפאנל או להמשיך עם ההמלצות לשני כיווני תוכן.`
-        : 'היי! שלחו נושא אחד — אכין קליטת הגדרות (עמודים, סטייל, צפיפות). אחר כך אפשר לשנות בפאנל או להמשיך עם ההמלצות לשני כיווני תוכן.',
+        ? `היי ${userName}! אני כאן לייעוץ בלבד — נושא, המלצות, וכיוון תוכן. מה שקובע את צורת הקרוסלה זה רק פאנל «הגדרות סופיות». שלחו נושא אחד להתחלה.`
+        : 'היי! אני כאן לייעוץ בלבד — נושא, המלצות, וכיוון תוכן. מה שקובע את צורת הקרוסלה זה רק פאנל «הגדרות סופיות». שלחו נושא אחד להתחלה.',
     },
   ]);
 
@@ -292,7 +292,7 @@ export default function CreationWizard({
 
       const becomingIntake =
         data.phase === 'intake' ||
-        (data.reply || '').includes('## מספר עמודים');
+        (data.reply || '').includes('מספר עמודים');
       if (becomingIntake) {
         const topicForIntake = (nextTopic || topicDraft).trim();
         const shouldSeedPanel =
@@ -308,7 +308,7 @@ export default function CreationWizard({
 
       const reply =
         data.reply ||
-        'מעולה. כשיש נושא ברור — אכין קליטת הגדרות.';
+        'מעולה. כשיש נושא ברור — אכין המלצות (ייעוץ בלבד).';
 
       setMessages([
         ...nextHistory,
@@ -335,7 +335,7 @@ export default function CreationWizard({
         ...nextHistory,
         {
           role: 'assistant',
-          text: 'שמרתי את הנושא והמלצות בפאנל. לחצו «המשך עם ההמלצות» כשמוכנים.',
+          text: 'שמרתי את הנושא והעתקתי המלצות להתחלה בפאנל. מה שקובע הוא הפאנל — לחצו «המשך עם ההגדרות הסופיות» כשמוכנים.',
         },
       ]);
       setIntakeReady(true);
@@ -364,7 +364,7 @@ export default function CreationWizard({
         ...prev,
         {
           role: 'assistant',
-          text: 'קודם נושא אחד בצ׳אט — ואז אפשר להמשיך עם ההמלצות.',
+          text: 'קודם נושא אחד בצ׳אט — ואז אפשר להמשיך עם ההגדרות הסופיות בפאנל.',
         },
       ]);
       inputRef.current?.focus();
@@ -439,10 +439,35 @@ export default function CreationWizard({
     ? recommendedSlideCountForTopic(topicDraft)
     : RECOMMENDED_SLIDE_COUNT;
 
+  const advice =
+    topicDraft.trim().length > 0
+      ? buildIntakeSuggestions(topicDraft)
+      : null;
+
+  const densityLabel =
+    DENSITY_OPTIONS.find((d) => d.id === options.density)?.label ||
+    options.density;
+  const styleLabel =
+    VISUAL_STYLE_OPTIONS.find((s) => s.id === options.visualStyle)?.label ||
+    options.visualStyle;
+  const adviceDensityLabel = advice
+    ? DENSITY_OPTIONS.find((d) => d.id === advice.density)?.label
+    : '';
+  const adviceStyleLabel = advice
+    ? VISUAL_STYLE_OPTIONS.find((s) => s.id === advice.visualStyle)?.label
+    : '';
+
   const pageHint =
     options.useRecommendedStructure
       ? `שער + תוכן + הוכחה + סיום (${options.slideCount})`
       : `${options.slideCount} שקפים מותאמים`;
+
+  const continueLabel = settingsMatchRecommended
+    ? 'אשר המלצות והמשך'
+    : 'המשך עם ההגדרות הסופיות';
+  const continueHint = settingsMatchRecommended
+    ? 'מאשר את ההמלצה כפי שהיא בפאנל ומציע שני כיווני תוכן.'
+    : 'משתמש במה שבפאנל עכשיו (מקור האמת) ומציע שני כיווני תוכן.';
 
   const busy = isLoading || chatLoading || stylesLoading;
 
@@ -472,14 +497,22 @@ export default function CreationWizard({
       <div className="relative grid min-h-[calc(100vh-2rem)] lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
         <section className="flex flex-col border-b border-white/8 lg:border-b-0 lg:border-l border-white/8">
           <header className="px-5 pt-6 pb-4 md:px-8 md:pt-8">
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <span className="rounded-full border border-amber-400/40 bg-amber-500/10 px-3 py-1 text-[11px] font-bold text-amber-100 tracking-wide">
+                ייעוץ בלבד — לא קובע
+              </span>
+              <span className="text-[11px] text-zinc-500">
+                נושא → המלצות → כיוון תוכן
+              </span>
+            </div>
             <p className="text-sm font-medium text-indigo-300/90 mb-2 animate-[wizardFade_0.6s_ease-out]">
-              מנושא אחד לחבילת קרוסלה מוכנה לפרסום
+              סוכן ייעוץ — ממליץ, לא מחליט
             </p>
             <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white animate-[wizardRise_0.7s_ease-out]">
               קרוסל. איי. אי
             </h1>
             <p className="mt-2 max-w-xl text-zinc-400 text-base md:text-lg animate-[wizardRise_0.85s_ease-out]">
-              נושא → קליטת הגדרות → כיוון תוכן → חבילה מלאה עם כיתוב והאשטאגים.
+              השיחה כאן לייעוץ. צורת הקרוסלה נקבעת רק בפאנל «הגדרות סופיות».
             </p>
             <ol className="mt-4 flex flex-wrap gap-2 text-xs text-zinc-500">
               <li
@@ -498,7 +531,7 @@ export default function CreationWizard({
                     : 'border-white/10'
                 }`}
               >
-                2 · הגדרות
+                2 · המלצות
               </li>
               <li
                 className={`rounded-full border px-3 py-1 ${
@@ -544,6 +577,10 @@ export default function CreationWizard({
                   </p>
                 ) : (
                   <>
+                    <p className="text-xs text-amber-200/80 border border-amber-400/20 bg-amber-500/5 rounded-xl px-3 py-2">
+                      כיוון תוכן = המלצה לסיפור. מספר השקפים, הסטייל והצפיפות
+                      נקבעים בפאנל ההגדרות הסופיות.
+                    </p>
                     {researchNote ? (
                       <p className="text-sm text-zinc-400 leading-relaxed">
                         {researchNote}
@@ -581,6 +618,54 @@ export default function CreationWizard({
               </div>
             ) : null}
 
+            {intakeReady && advice && phase === 'topic' ? (
+              <div className="mt-2 rounded-2xl border border-violet-400/30 bg-violet-500/10 px-4 py-3 animate-[wizardPop_0.35s_ease-out]">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <p className="text-xs font-bold text-violet-200">
+                    כרטיס המלצה · לא נועל כלום
+                  </p>
+                  {!settingsMatchRecommended ? (
+                    <button
+                      type="button"
+                      onClick={setRecommended}
+                      className="text-[11px] font-bold text-violet-100 underline underline-offset-2 hover:text-white"
+                    >
+                      החל המלצה על ההגדרות
+                    </button>
+                  ) : (
+                    <span className="text-[11px] text-violet-300/80">
+                      כבר מיושר לפאנל
+                    </span>
+                  )}
+                </div>
+                <dl className="grid grid-cols-3 gap-2 text-center text-[12px]">
+                  <div className="rounded-xl bg-black/25 px-2 py-2">
+                    <dt className="text-zinc-500 mb-0.5">שקפים</dt>
+                    <dd className="font-black text-violet-50">
+                      {advice.slideCount}
+                    </dd>
+                  </div>
+                  <div className="rounded-xl bg-black/25 px-2 py-2">
+                    <dt className="text-zinc-500 mb-0.5">סטייל</dt>
+                    <dd className="font-black text-violet-50">
+                      {adviceStyleLabel}
+                    </dd>
+                  </div>
+                  <div className="rounded-xl bg-black/25 px-2 py-2">
+                    <dt className="text-zinc-500 mb-0.5">צפיפות</dt>
+                    <dd className="font-black text-violet-50">
+                      {adviceDensityLabel}
+                    </dd>
+                  </div>
+                </dl>
+                <p className="mt-2 text-[11px] text-zinc-400 leading-snug">
+                  {settingsMatchRecommended
+                    ? 'הפאנל תואם להמלצה. אפשר עדיין לשנות שם לפני המשך.'
+                    : 'הפאנל שונה מההמלצה — וזה בסדר. מה שבפאנל הוא מה שייווצר.'}
+                </p>
+              </div>
+            ) : null}
+
             {chatLoading && phase === 'topic' ? (
               <div className="text-sm text-zinc-500 animate-pulse">
                 הסוכן חושב…
@@ -599,8 +684,8 @@ export default function CreationWizard({
                     className="text-xs md:text-sm px-3 py-1.5 rounded-full border border-indigo-400/50 bg-indigo-500/20 text-indigo-100 font-bold hover:bg-indigo-500/30 transition disabled:opacity-40"
                   >
                     {settingsMatchRecommended
-                      ? 'המשך עם ההמלצות'
-                      : 'המשך עם ההגדרות שבחרתי'}
+                      ? 'אשר המלצות והמשך'
+                      : 'המשך עם ההגדרות הסופיות'}
                   </button>
                 ) : null}
                 {QUICK_PROMPTS.map((prompt) => (
@@ -677,12 +762,34 @@ export default function CreationWizard({
           )}
         </section>
 
-        <aside className="flex flex-col gap-6 px-5 py-6 md:px-7 md:py-8 bg-black/20 backdrop-blur-sm">
+        <aside className="flex flex-col gap-5 px-5 py-6 md:px-7 md:py-8 bg-black/30 backdrop-blur-sm border-r border-emerald-400/15">
           <div>
-            <h2 className="text-lg font-bold text-white mb-1">הגדרות קרוסלה</h2>
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <span className="rounded-full border border-emerald-400/50 bg-emerald-500/15 px-3 py-1 text-[11px] font-bold text-emerald-100 tracking-wide">
+                קובע את הקרוסלה
+              </span>
+              {!settingsMatchRecommended && intakeReady ? (
+                <span className="rounded-full border border-sky-400/35 bg-sky-500/10 px-2.5 py-1 text-[11px] font-semibold text-sky-100">
+                  שונה מההמלצה
+                </span>
+              ) : null}
+            </div>
+            <h2 className="text-lg font-bold text-white mb-1">
+              הגדרות סופיות
+            </h2>
             <p className="text-sm text-zinc-500">
-              עמודים, סטייל וצפיפות — אפשר לשנות כאן לפני «המשך עם ההמלצות».
+              רק מה שכאן נקבע ביצירה. הצ׳אט ממליץ — אתם מחליטים כאן.
             </p>
+          </div>
+
+          <div className="rounded-2xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-3">
+            <p className="text-[11px] font-bold text-emerald-200/90 mb-1.5">
+              כך תיווצר הקרוסלה
+            </p>
+            <p className="text-sm font-black text-emerald-50 leading-snug">
+              {options.slideCount} שקפים · {styleLabel} · {densityLabel}
+            </p>
+            <p className="text-[11px] text-emerald-200/70 mt-1">{pageHint}</p>
           </div>
 
           <div className="space-y-3">
@@ -702,7 +809,7 @@ export default function CreationWizard({
               }`}
             >
               <div className="font-bold">
-                מומלץ — {topicRecommendedCount} שקפים
+                המלצת מבנה — {topicRecommendedCount} שקפים
               </div>
               <div className="text-sm opacity-80 mt-0.5">
                 שער + תוכן + הוכחה + סיום
@@ -848,19 +955,15 @@ export default function CreationWizard({
                   >
                     {stylesLoading
                       ? 'מציע כיוונים…'
-                      : settingsMatchRecommended
-                        ? 'המשך עם ההמלצות'
-                        : 'המשך עם ההגדרות שבחרתי'}
+                      : continueLabel}
                   </button>
                   <p className="text-center text-[11px] text-zinc-500 leading-snug px-1">
-                    {settingsMatchRecommended
-                      ? 'נועל עמודים, סטייל וצפיפות מומלצים ומציע שני כיווני תוכן.'
-                      : 'משתמש בהגדרות שבפאנל (בלי לאפס) ומציע שני כיווני תוכן.'}
+                    {continueHint}
                   </p>
                 </div>
               ) : (
                 <p className="text-center text-sm text-zinc-500 py-3 px-2 leading-snug">
-                  שלחו נושא בצ׳אט — ואז יופיע כאן כפתור המשך עם ההמלצות.
+                  שלחו נושא בצ׳אט — ואז תופיע כאן פעולת המשך לפי ההגדרות הסופיות.
                 </p>
               )
             ) : (

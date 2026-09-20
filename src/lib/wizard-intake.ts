@@ -136,27 +136,29 @@ export function buildIntakeReply(topic: string): string {
     .join('\n');
 
   return [
-    `מעולה — «${topic.trim()}» יושב יפה בנישת ${niche.nicheLabel}. בואו ננעל הגדרות ואז אציע שני כיווני תוכן.`,
+    `מעולה — «${topic.trim()}» יושב יפה בנישת ${niche.nicheLabel}.`,
     '',
-    '## מספר עמודים',
+    '⚠️ חשוב: הצ׳אט הוא ייעוץ בלבד. מה שקובע את הקרוסלה — רק «הגדרות סופיות» בפאנל.',
+    '',
+    '## המלצה · מספר עמודים',
     pagesExtra,
     `אפשר גם מותאם אישית בין ${MIN_SLIDE_COUNT} ל־${MAX_SLIDE_COUNT}.`,
     '',
-    '## סטייל ויזואלי',
+    '## המלצה · סטייל ויזואלי',
     niche.styleReason,
     `המלצה לנישה: ${styleLabel}.`,
     styleLines,
     '• צילומי מסך / דוגמאות — בקרוב (בינתיים בחרו מתוך הרשימה או תארו בחופשי).',
     '• תיאור חופשי — כתבו איך תרצו שזה ייראה.',
     '',
-    '## צפיפות מידע',
+    '## המלצה · צפיפות מידע',
     DENSITY_OPTIONS.map((d) =>
       d.id === 'standard'
         ? `• ${d.label} ⭐ — ${d.hint}`
         : `• ${d.label} — ${d.hint}`
     ).join('\n'),
     '',
-    'אפשר לשנות בפאנל משמאל, או ללחוץ «המשך עם ההמלצות» / לכתוב «מומלץ» — ואציע שני כיווני תוכן.',
+    'ההמלצות הועתקו להתחלה בפאנל. שנו שם מה שרוצים, ואז לחצו «המשך עם ההגדרות הסופיות».',
   ].join('\n');
 }
 
@@ -256,7 +258,7 @@ export function buildOptionsAckReply(
     const s = buildIntakeSuggestions(topic);
     const styleLabel =
       VISUAL_STYLE_OPTIONS.find((x) => x.id === s.visualStyle)?.label || '';
-    return `מעולה — נועל מומלץ: ${s.slideCount} שקפים, סטייל ${styleLabel}, צפיפות סטנדרטית. עכשיו מציע שני כיווני תוכן…`;
+    return `החלתי את ההמלצה על ההגדרות הסופיות: ${s.slideCount} שקפים, סטייל ${styleLabel}, צפיפות סטנדרטית. עכשיו מציע שני כיווני תוכן…`;
   }
 
   const bits: string[] = [];
@@ -274,11 +276,11 @@ export function buildOptionsAckReply(
   }
 
   if (picks.readyForDirections) {
-    return `נעלתי: ${bits.join(' · ') || 'ההגדרות שבחרתם'}. עוברים לשני כיווני תוכן…`;
+    return `ההגדרות הסופיות בפאנל: ${bits.join(' · ') || 'כפי שבחרתם'}. עוברים לשני כיווני תוכן…`;
   }
 
   if (bits.length) {
-    return `עדכנתי: ${bits.join(' · ')}. אפשר לכוון עוד בפאנל, או לכתוב «מומלץ» / «המשך» כדי לעבור לכיווני תוכן.`;
+    return `עדכון הצעה: ${bits.join(' · ')}. מה שקובע הוא רק הפאנל — כוונו שם, או כתבו «המשך» כדי לעבור לכיווני תוכן.`;
   }
 
   return '';
