@@ -21,7 +21,7 @@ export default function Home() {
           {session ? (
             <div className="flex items-center gap-2 md:gap-4">
               <span className="text-sm text-gray-700 dark:text-gray-300 font-medium hidden md:block">שלום, {session.user?.name}</span>
-              <button onClick={() => signOut()} className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hidden sm:block">התנתק</button>
+              <button onClick={() => signOut()} className="text-sm font-medium text-gray-500 dark:text-gray-400 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hidden sm:block">התנתק</button>
               <Link href="/dashboard/create" className="px-3 md:px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold text-sm md:text-base hover:bg-indigo-700 transition">
                 ליצירת קרוסלה
               </Link>
@@ -39,13 +39,13 @@ export default function Home() {
 
       {/* Hero Section */}
       <section className="pt-24 pb-16 px-4 max-w-5xl mx-auto text-center">
-        <h1 className="text-5xl md:text-6xl font-extrabold text-gray-900 mb-6 tracking-tight">
+        <h1 className="text-5xl md:text-6xl font-extrabold text-gray-900 dark:text-white mb-6 tracking-tight">
           הפוך כל רעיון ל<span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">קרוסלה מנצחת</span> תוך שניות
         </h1>
-        <p className="text-xl text-gray-800 font-semibold mb-2 max-w-2xl mx-auto">
-          מבית <span className="text-indigo-700 font-bold">בינה לתעשייה</span>
+        <p className="text-xl text-gray-800 dark:text-gray-200 font-semibold mb-2 max-w-2xl mx-auto">
+          מבית <span className="text-indigo-700 dark:text-indigo-400 font-bold">בינה לתעשייה</span>
         </p>
-        <p className="text-lg text-gray-600 mb-10 max-w-2xl mx-auto">
+        <p className="text-lg text-gray-600 dark:text-gray-400 mb-10 max-w-2xl mx-auto">
           המערכת המובילה ליצירת קרוסלות לאינסטגרם ולינקדאין בעזרת בינה מלאכותית. חסוך שעות של עיצוב וקופירייטינג – פשוט הקלד נושא, קהל יעד ומטרה, והבינה המלאכותית שלנו תעשה את השאר.
         </p>
         <div className="flex flex-col sm:flex-row justify-center gap-4 items-center">
@@ -76,18 +76,18 @@ export default function Home() {
           <div className="grid md:grid-cols-3 gap-8 mb-16">
             <div className="p-8 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-3xl border border-indigo-100">
               <div className="w-14 h-14 bg-indigo-600 text-white flex items-center justify-center rounded-2xl mb-5 text-3xl">🌐</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">קורא את האתר שלך</h3>
-              <p className="text-gray-600 leading-relaxed">מזין כתובת האתר שלך פעם אחת, וה-AI לומד את המוצרים, הערכים, השפה והייחוד שלך לעומק. כל קרוסלה עתידית תגלם את זה.</p>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">קורא את האתר שלך</h3>
+              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">מזין כתובת האתר שלך פעם אחת, וה-AI לומד את המוצרים, הערכים, השפה והייחוד שלך לעומק. כל קרוסלה עתידית תגלם את זה.</p>
             </div>
             <div className="p-8 bg-gradient-to-br from-purple-50 to-pink-50 rounded-3xl border border-purple-100">
               <div className="w-14 h-14 bg-purple-600 text-white flex items-center justify-center rounded-2xl mb-5 text-3xl">📸</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">לומד מהסגנון שאהבת</h3>
-              <p className="text-gray-600 leading-relaxed">מוסיף קישורים לקרוסלות הטובות שיצרת בעבר, וה-AI ינתח את המבנה, הטון והאסתטיקה – ויחזור אליך עם עוד מאותו הדבר שעבד.</p>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">לומד מהסגנון שאהבת</h3>
+              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">מוסיף קישורים לקרוסלות הטובות שיצרת בעבר, וה-AI ינתח את המבנה, הטון והאסתטיקה – ויחזור אליך עם עוד מאותו הדבר שעבד.</p>
             </div>
             <div className="p-8 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl border border-blue-100">
               <div className="w-14 h-14 bg-blue-600 text-white flex items-center justify-center rounded-2xl mb-5 text-3xl">⚡</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">חיסכון של שעות בשבוע</h3>
-              <p className="text-gray-600 leading-relaxed">מה שלקח שעתיים של עיצוב, קופירייטינג ותיקונים – קורה עכשיו ב-30 שניות. בדיוק בסגנון שלך, בדיוק לקהל שלך, בדיוק בזמן שלך.</p>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">חיסכון של שעות בשבוע</h3>
+              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">מה שלקח שעתיים של עיצוב, קופירייטינג ותיקונים – קורה עכשיו ב-30 שניות. בדיוק בסגנון שלך, בדיוק לקהל שלך, בדיוק בזמן שלך.</p>
             </div>
           </div>
 
