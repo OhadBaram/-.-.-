@@ -51,27 +51,27 @@ interface TemplateOption {
 }
 
 const TEMPLATES: TemplateOption[] = [
-  { id: 'minimal',      label: 'מינימליסטי' },
-  { id: 'bold',         label: 'נועז'        },
-  { id: 'gradient',     label: 'גרדיאנט'     },
-  { id: 'dark-luxury',  label: 'יוקרה כהה'   },
-  { id: 'frame',        label: 'ממוסגר'       },
-  { id: 'split',        label: 'מפוצל'        },
-  { id: 'story',        label: 'סיפור'        },
-  { id: 'quote',        label: 'ציטוט'        },
-  { id: 'numbered',     label: 'ממוספר'       },
-  { id: 'magazine',     label: 'מגזין'        },
-  { id: 'waves',        label: 'גלים'         },
-  { id: 'neon',         label: 'ניאון'        },
   { id: 'image-split',  label: 'חצי תמונה'    },
   { id: 'image-full-dark',      label: 'תמונת רקע כהה' },
   { id: 'image-circle-profile', label: 'תמונת פרופיל' },
-  { id: 'image-split-bottom',   label: 'פיצול תחתון' },
   { id: 'image-polaroid',       label: 'פולארויד' },
+  { id: 'minimal',      label: 'מינימליסטי' },
+  { id: 'bold',         label: 'נועז'        },
+  { id: 'gradient',     label: 'גרדיאנט'     },
   { id: 'image-side',           label: 'חצי רוחב' },
   { id: 'image-magazine',       label: 'שער מגזין' },
+  { id: 'dark-luxury',  label: 'יוקרה כהה'   },
+  { id: 'frame',        label: 'ממוסגר'       },
+  { id: 'split',        label: 'מפוצל'        },
+  { id: 'image-split-bottom',   label: 'פיצול תחתון' },
+  { id: 'story',        label: 'סיפור'        },
+  { id: 'quote',        label: 'ציטוט'        },
   { id: 'image-overlay',        label: 'תמונה עם שכבה' },
+  { id: 'numbered',     label: 'ממוספר'       },
+  { id: 'magazine',     label: 'מגזין'        },
   { id: 'image-arch',           label: 'מסגרת קשת' },
+  { id: 'waves',        label: 'גלים'         },
+  { id: 'neon',         label: 'ניאון'        },
 ];
 
 export interface SlideOverride {
@@ -99,6 +99,7 @@ export default function CarouselRenderer({
   const [localSlides, setLocalSlides] = useState<Slide[]>(slides);
   const [theme,    setTheme]    = useState<'light' | 'dark'>('light');
   const [template, setTemplate] = useState<TemplateId>('minimal');
+  const [globalFont, setGlobalFont] = useState('Heebo');
 
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [slideOverrides, setSlideOverrides] = useState<Record<number, { fontSize?: number; textY?: number }>>(initialSlideOverrides);
@@ -150,28 +151,28 @@ export default function CarouselRenderer({
       ctx.globalAlpha = 1;
 
       switch (tpl) {
-        case 'minimal':     drawMinimal    (ctx, W, H, text, brandColor, isDark, currentOverride);              break;
-        case 'bold':        drawBold       (ctx, W, H, text, brandColor, isDark, currentOverride);              break;
-        case 'gradient':    drawGradient   (ctx, W, H, text, brandColor, isDark, currentOverride);              break;
-        case 'dark-luxury': drawDarkLuxury (ctx, W, H, text, brandColor, isDark, currentOverride);              break;
-        case 'frame':       drawFrame      (ctx, W, H, text, brandColor, isDark, currentOverride);              break;
-        case 'split':       drawSplit      (ctx, W, H, text, brandColor, isDark, slideIndex, currentOverride);  break;
-        case 'story':       drawStory      (ctx, W, H, text, brandColor, isDark, currentOverride);              break;
-        case 'quote':       drawQuote      (ctx, W, H, text, brandColor, isDark, currentOverride);              break;
-        case 'numbered':    drawNumbered   (ctx, W, H, text, brandColor, isDark, slideIndex, currentOverride);  break;
-        case 'magazine':    drawMagazine   (ctx, W, H, text, brandColor, isDark, currentOverride);              break;
-        case 'waves':       drawWaves      (ctx, W, H, text, brandColor, isDark, currentOverride);              break;
-        case 'neon':        drawNeon       (ctx, W, H, text, brandColor, isDark, currentOverride);              break;
-        case 'image-split': await drawImageSplit(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl); break;
-        case 'image-full-dark': await drawImageFullDark(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl); break;
-        case 'image-circle-profile': await drawImageCircle(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl); break;
-        case 'image-split-bottom': await drawImageSplitBottom(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl); break;
-        case 'image-polaroid': await drawImagePolaroid(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl); break;
-        case 'image-side': await drawImageSide(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl); break;
-        case 'image-magazine': await drawImageMagazine(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl); break;
-        case 'image-overlay': await drawImageOverlay(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl); break;
-        case 'image-arch': await drawImageArch(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl); break;
-        default:            drawMinimal    (ctx, W, H, text, brandColor, isDark, currentOverride);
+        case 'minimal':     drawMinimal    (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);              break;
+        case 'bold':        drawBold       (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);              break;
+        case 'gradient':    drawGradient   (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);              break;
+        case 'dark-luxury': drawDarkLuxury (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);              break;
+        case 'frame':       drawFrame      (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);              break;
+        case 'split':       drawSplit      (ctx, W, H, text, brandColor, isDark, slideIndex, currentOverride, globalFont);  break;
+        case 'story':       drawStory      (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);              break;
+        case 'quote':       drawQuote      (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);              break;
+        case 'numbered':    drawNumbered   (ctx, W, H, text, brandColor, isDark, slideIndex, currentOverride, globalFont);  break;
+        case 'magazine':    drawMagazine   (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);              break;
+        case 'waves':       drawWaves      (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);              break;
+        case 'neon':        drawNeon       (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);              break;
+        case 'image-split': await drawImageSplit(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
+        case 'image-full-dark': await drawImageFullDark(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
+        case 'image-circle-profile': await drawImageCircle(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
+        case 'image-split-bottom': await drawImageSplitBottom(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
+        case 'image-polaroid': await drawImagePolaroid(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
+        case 'image-side': await drawImageSide(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
+        case 'image-magazine': await drawImageMagazine(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
+        case 'image-overlay': await drawImageOverlay(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
+        case 'image-arch': await drawImageArch(ctx, W, H, text, brandColor, isDark, currentOverride, slide.imageUrl, globalFont); break;
+        default:            drawMinimal    (ctx, W, H, text, brandColor, isDark, currentOverride, globalFont);
       }
     },
     [theme, brandColor, slideOverrides]
@@ -315,6 +316,17 @@ export default function CarouselRenderer({
               const newSlides = [...localSlides];
               newSlides[index] = { ...newSlides[index], imageUrl: base64 };
               setLocalSlides(newSlides);
+              
+              if (!template.startsWith('image-')) {
+                setTemplate('image-split');
+                
+                // Add a small UX toast/alert using standard DOM to let them know what happened
+                const toast = document.createElement('div');
+                toast.innerText = 'התבנית הוחלפה אוטומטית כדי לתמוך בתמונה!';
+                toast.className = 'fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded-full shadow-lg z-50 text-sm font-bold animate-bounce';
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 4000);
+              }
             }}
 
             remixingIndex={remixingIndex}
