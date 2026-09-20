@@ -292,9 +292,12 @@ export default function CarouselRenderer({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ currentText }),
       });
-      if (!res.ok) throw new Error('Failed to remix');
-      const data = await res.json();
-      
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || data.error || 'Failed to remix');
+      }
+      if (!data.newText) throw new Error('Empty remix result');
+
       const newSlides = [...localSlides];
       newSlides[index] = { ...newSlides[index], text: data.newText };
       setLocalSlides(newSlides);
