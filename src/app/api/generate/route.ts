@@ -56,6 +56,19 @@ export async function POST(req: Request) {
       }
     }
 
+    if (workspaceId && session?.user?.email) {
+      const user = await prisma.user.findUnique({ where: { email: session.user.email } });
+      if (user) {
+        const { getWorkspaceUsage } = await import('@/lib/usage');
+        const usage = await getWorkspaceUsage(workspaceId, user.id);
+        if (!usage.canGenerate) {
+          return NextResponse.json({ 
+            error: `הגעת למגבלת היצירה החודשית שלך (${usage.limit} קרוסלות בחודש). אנא שדרג את החבילה שלך.` 
+          }, { status: 402 });
+        }
+      }
+    }
+
     let scrapedContext = '';
     let brandIdentityContext = '';
 
