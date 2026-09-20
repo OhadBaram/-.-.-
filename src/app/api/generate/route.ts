@@ -117,7 +117,9 @@ ${scrapedContext ? `\nלמד על סגנון המותג, הנושאים והטו
 
 צור מערך באורך מדויק של ${slideCount || 8} שקפים. (מספר אידיאלי לחשיפה גבוהה באינסטגרם).
 עבור כל שקף, אנא ספק את הטקסט בעברית בלבד. 
-החזר את התשובה בפורמט JSON בלבד, המכיל מערך של אובייקטים או אובייקט JSON המכיל מפתח slides עם המערך (ללא טקסט נוסף).
+החזר את התשובה בפורמט JSON בלבד המכיל 2 מפתחות:
+1. "explanation": טקסט הסבר בעברית (כ-3 משפטים) למשתמש, שמתאר מה הבנת מהלינקים ומהעסק שלו, ומה התוכנית והאסטרטגיה של הקרוסלה שיצרת.
+2. "slides": מערך השקפים.
 כל אובייקט ייצג שקף ויכלול את השדות:
 - id: מחרוזת מזהה (לדוגמה "1")
 - text: טקסט השקף (קצר וקולע, מקסימום 15 מילים לשקף)
@@ -125,8 +127,11 @@ ${scrapedContext ? `\nלמד על סגנון המותג, הנושאים והטו
 - textColor: קוד צבע HEX (קריא ומתאים לרקע)
 `;
 
+
     const parsedJson = await generateJson({ prompt, provider: aiProvider, model: aiModel });
     const slides = Array.isArray(parsedJson) ? parsedJson : (parsedJson.slides || parsedJson);
+    const explanation = parsedJson.explanation || '';
+
 
     if (workspaceId && session?.user?.email) {
       try {
@@ -148,7 +153,7 @@ ${scrapedContext ? `\nלמד על סגנון המותג, הנושאים והטו
       }
     }
 
-    return NextResponse.json({ slides });
+    return NextResponse.json({ slides, explanation });
   } catch (error) {
     console.error('Error generating carousel:', error);
     return NextResponse.json({ error: 'Failed to generate carousel' }, { status: 500 });

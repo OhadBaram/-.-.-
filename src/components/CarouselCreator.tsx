@@ -22,6 +22,8 @@ export default function CarouselCreator({
 }: CarouselCreatorProps) {
   const [slides, setSlides] = useState<Slide[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [explanation, setExplanation] = useState<string | null>(null);
+  const [isApproved, setIsApproved] = useState(false);
 
   const handleGenerate = async (data: any) => {
     setIsLoading(true);
@@ -40,6 +42,7 @@ export default function CarouselCreator({
       }
 
       setSlides(result.slides);
+      if (result.explanation) setExplanation(result.explanation);
     } catch (error: any) {
       console.error(error);
       alert(`אירעה שגיאה ביצירת הקרוסלה: ${error.message}`);
@@ -52,24 +55,55 @@ export default function CarouselCreator({
     return isLoading ? (
       <SkeletonLoader />
     ) : (
-      <CarouselForm 
-        onSubmit={handleGenerate} 
-        isLoading={isLoading} 
-        initialWebsiteUrl={initialWebsiteUrl}
-        initialReferenceLink1={initialReferenceLink1}
-        initialReferenceLink2={initialReferenceLink2}
-        initialReferenceLink3={initialReferenceLink3}
-      />
+      <div className="p-8 max-w-4xl mx-auto">
+        <header className="mb-10 text-center relative">
+          <h1 className="text-4xl md:text-5xl font-black mb-3 text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 dark:from-indigo-400 to-purple-600 dark:to-purple-400">יצירת קרוסלה חדשה</h1>
+          <p className="text-gray-600 dark:text-gray-300 text-lg md:text-xl font-medium">הזן פרטים וקבל קרוסלה מוכנה תוך שניות</p>
+        </header>
+        <CarouselForm 
+          onSubmit={handleGenerate} 
+          isLoading={isLoading} 
+          initialWebsiteUrl={initialWebsiteUrl}
+          initialReferenceLink1={initialReferenceLink1}
+          initialReferenceLink2={initialReferenceLink2}
+          initialReferenceLink3={initialReferenceLink3}
+        />
+      </div>
+    );
+  }
+
+  if (!isApproved && explanation) {
+    return (
+      <div className="p-8 max-w-3xl mx-auto mt-10 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700">
+        <h2 className="text-3xl font-black mb-6 text-indigo-600 dark:text-indigo-400">היי! הנה מה שהכנתי עבורך 💡</h2>
+        <div className="prose dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 text-lg leading-relaxed mb-8 bg-indigo-50 dark:bg-indigo-900/30 p-6 rounded-xl border border-indigo-100 dark:border-indigo-800">
+          {explanation}
+        </div>
+        <div className="flex gap-4">
+          <button 
+            onClick={() => setIsApproved(true)}
+            className="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors text-lg"
+          >
+            מעולה, בוא נראה את הקרוסלה! ➤
+          </button>
+          <button 
+            onClick={() => { setSlides(null); setExplanation(null); }}
+            className="py-3 px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 font-bold rounded-lg transition-colors text-lg"
+          >
+            חזור וערוך פרטים
+          </button>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="w-full h-screen fixed inset-0 z-50 bg-white dark:bg-gray-900">
       <button 
-        onClick={() => setSlides(null)}
-        className="mb-6 px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors shadow-sm"
+        onClick={() => { setSlides(null); setExplanation(null); setIsApproved(false); }}
+        className="absolute top-4 right-4 z-[60] px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-200 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 font-bold"
       >
-        חזור ליצירת קרוסלה חדשה
+        חזור ליצירת קרוסלה
       </button>
       <CarouselRenderer slides={slides} brandColor={brandColor} />
     </div>
