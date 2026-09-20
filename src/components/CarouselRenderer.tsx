@@ -563,9 +563,32 @@ export default function CarouselRenderer({
 
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [slideOverrides, setSlideOverrides] = useState<Record<number, { fontSize?: number; textY?: number }>>(initialSlideOverrides);
+  const [remixingIndex, setRemixingIndex] = useState<number | null>(null);
 
   const CANVAS_WIDTH  = 1080;
   const CANVAS_HEIGHT = 1350;
+
+  const handleRemix = async (index: number, currentText: string) => {
+    setRemixingIndex(index);
+    try {
+      const res = await fetch('/api/remix-slide', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentText }),
+      });
+      if (!res.ok) throw new Error('Failed to remix');
+      const data = await res.json();
+      
+      const newSlides = [...localSlides];
+      newSlides[index] = { ...newSlides[index], text: data.newText };
+      setLocalSlides(newSlides);
+    } catch (err) {
+      console.error(err);
+      alert('אירעה שגיאה בשיכתוב השקף.');
+    } finally {
+      setRemixingIndex(null);
+    }
+  };
 
   const drawSlide = useCallback(
     (
@@ -791,17 +814,31 @@ export default function CarouselRenderer({
                 </div>
               )}
 
-              <textarea
-                value={slide.text}
-                onChange={(e) => {
-                  const newSlides = [...localSlides];
-                  newSlides[index] = { ...newSlides[index], text: e.target.value };
-                  setLocalSlides(newSlides);
-                }}
-                className="w-full p-2 border rounded resize-y"
-                rows={3}
-                dir="rtl"
-              />
+              <div className="relative">
+                <textarea
+                  value={slide.text}
+                  onChange={(e) => {
+                    const newSlides = [...localSlides];
+                    newSlides[index] = { ...newSlides[index], text: e.target.value };
+                    setLocalSlides(newSlides);
+                  }}
+                  className="w-full p-2 border rounded resize-y"
+                  rows={3}
+                  dir="rtl"
+                />
+                <button
+                  onClick={() => handleRemix(index, slide.text)}
+                  disabled={remixingIndex === index}
+                  className="absolute left-2 bottom-2 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 text-xs px-2 py-1 rounded shadow-sm flex items-center gap-1 transition-colors disabled:opacity-50"
+                  title="שכתוב קריאייטיבי ע״י AI"
+                >
+                  {remixingIndex === index ? (
+                    <span className="animate-spin inline-block w-3 h-3 border-2 border-indigo-700 border-t-transparent rounded-full"></span>
+                  ) : (
+                    '✨ AI Remix'
+                  )}
+                </button>
+              </div>
             </div>
           );
         })}
