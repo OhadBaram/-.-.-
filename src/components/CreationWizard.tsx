@@ -573,8 +573,8 @@ export default function CreationWizard({
     ? 'אשר המלצות והמשך'
     : 'המשך עם ההגדרות הסופיות';
   const continueHint = settingsMatchRecommended
-    ? 'מאשר את ההמלצה כפי שהיא בפאנל ומציע שני כיווני תוכן.'
-    : 'משתמש במה שבפאנל עכשיו (מקור האמת) ומציע שני כיווני תוכן.';
+    ? 'מאשר את ההמלצה בפאנל ומציג כאן שני כיווני תוכן לבחירה.'
+    : 'משתמש במה שבפאנל ומציג כאן שני כיווני תוכן לבחירה.';
 
   const busy = isLoading || chatLoading || stylesLoading;
 
