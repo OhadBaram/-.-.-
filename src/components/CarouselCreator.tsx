@@ -183,10 +183,16 @@ export default function CarouselCreator({
   };
 
   const wizardNode = (
-    <div className="p-3 md:p-6 max-w-6xl mx-auto space-y-3">
+    <div
+      className={
+        wizardMode === 'full'
+          ? 'p-3 md:p-6 max-w-6xl mx-auto space-y-3 lg:flex lg:h-[calc(100dvh-1.5rem)] lg:max-h-[calc(100dvh-1.5rem)] lg:min-h-0 lg:flex-col lg:space-y-0 lg:gap-3'
+          : 'p-3 md:p-6 max-w-6xl mx-auto space-y-3'
+      }
+    >
       {hasDraft && showWizardOverDraft ? (
         <div
-          className="rounded-2xl border border-amber-400/40 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 justify-between"
+          className="shrink-0 rounded-2xl border border-amber-400/40 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 justify-between"
           dir="rtl"
         >
           <div className="min-w-0">
@@ -234,9 +240,9 @@ export default function CarouselCreator({
           initialBrandPalette={brandPalette}
         />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:space-y-0 lg:gap-3">
           <div
-            className="rounded-2xl border border-white/10 bg-[#111827] px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+            className="shrink-0 rounded-2xl border border-white/10 bg-[#111827] px-4 py-3 flex flex-wrap items-center justify-between gap-3"
             dir="rtl"
           >
             <p className="text-sm text-zinc-300">
@@ -253,21 +259,23 @@ export default function CarouselCreator({
               חזרה למסלול המהיר
             </button>
           </div>
-          <CreationWizard
-            key={`full-${wizardDraft.topic}`}
-            userName={userName}
-            onSubmit={handleGenerate}
-            isLoading={isLoading}
-            initialTopic={wizardDraft.topic}
-            onTopicChange={(topic) =>
-              setWizardDraft((prev) => normalizeWizardDraft({ topic }, prev))
-            }
-            initialWebsiteUrl={initialWebsiteUrl}
-            initialReferenceLink1={initialReferenceLink1}
-            initialReferenceLink2={initialReferenceLink2}
-            initialReferenceLink3={initialReferenceLink3}
-            initialBrandPalette={brandPalette}
-          />
+          <div className="min-h-0 lg:h-full lg:flex-1">
+            <CreationWizard
+              key={`full-${wizardDraft.topic}`}
+              userName={userName}
+              onSubmit={handleGenerate}
+              isLoading={isLoading}
+              initialTopic={wizardDraft.topic}
+              onTopicChange={(topic) =>
+                setWizardDraft((prev) => normalizeWizardDraft({ topic }, prev))
+              }
+              initialWebsiteUrl={initialWebsiteUrl}
+              initialReferenceLink1={initialReferenceLink1}
+              initialReferenceLink2={initialReferenceLink2}
+              initialReferenceLink3={initialReferenceLink3}
+              initialBrandPalette={brandPalette}
+            />
+          </div>
         </div>
       )}
     </div>
