@@ -190,6 +190,20 @@ export default function CarouselCreator({
           : 'p-3 md:p-6 max-w-6xl mx-auto space-y-3'
       }
     >
+      <div
+        className="md:hidden rounded-2xl border border-amber-300/70 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-700/50 px-4 py-3 text-center"
+        role="note"
+        dir="rtl"
+      >
+        <p className="text-sm font-bold text-amber-950 dark:text-amber-100">
+          מומלץ לפתוח במחשב
+        </p>
+        <p className="text-xs text-amber-900/80 dark:text-amber-200/80 mt-1 leading-snug">
+          יצירה אפשרית גם בטלפון, אבל עריכת צבעים, גופן ותצוגה מקדימה נוחים הרבה
+          יותר במסך רחב.
+        </p>
+      </div>
+
       {hasDraft && showWizardOverDraft ? (
         <div
           className="shrink-0 rounded-2xl border border-amber-400/40 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 justify-between"

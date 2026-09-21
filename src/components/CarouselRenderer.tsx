@@ -747,6 +747,17 @@ export default function CarouselRenderer({
 
   return (
     <div className="flex flex-col md:flex-row h-full min-h-0 w-full bg-gray-50 dark:bg-gray-900 overflow-hidden" dir="rtl">
+      {/* המלצה במובייל — לעריכה מלאה עדיף מחשב */}
+      <div
+        className="md:hidden shrink-0 z-30 px-3 py-2 bg-amber-50 dark:bg-amber-950/50 border-b border-amber-200/80 dark:border-amber-800/60 text-center"
+        role="note"
+      >
+        <p className="text-[11px] font-semibold text-amber-950 dark:text-amber-100 leading-snug">
+          לעריכה נוחה של צבעים, גופן וצ׳אט — מומלץ לפתוח במחשב. כאן אפשר לתקן
+          טקסט ולראות תצוגה.
+        </p>
+      </div>
+
       {/* לשוניות מובייל — תצוגה מול עריכה */}
       <div className="md:hidden shrink-0 grid grid-cols-2 gap-1 p-2 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 z-30">
         <button
@@ -775,12 +786,12 @@ export default function CarouselRenderer({
 
       {/* סיידבר — עריכה מהירה */}
       <div
-        className={`w-full md:w-80 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 overflow-y-auto order-last md:order-first flex-col min-h-0 ${
-          mobilePane === 'edit' ? 'flex flex-1' : 'hidden'
-        } md:flex md:flex-none`}
+        className={`w-full md:w-[22rem] lg:w-96 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 order-last md:order-first flex-col min-h-0 ${
+          mobilePane === 'edit' ? 'flex flex-1 overflow-y-auto' : 'hidden'
+        } md:flex md:flex-none md:h-full md:overflow-hidden`}
       >
         {/* ייצוא דביק בראש הסיידבר */}
-        <div className="sticky top-0 z-20 flex flex-col gap-2 p-4 pb-3 bg-white/95 dark:bg-gray-800/95 backdrop-blur border-b border-gray-200 dark:border-gray-700">
+        <div className="sticky top-0 z-20 flex flex-col gap-2 p-4 pb-3 bg-white/95 dark:bg-gray-800/95 backdrop-blur border-b border-gray-200 dark:border-gray-700 shrink-0">
           <label className="text-[11px] font-bold text-gray-500 dark:text-gray-400">
             יעד פרסום
             <select
@@ -820,16 +831,17 @@ export default function CarouselRenderer({
           </button>
         </div>
 
-        <div className="p-4 flex flex-col gap-5">
+        <div className="p-4 flex flex-col gap-5 md:flex-1 md:min-h-0 md:overflow-y-auto">
           {/* עריכה מהירה */}
           <section>
             <h3 className="font-bold mb-1 text-gray-800 dark:text-gray-200">עריכה מהירה</h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-              טקסט השקף וניווט בין שקפים
+              צבעים, גופן וניווט בין שקפים
             </p>
 
+            {/* במובייל בלבד — במחשב עורכים מלל מתחת לתצוגה */}
             {activeSlide && (
-              <div className="mb-4">
+              <div className="mb-4 md:hidden">
                 <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">
                   טקסט שקף {activeSlideIndex + 1}
                 </label>
@@ -1182,39 +1194,40 @@ export default function CarouselRenderer({
                     </div>
                   </div>
                 )}
-
-                <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-                  <CopilotWidget
-                    slides={localSlides}
-                    template={activeSlideTemplate}
-                    globalFont={globalFont}
-                    brandColor={activeBrandColor}
-                    theme={theme}
-                    onUpdateSlideText={(index, text) => {
-                      const newSlides = [...localSlides];
-                      if (newSlides[index]) {
-                        newSlides[index] = { ...newSlides[index], text };
-                        setLocalSlides(newSlides);
-                      }
-                    }}
-                    onChangeTemplate={handleChangeTemplateFromCopilot}
-                    onChangeFont={(font) => setGlobalFont(font)}
-                    onChangeColors={(color, newTheme) => {
-                      if (color) {
-                        setBrandPalette((prev) =>
-                          clampPalette({
-                            ...prev,
-                            accents: [color, ...prev.accents.slice(1)],
-                          })
-                        );
-                      }
-                      if (newTheme === 'light' || newTheme === 'dark') setTheme(newTheme);
-                    }}
-                  />
-                </div>
               </div>
             )}
           </section>
+        </div>
+
+        {/* צ׳אט דביק בתחתית הסיידבר במחשב — תמיד גלוי */}
+        <div className="shrink-0 border-t border-gray-200 dark:border-gray-700 p-3 bg-white dark:bg-gray-800 md:sticky md:bottom-0">
+          <CopilotWidget
+            slides={localSlides}
+            template={activeSlideTemplate}
+            globalFont={globalFont}
+            brandColor={activeBrandColor}
+            theme={theme}
+            onUpdateSlideText={(index, text) => {
+              const newSlides = [...localSlides];
+              if (newSlides[index]) {
+                newSlides[index] = { ...newSlides[index], text };
+                setLocalSlides(newSlides);
+              }
+            }}
+            onChangeTemplate={handleChangeTemplateFromCopilot}
+            onChangeFont={(font) => setGlobalFont(font)}
+            onChangeColors={(color, newTheme) => {
+              if (color) {
+                setBrandPalette((prev) =>
+                  clampPalette({
+                    ...prev,
+                    accents: [color, ...prev.accents.slice(1)],
+                  })
+                );
+              }
+              if (newTheme === 'light' || newTheme === 'dark') setTheme(newTheme);
+            }}
+          />
         </div>
       </div>
 
@@ -1262,49 +1275,51 @@ export default function CarouselRenderer({
         </div>
 
         <div
-          className={`flex-1 flex flex-col justify-center items-center p-4 md:p-8 overflow-auto relative transition-colors duration-300 min-h-[50dvh] md:min-h-0 ${
+          className={`flex-1 flex justify-center overflow-auto relative transition-colors duration-300 min-h-[36dvh] md:min-h-0 ${
             isCanvasDark ? 'bg-gray-950' : 'bg-gray-200'
           }`}
         >
-          {localSlides.map((slide, i) => (
-            <div
-              key={`canvas-${i}-${slide.id}`}
-              className={`transition-opacity duration-300 ${
-                i === activeSlideIndex ? 'block opacity-100' : 'hidden opacity-0'
-              }`}
-            >
-              <canvas
-                ref={(el) => {
-                  canvasRefs.current[i] = el;
-                }}
-                width={1080}
-                height={1350}
-                className="max-h-[min(70dvh,720px)] md:max-h-[60vh] max-w-full w-auto object-contain shadow-2xl rounded"
-              />
-            </div>
-          ))}
-          {activeSlide ? (
-            <div className="mt-4 w-full max-w-sm">
-              <ImagePickerControl
-                variant="compact"
-                compactLabel={
-                  activeSlide.imageUrl ? 'החלף תמונה בשקף' : 'הוסף תמונה לשקף'
-                }
-                value={activeSlide.imageUrl ?? null}
-                onChange={(next) => {
-                  if (next) handleSlideImageUpload(activeSlideIndex, next);
-                  else handleSlideImageClear(activeSlideIndex);
-                }}
-              />
-            </div>
-          ) : null}
+          <div className="flex flex-col items-center justify-center py-3 px-3 md:py-4 md:px-4 w-full max-w-[22rem] md:max-w-sm">
+            {localSlides.map((slide, i) => (
+              <div
+                key={`canvas-${i}-${slide.id}`}
+                className={`transition-opacity duration-300 w-full ${
+                  i === activeSlideIndex ? 'block opacity-100' : 'hidden opacity-0'
+                }`}
+              >
+                <canvas
+                  ref={(el) => {
+                    canvasRefs.current[i] = el;
+                  }}
+                  width={1080}
+                  height={1350}
+                  className="max-h-[min(48dvh,420px)] md:max-h-[min(42vh,460px)] w-full h-auto object-contain shadow-2xl rounded"
+                />
+              </div>
+            ))}
+            {activeSlide ? (
+              <div className="mt-3 w-full md:hidden">
+                <ImagePickerControl
+                  variant="compact"
+                  compactLabel={
+                    activeSlide.imageUrl ? 'החלף תמונה בשקף' : 'הוסף תמונה לשקף'
+                  }
+                  value={activeSlide.imageUrl ?? null}
+                  onChange={(next) => {
+                    if (next) handleSlideImageUpload(activeSlideIndex, next);
+                    else handleSlideImageClear(activeSlideIndex);
+                  }}
+                />
+              </div>
+            ) : null}
+          </div>
         </div>
 
-        <div className="hidden md:flex p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 justify-center shadow-lg z-10 overflow-y-auto max-h-[35vh]">
+        <div className="hidden md:flex shrink-0 p-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg z-10">
           {localSlides[activeSlideIndex] && (
-            <div className="w-full max-w-xl">
-              <div className="flex justify-between items-center mb-4 gap-2">
-                <h3 className="font-bold text-gray-700 dark:text-gray-300">
+            <div className="w-full max-w-4xl mx-auto">
+              <div className="flex justify-between items-center mb-2 gap-2">
+                <h3 className="font-bold text-gray-700 dark:text-gray-300 text-sm">
                   עריכת שקף {activeSlideIndex + 1}
                 </h3>
                 <div className="flex items-center gap-1 shrink-0">
@@ -1332,6 +1347,7 @@ export default function CarouselRenderer({
                 </div>
               </div>
               <SlideEditor
+                layout="split"
                 slide={localSlides[activeSlideIndex]}
                 index={activeSlideIndex}
                 canvasRef={{ current: null }}
