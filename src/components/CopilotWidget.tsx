@@ -231,7 +231,7 @@ export default function CopilotWidget({
   };
 
   return (
-    <div className="w-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col h-80 shadow-inner">
+    <div className="w-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col h-64 md:h-72 shadow-inner">
       <div className="bg-indigo-600 p-3 flex justify-between items-center text-white">
         <span className="font-bold flex items-center gap-2">✨ AI Copilot</span>
         {isRecording ? (

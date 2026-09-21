@@ -24,6 +24,8 @@ import {
   type CreationSubmitPayload,
 } from '@/lib/creation-flow/build-payload';
 import { recommendedSlideCountForTopic } from '@/lib/wizard-intake';
+import type { WizardSharedDraft } from '@/lib/creation-flow/wizard-draft';
+import { normalizeWizardDraft } from '@/lib/creation-flow/wizard-draft';
 
 const QUICK_TOPICS = [
   '5 טעויות שמרחיקות לקוחות מהעסק',
@@ -38,12 +40,15 @@ export interface FastPathWizardProps {
   userName?: string;
   isLoading: boolean;
   onSubmit: (data: CreationSubmitPayload) => void;
-  onRequestFullPath: () => void;
+  /** מעביר טיוטה נוכחית למסלול המלא */
+  onRequestFullPath: (draft: WizardSharedDraft) => void;
   initialWebsiteUrl?: string;
   initialReferenceLink1?: string;
   initialReferenceLink2?: string;
   initialReferenceLink3?: string;
   initialBrandPalette?: BrandPalette | string;
+  /** טיוטה שנשמרה ממעבר קודם / מסלול מלא */
+  initialDraft?: WizardSharedDraft;
 }
 
 function initialPalette(
@@ -72,14 +77,18 @@ export default function FastPathWizard({
   initialReferenceLink2 = '',
   initialReferenceLink3 = '',
   initialBrandPalette,
+  initialDraft,
 }: FastPathWizardProps) {
-  const [step, setStep] = useState<FastStep>('target');
-  const [publishTarget, setPublishTarget] = useState<PublishTarget>(
-    DEFAULT_PUBLISH_TARGET
+  const seeded = normalizeWizardDraft(initialDraft);
+  const [step, setStep] = useState<FastStep>(() =>
+    seeded.topic ? 'topic' : 'target'
   );
-  const [topic, setTopic] = useState('');
+  const [publishTarget, setPublishTarget] = useState<PublishTarget>(
+    seeded.publishTarget
+  );
+  const [topic, setTopic] = useState(seeded.topic);
   const [coverImageDataUrl, setCoverImageDataUrl] = useState<string | null>(
-    null
+    seeded.coverImageDataUrl
   );
   const [formError, setFormError] = useState<string | null>(null);
   const [options] = useState<WizardOptions>(DEFAULT_WIZARD_OPTIONS);
@@ -292,7 +301,15 @@ export default function FastPathWizard({
               <button
                 type="button"
                 disabled={isLoading}
-                onClick={onRequestFullPath}
+                onClick={() =>
+                  onRequestFullPath(
+                    normalizeWizardDraft({
+                      topic: topicTrimmed,
+                      publishTarget,
+                      coverImageDataUrl,
+                    })
+                  )
+                }
                 className="font-bold text-sky-700 dark:text-sky-300 hover:text-sky-800 dark:hover:text-sky-200 underline underline-offset-2 disabled:opacity-40"
               >
                 שליטה מלאה (סגנון, כיוון, מספר)
@@ -355,14 +372,32 @@ export default function FastPathWizard({
                 דלגו בינתיים
               </button>
             </div>
-            <button
-              type="button"
-              disabled={isLoading}
-              onClick={() => setStep('topic')}
-              className="text-sm font-bold text-gray-500 hover:text-gray-800 dark:text-zinc-400 dark:hover:text-zinc-200 underline underline-offset-2 disabled:opacity-40"
-            >
-              חזרה לנושא
-            </button>
+            <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={() => setStep('topic')}
+                className="font-bold text-gray-500 hover:text-gray-800 dark:text-zinc-400 dark:hover:text-zinc-200 underline underline-offset-2 disabled:opacity-40"
+              >
+                חזרה לנושא
+              </button>
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={() =>
+                  onRequestFullPath(
+                    normalizeWizardDraft({
+                      topic: topicTrimmed,
+                      publishTarget,
+                      coverImageDataUrl,
+                    })
+                  )
+                }
+                className="font-bold text-sky-700 dark:text-sky-300 hover:text-sky-800 dark:hover:text-sky-200 underline underline-offset-2 disabled:opacity-40"
+              >
+                שליטה מלאה (סגנון, כיוון, מספר)
+              </button>
+            </div>
           </section>
         ) : null}
       </div>

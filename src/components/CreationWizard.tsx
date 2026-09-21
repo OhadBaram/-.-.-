@@ -39,6 +39,10 @@ interface CreationWizardProps {
   initialReferenceLink2?: string;
   initialReferenceLink3?: string;
   initialBrandPalette?: BrandPalette | string;
+  /** נושא שהועבר מהמסלול המהיר */
+  initialTopic?: string;
+  /** סנכרון נושא חזרה לטיוטה המשותפת (מעבר חזרה למסלול מהיר) */
+  onTopicChange?: (topic: string) => void;
 }
 
 interface ChatMessage {
@@ -153,8 +157,14 @@ export default function CreationWizard({
   initialReferenceLink2 = '',
   initialReferenceLink3 = '',
   initialBrandPalette,
+  initialTopic = '',
+  onTopicChange,
 }: CreationWizardProps) {
-  const [options, setOptions] = useState<WizardOptions>(DEFAULT_WIZARD_OPTIONS);
+  const seededTopic = initialTopic.trim();
+  const [options, setOptions] = useState<WizardOptions>(() => {
+    if (!seededTopic) return DEFAULT_WIZARD_OPTIONS;
+    return { ...DEFAULT_WIZARD_OPTIONS, ...buildIntakeSuggestions(seededTopic) };
+  });
   const [brandPalette, setBrandPalette] = useState<BrandPalette>(() => {
     if (Array.isArray(initialBrandPalette)) {
       return clampPalette(initialBrandPalette);
@@ -164,31 +174,47 @@ export default function CreationWizard({
     }
     return recommendPaletteLocal({ visualStyle: 'minimal' });
   });
-  const [topicDraft, setTopicDraft] = useState('');
+  const [topicDraft, setTopicDraft] = useState(seededTopic);
   const [inputText, setInputText] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [stylesLoading, setStylesLoading] = useState(false);
-  const [intakeReady, setIntakeReady] = useState(false);
+  const [intakeReady, setIntakeReady] = useState(Boolean(seededTopic));
   const [phase, setPhase] = useState<WizardPhase>('topic');
   const [researchNote, setResearchNote] = useState('');
   const [directions, setDirections] = useState<NarrativeDirection[]>([]);
   const [selectedDirectionId, setSelectedDirectionId] = useState<string | null>(
     null
   );
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: 'assistant',
-      text: userName
-        ? `היי ${userName}! אני כאן לייעוץ בלבד — נושא, המלצות, וכיוון תוכן. מה שקובע את צורת הקרוסלה זה רק פאנל «הגדרות סופיות». שלחו נושא אחד להתחלה.`
-        : 'היי! אני כאן לייעוץ בלבד — נושא, המלצות, וכיוון תוכן. מה שקובע את צורת הקרוסלה זה רק פאנל «הגדרות סופיות». שלחו נושא אחד להתחלה.',
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    const greeting = userName
+      ? `היי ${userName}! אני כאן לייעוץ בלבד — נושא, המלצות, וכיוון תוכן. מה שקובע את צורת הקרוסלה זה רק פאנל «הגדרות סופיות». שלחו נושא אחד להתחלה.`
+      : 'היי! אני כאן לייעוץ בלבד — נושא, המלצות, וכיוון תוכן. מה שקובע את צורת הקרוסלה זה רק פאנל «הגדרות סופיות». שלחו נושא אחד להתחלה.';
+
+    if (!seededTopic) {
+      return [{ role: 'assistant', text: greeting }];
+    }
+
+    return [
+      { role: 'assistant', text: greeting },
+      { role: 'user', text: seededTopic },
+      {
+        role: 'assistant',
+        text: `קלטתי את הנושא מהמסלול המהיר: «${seededTopic}». ההגדרות הסופיות בפאנל עודכנו לפי ההמלצה — אפשר לשנות ואז ללחוץ «המשך עם ההגדרות הסופיות».`,
+      },
+    ];
+  });
 
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const nextStepRef = useRef<HTMLDivElement>(null);
   const optionsRef = useRef(options);
   optionsRef.current = options;
+  const onTopicChangeRef = useRef(onTopicChange);
+  onTopicChangeRef.current = onTopicChange;
+
+  useEffect(() => {
+    onTopicChangeRef.current?.(topicDraft.trim());
+  }, [topicDraft]);
 
   useEffect(() => {
     const el = listRef.current;
@@ -563,7 +589,7 @@ export default function CreationWizard({
 
   return (
     <div
-      className="wizard-shell relative min-h-[calc(100vh-2rem)] overflow-hidden rounded-none md:rounded-3xl border border-white/5 bg-[#0c0f14] text-zinc-100 shadow-2xl"
+      className="wizard-shell relative min-h-[calc(100vh-2rem)] lg:min-h-0 lg:h-full overflow-hidden rounded-none md:rounded-3xl border border-white/5 bg-[#0c0f14] text-zinc-100 shadow-2xl"
       dir="rtl"
       style={{ fontFamily: 'Heebo, Assistant, sans-serif' }}
     >
@@ -584,10 +610,10 @@ export default function CreationWizard({
         }}
       />
 
-      <div className="relative grid min-h-[calc(100vh-2rem)] lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
-        <section className="flex flex-col border-b border-white/8 lg:border-b-0 lg:border-l border-white/8">
-          <header className="px-5 pt-6 pb-4 md:px-8 md:pt-8">
-            <div className="flex flex-wrap items-center gap-2 mb-3">
+      <div className="relative grid min-h-[calc(100vh-2rem)] lg:min-h-0 lg:h-full lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
+        <section className="flex min-h-0 flex-col border-b border-white/8 lg:h-full lg:border-b-0 lg:border-l border-white/8">
+          <header className="shrink-0 px-5 pt-5 pb-3 md:px-8 md:pt-6 md:pb-3">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
               <span className="rounded-full border border-amber-400/40 bg-amber-500/10 px-3 py-1 text-[11px] font-bold text-amber-100 tracking-wide">
                 ייעוץ בלבד — לא קובע
               </span>
@@ -595,16 +621,13 @@ export default function CreationWizard({
                 נושא → המלצות → כיוון תוכן
               </span>
             </div>
-            <p className="text-sm font-medium text-indigo-300/90 mb-2 animate-[wizardFade_0.6s_ease-out]">
-              סוכן ייעוץ — ממליץ, לא מחליט
-            </p>
-            <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white animate-[wizardRise_0.7s_ease-out]">
+            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-white animate-[wizardRise_0.7s_ease-out]">
               קרוסל. איי. אי
             </h1>
-            <p className="mt-2 max-w-xl text-zinc-400 text-base md:text-lg animate-[wizardRise_0.85s_ease-out]">
+            <p className="mt-1 max-w-xl text-zinc-400 text-sm md:text-base animate-[wizardRise_0.85s_ease-out]">
               השיחה כאן לייעוץ. צורת הקרוסלה נקבעת רק בפאנל «הגדרות סופיות».
             </p>
-            <ol className="mt-4 flex flex-wrap gap-2 text-xs text-zinc-500">
+            <ol className="mt-3 flex flex-wrap gap-2 text-xs text-zinc-500">
               <li
                 className={`rounded-full border px-3 py-1 ${
                   phase === 'topic' && !intakeReady
@@ -640,7 +663,7 @@ export default function CreationWizard({
 
           <div
             ref={listRef}
-            className="flex-1 overflow-y-auto px-5 md:px-8 pb-4 flex flex-col gap-3 min-h-[280px] max-h-[52vh] lg:max-h-none"
+            className="flex min-h-[200px] max-h-[42vh] flex-1 flex-col gap-3 overflow-y-auto px-5 pb-4 md:px-8 lg:max-h-none lg:min-h-0"
           >
             {messages.map((msg, i) => (
               <div
@@ -734,7 +757,7 @@ export default function CreationWizard({
 
           {phase === 'topic' ? (
             <>
-              <div className="px-5 md:px-8 pb-3 flex flex-wrap gap-2">
+              <div className="shrink-0 px-5 md:px-8 pb-2 flex flex-wrap gap-2">
                 {intakeReady && topicDraft ? (
                   <button
                     type="button"
@@ -760,7 +783,7 @@ export default function CreationWizard({
                 ))}
               </div>
 
-              <div className="px-5 md:px-8 pb-6 pt-2">
+              <div className="shrink-0 px-5 md:px-8 pb-4 pt-1 border-t border-white/5 bg-[#0c0f14]/90 backdrop-blur-sm">
                 <div className="flex gap-2 items-end rounded-2xl border border-white/10 bg-black/30 p-2 focus-within:border-indigo-400/50 transition">
                   <textarea
                     ref={inputRef}
@@ -787,7 +810,7 @@ export default function CreationWizard({
                   </button>
                 </div>
                 {topicDraft ? (
-                  <p className="mt-3 text-xs text-zinc-500">
+                  <p className="mt-2 text-xs text-zinc-500">
                     נושא ליצירה:{' '}
                     <span className="text-zinc-300 font-medium">
                       {topicDraft}
@@ -797,7 +820,7 @@ export default function CreationWizard({
               </div>
             </>
           ) : (
-            <div className="px-5 md:px-8 pb-6 pt-2 flex flex-wrap gap-2">
+            <div className="shrink-0 px-5 md:px-8 pb-4 pt-2 flex flex-wrap gap-2 border-t border-white/5">
               <button
                 type="button"
                 disabled={busy}
@@ -821,7 +844,7 @@ export default function CreationWizard({
           )}
         </section>
 
-        <aside className="flex flex-col gap-5 px-5 py-6 md:px-7 md:py-8 bg-black/30 backdrop-blur-sm border-r border-emerald-400/15">
+        <aside className="flex min-h-0 flex-col gap-5 overflow-y-auto px-5 py-6 md:px-7 md:py-7 bg-black/30 backdrop-blur-sm border-r border-emerald-400/15 lg:h-full">
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-2">
               <span className="rounded-full border border-emerald-400/50 bg-emerald-500/15 px-3 py-1 text-[11px] font-bold text-emerald-100 tracking-wide">

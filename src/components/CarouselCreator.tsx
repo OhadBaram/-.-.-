@@ -18,6 +18,11 @@ import {
 } from '@/lib/brand-palette';
 import { applyCoverImageToSlides } from '@/lib/contracts/cover-image';
 import {
+  EMPTY_WIZARD_DRAFT,
+  normalizeWizardDraft,
+  type WizardSharedDraft,
+} from '@/lib/creation-flow/wizard-draft';
+import {
   DEFAULT_PUBLISH_TARGET,
   parsePublishTarget,
   type PublishTarget,
@@ -63,6 +68,8 @@ export default function CarouselCreator({
     DEFAULT_PUBLISH_TARGET
   );
   const [wizardMode, setWizardMode] = useState<'fast' | 'full'>('fast');
+  const [wizardDraft, setWizardDraft] =
+    useState<WizardSharedDraft>(EMPTY_WIZARD_DRAFT);
   const [brandPalette, setBrandPalette] = useState<BrandPalette>(() =>
     parseBrandPalette(brandColor)
   );
@@ -176,10 +183,30 @@ export default function CarouselCreator({
   };
 
   const wizardNode = (
-    <div className="p-3 md:p-6 max-w-6xl mx-auto space-y-3">
+    <div
+      className={
+        wizardMode === 'full'
+          ? 'p-3 md:p-6 max-w-6xl mx-auto space-y-3 lg:flex lg:h-[calc(100dvh-1.5rem)] lg:max-h-[calc(100dvh-1.5rem)] lg:min-h-0 lg:flex-col lg:space-y-0 lg:gap-3'
+          : 'p-3 md:p-6 max-w-6xl mx-auto space-y-3'
+      }
+    >
+      <div
+        className="md:hidden rounded-2xl border border-amber-300/70 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-700/50 px-4 py-3 text-center"
+        role="note"
+        dir="rtl"
+      >
+        <p className="text-sm font-bold text-amber-950 dark:text-amber-100">
+          מומלץ לפתוח במחשב
+        </p>
+        <p className="text-xs text-amber-900/80 dark:text-amber-200/80 mt-1 leading-snug">
+          יצירה אפשרית גם בטלפון, אבל עריכת צבעים, גופן ותצוגה מקדימה נוחים הרבה
+          יותר במסך רחב.
+        </p>
+      </div>
+
       {hasDraft && showWizardOverDraft ? (
         <div
-          className="rounded-2xl border border-amber-400/40 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 justify-between"
+          className="shrink-0 rounded-2xl border border-amber-400/40 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 justify-between"
           dir="rtl"
         >
           <div className="min-w-0">
@@ -211,10 +238,15 @@ export default function CarouselCreator({
 
       {wizardMode === 'fast' ? (
         <FastPathWizard
+          key={`fast-${wizardDraft.topic}-${wizardDraft.publishTarget}`}
           userName={userName}
           onSubmit={handleGenerate}
           isLoading={isLoading}
-          onRequestFullPath={() => setWizardMode('full')}
+          initialDraft={wizardDraft}
+          onRequestFullPath={(draft) => {
+            setWizardDraft(normalizeWizardDraft(draft));
+            setWizardMode('full');
+          }}
           initialWebsiteUrl={initialWebsiteUrl}
           initialReferenceLink1={initialReferenceLink1}
           initialReferenceLink2={initialReferenceLink2}
@@ -222,9 +254,9 @@ export default function CarouselCreator({
           initialBrandPalette={brandPalette}
         />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:space-y-0 lg:gap-3">
           <div
-            className="rounded-2xl border border-white/10 bg-[#111827] px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+            className="shrink-0 rounded-2xl border border-white/10 bg-[#111827] px-4 py-3 flex flex-wrap items-center justify-between gap-3"
             dir="rtl"
           >
             <p className="text-sm text-zinc-300">
@@ -232,22 +264,32 @@ export default function CarouselCreator({
             </p>
             <button
               type="button"
-              onClick={() => setWizardMode('fast')}
+              onClick={() => {
+                setWizardDraft((prev) => normalizeWizardDraft(prev));
+                setWizardMode('fast');
+              }}
               className="text-sm font-bold text-sky-300 hover:text-sky-200 underline underline-offset-2"
             >
               חזרה למסלול המהיר
             </button>
           </div>
-          <CreationWizard
-            userName={userName}
-            onSubmit={handleGenerate}
-            isLoading={isLoading}
-            initialWebsiteUrl={initialWebsiteUrl}
-            initialReferenceLink1={initialReferenceLink1}
-            initialReferenceLink2={initialReferenceLink2}
-            initialReferenceLink3={initialReferenceLink3}
-            initialBrandPalette={brandPalette}
-          />
+          <div className="min-h-0 lg:h-full lg:flex-1">
+            <CreationWizard
+              key={`full-${wizardDraft.topic}`}
+              userName={userName}
+              onSubmit={handleGenerate}
+              isLoading={isLoading}
+              initialTopic={wizardDraft.topic}
+              onTopicChange={(topic) =>
+                setWizardDraft((prev) => normalizeWizardDraft({ topic }, prev))
+              }
+              initialWebsiteUrl={initialWebsiteUrl}
+              initialReferenceLink1={initialReferenceLink1}
+              initialReferenceLink2={initialReferenceLink2}
+              initialReferenceLink3={initialReferenceLink3}
+              initialBrandPalette={brandPalette}
+            />
+          </div>
         </div>
       )}
     </div>
