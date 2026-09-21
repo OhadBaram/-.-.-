@@ -110,33 +110,40 @@ export function primaryBrandColor(palette: BrandPalette | LegacyBrandColors): st
   return clampPalette(palette).accents[0];
 }
 
+/**
+ * אקסנט אחיד לכל השקפים.
+ * `slideIndex` נשמר בחתימה לתאימות קוראים קיימים — אינו משנה את הצבע.
+ */
 export function colorForSlide(
   palette: BrandPalette | LegacyBrandColors,
-  slideIndex: number
+  _slideIndex = 0
 ): string {
-  const accents = clampPalette(palette).accents;
-  return accents[slideIndex % accents.length];
+  return primaryBrandColor(palette);
 }
 
+/**
+ * רקע אחיד לכל השקפים לפי מצב בהיר/כהה.
+ * בוחר רקע בהיר אחד או כהה אחד מהפלטה — בלי רוטציה בין שקפים.
+ */
 export function backgroundForSlide(
   palette: BrandPalette | LegacyBrandColors,
-  slideIndex: number,
+  _slideIndex = 0,
   isDark = false
 ): string | undefined {
   const backgrounds = clampPalette(palette).backgrounds;
   if (!backgrounds.length) return undefined;
   if (backgrounds.length === 1) return backgrounds[0];
-  // במצב כהה מעדיפים רקע כהה אם קיים בפלטה
+
   if (isDark) {
-    const darkish = backgrounds.find((c) => luminance(c) < 0.35);
-    if (darkish) return darkish;
-  } else {
-    const lightish = backgrounds.find((c) => luminance(c) >= 0.35);
-    if (lightish && backgrounds.length > 1) {
-      return backgrounds[slideIndex % backgrounds.length];
-    }
+    return (
+      backgrounds.find((c) => luminance(c) < 0.35) ??
+      backgrounds[backgrounds.length - 1]
+    );
   }
-  return backgrounds[slideIndex % backgrounds.length];
+
+  return (
+    backgrounds.find((c) => luminance(c) >= 0.35) ?? backgrounds[0]
+  );
 }
 
 function luminance(hex: string): number {
