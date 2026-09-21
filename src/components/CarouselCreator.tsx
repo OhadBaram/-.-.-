@@ -5,6 +5,8 @@ import CarouselRenderer, { Slide } from '@/components/CarouselRenderer';
 import CreationWizard, {
   type CreationWizardSubmitPayload,
 } from '@/components/CreationWizard';
+import FastPathWizard from '@/components/FastPathWizard';
+import type { CreationSubmitPayload } from '@/lib/creation-flow/build-payload';
 import SkeletonLoader from '@/components/SkeletonLoader';
 import WizardSummaryBar from '@/components/WizardSummaryBar';
 import { type WizardPackageMeta } from '@/lib/wizard';
@@ -31,7 +33,7 @@ interface CarouselCreatorProps {
 }
 
 function metaFromSubmit(
-  data: CreationWizardSubmitPayload
+  data: CreationWizardSubmitPayload | CreationSubmitPayload
 ): WizardPackageMeta {
   return {
     slideCount: data.slideCount,
@@ -60,6 +62,7 @@ export default function CarouselCreator({
   const [publishTarget, setPublishTarget] = useState<PublishTarget>(
     DEFAULT_PUBLISH_TARGET
   );
+  const [wizardMode, setWizardMode] = useState<'fast' | 'full'>('fast');
   const [brandPalette, setBrandPalette] = useState<BrandPalette>(() =>
     parseBrandPalette(brandColor)
   );
@@ -93,7 +96,9 @@ export default function CarouselCreator({
     clearPackage();
   };
 
-  const handleGenerate = async (data: CreationWizardSubmitPayload) => {
+  const handleGenerate = async (
+    data: CreationWizardSubmitPayload | CreationSubmitPayload
+  ) => {
     if (hasDraft) {
       const ok = window.confirm(
         'יצירה מחדש תחליף את הקרוסלה שבעריכה. להמשיך?'
@@ -204,16 +209,47 @@ export default function CarouselCreator({
         </div>
       ) : null}
 
-      <CreationWizard
-        userName={userName}
-        onSubmit={handleGenerate}
-        isLoading={isLoading}
-        initialWebsiteUrl={initialWebsiteUrl}
-        initialReferenceLink1={initialReferenceLink1}
-        initialReferenceLink2={initialReferenceLink2}
-        initialReferenceLink3={initialReferenceLink3}
-        initialBrandPalette={brandPalette}
-      />
+      {wizardMode === 'fast' ? (
+        <FastPathWizard
+          userName={userName}
+          onSubmit={handleGenerate}
+          isLoading={isLoading}
+          onRequestFullPath={() => setWizardMode('full')}
+          initialWebsiteUrl={initialWebsiteUrl}
+          initialReferenceLink1={initialReferenceLink1}
+          initialReferenceLink2={initialReferenceLink2}
+          initialReferenceLink3={initialReferenceLink3}
+          initialBrandPalette={brandPalette}
+        />
+      ) : (
+        <div className="space-y-3">
+          <div
+            className="rounded-2xl border border-white/10 bg-[#111827] px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+            dir="rtl"
+          >
+            <p className="text-sm text-zinc-300">
+              מצב שליטה מלאה — צ׳אט, הגדרות וכיווני תוכן.
+            </p>
+            <button
+              type="button"
+              onClick={() => setWizardMode('fast')}
+              className="text-sm font-bold text-sky-300 hover:text-sky-200 underline underline-offset-2"
+            >
+              חזרה למסלול המהיר
+            </button>
+          </div>
+          <CreationWizard
+            userName={userName}
+            onSubmit={handleGenerate}
+            isLoading={isLoading}
+            initialWebsiteUrl={initialWebsiteUrl}
+            initialReferenceLink1={initialReferenceLink1}
+            initialReferenceLink2={initialReferenceLink2}
+            initialReferenceLink3={initialReferenceLink3}
+            initialBrandPalette={brandPalette}
+          />
+        </div>
+      )}
     </div>
   );
 

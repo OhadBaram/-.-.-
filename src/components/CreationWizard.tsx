@@ -24,29 +24,11 @@ import {
   recommendPaletteLocal,
   type BrandPalette,
 } from '@/lib/brand-palette';
+import { buildCreationSubmitPayload } from '@/lib/creation-flow/build-payload';
+import type { CreationSubmitPayload } from '@/lib/creation-flow/build-payload';
 
-export interface CreationWizardSubmitPayload {
-  topic: string;
-  audience: string;
-  goal: string;
-  brand: string;
-  brandColors: BrandPalette;
-  slideCount: number;
-  density: WizardOptions['density'];
-  visualStyle: WizardOptions['visualStyle'];
-  visualStyleCustom: string;
-  useRecommendedStructure: boolean;
-  narrativeDirection: NarrativeDirection;
-  websiteUrl?: string;
-  referenceLink1?: string;
-  referenceLink2?: string;
-  referenceLink3?: string;
-  /** ברירת מחדל: full — עד שמסלול מהיר יוטמע במלואו */
-  flowVariant?: 'fast' | 'full';
-  publishTarget?: 'instagram' | 'linkedin';
-  coverImageDataUrl?: string;
-  coverImageApplyTo?: 'first' | 'first_and_image_slots';
-}
+/** תואם ל־CreationSubmitPayload לתאימות לאחור עם CarouselCreator */
+export type CreationWizardSubmitPayload = CreationSubmitPayload;
 
 interface CreationWizardProps {
   userName?: string;
@@ -438,35 +420,30 @@ export default function CreationWizard({
       return;
     }
 
-    const styleMeta = VISUAL_STYLE_OPTIONS.find(
-      (s) => s.id === options.visualStyle
-    );
-    const brandParts = [
-      styleMeta?.promptHint || styleMeta?.label || '',
-      options.visualStyle === 'custom' ? options.visualStyleCustom : '',
-    ]
-      .filter(Boolean)
-      .join(' | ');
-
-    onSubmit({
-      topic,
-      audience: options.audience,
-      goal: options.goal,
-      brand: brandParts,
-      brandColors: clampPalette(brandPalette),
-      slideCount: options.slideCount,
-      density: options.density,
-      visualStyle: options.visualStyle,
-      visualStyleCustom: options.visualStyleCustom,
-      useRecommendedStructure: options.useRecommendedStructure,
-      narrativeDirection: selected,
-      websiteUrl: initialWebsiteUrl,
-      referenceLink1: initialReferenceLink1,
-      referenceLink2: initialReferenceLink2,
-      referenceLink3: initialReferenceLink3,
-      flowVariant: 'full',
-      publishTarget: 'instagram',
-    });
+    try {
+      onSubmit(
+        buildCreationSubmitPayload({
+          topic,
+          options,
+          brandPalette,
+          narrativeDirection: selected,
+          flowVariant: 'full',
+          publishTarget: 'instagram',
+          websiteUrl: initialWebsiteUrl || undefined,
+          referenceLink1: initialReferenceLink1 || undefined,
+          referenceLink2: initialReferenceLink2 || undefined,
+          referenceLink3: initialReferenceLink3 || undefined,
+        })
+      );
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          text: 'חסר נושא או כיוון תוכן. השלימו לפני היצירה.',
+        },
+      ]);
+    }
   };
 
   const topicRecommendedCount = topicDraft

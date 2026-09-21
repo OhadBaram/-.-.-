@@ -21,8 +21,10 @@ jobs:
           npx eslint
           src/lib/contracts
           src/lib/api
+          src/lib/creation-flow
           src/lib/validations.ts
           src/components/ImagePickerControl.tsx
+          src/components/FastPathWizard.tsx
           src/components/SlideEditor.tsx
           src/components/CarouselCreator.tsx
           src/components/WizardSummaryBar.tsx

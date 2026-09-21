@@ -7,6 +7,7 @@ import { jsPDF } from 'jspdf';
 import SlideEditor from '@/components/SlideEditor';
 import CopilotWidget from '@/components/CopilotWidget';
 import BrandPalettePicker from '@/components/BrandPalettePicker';
+import ImagePickerControl from '@/components/ImagePickerControl';
 import { MAX_SLIDE_COUNT } from '@/lib/wizard';
 import {
   clampPalette,
@@ -1149,7 +1150,7 @@ export default function CarouselRenderer({
 
         {/* Canvas Area — background follows canvas theme (not next-themes) */}
         <div
-          className={`flex-1 flex justify-center items-center p-8 overflow-auto relative transition-colors duration-300 ${
+          className={`flex-1 flex flex-col justify-center items-center p-8 overflow-auto relative transition-colors duration-300 ${
             isCanvasDark ? 'bg-gray-950' : 'bg-gray-200'
           }`}
         >
@@ -1168,6 +1169,21 @@ export default function CarouselRenderer({
               />
             </div>
           ))}
+          {activeSlide ? (
+            <div className="mt-4 w-full max-w-sm">
+              <ImagePickerControl
+                variant="compact"
+                compactLabel={
+                  activeSlide.imageUrl ? 'החלף תמונה בשקף' : 'הוסף תמונה לשקף'
+                }
+                value={activeSlide.imageUrl ?? null}
+                onChange={(next) => {
+                  if (next) handleSlideImageUpload(activeSlideIndex, next);
+                  else handleSlideImageClear(activeSlideIndex);
+                }}
+              />
+            </div>
+          ) : null}
         </div>
 
         {/* Slide Controls */}
