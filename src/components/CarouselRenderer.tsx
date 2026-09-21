@@ -460,8 +460,48 @@ export default function CarouselRenderer({
   );
 
   React.useEffect(() => {
-    setLocalSlides(withDefaultTemplates(slides));
+    const isDark = theme === 'dark';
+    const surface =
+      backgroundForSlide(brandPalette, 0, isDark) ||
+      (isDark ? '#111827' : '#ffffff');
+    const nextText = isDark ? '#f8fafc' : '#111827';
+    setLocalSlides(
+      withDefaultTemplates(slides).map((slide) => ({
+        ...slide,
+        backgroundColor: surface,
+        textColor: nextText,
+      }))
+    );
+    // רק כשמגיעה חבילה חדשה מהאשף — לא מאפסים עריכות מקומיות על שינוי פלטה
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally slides-only
   }, [slides]);
+
+  /** פלטה/מצב בהיר־כהה → אותו רקע לכל השקפים, בלי למחוק טקסט או תמונות */
+  React.useEffect(() => {
+    const isDark = theme === 'dark';
+    const surface =
+      backgroundForSlide(brandPalette, 0, isDark) ||
+      (isDark ? '#111827' : '#ffffff');
+    const nextText = isDark ? '#f8fafc' : '#111827';
+    setLocalSlides((prev) => {
+      let changed = false;
+      const next = prev.map((slide) => {
+        if (
+          slide.backgroundColor === surface &&
+          slide.textColor === nextText
+        ) {
+          return slide;
+        }
+        changed = true;
+        return {
+          ...slide,
+          backgroundColor: surface,
+          textColor: nextText,
+        };
+      });
+      return changed ? next : prev;
+    });
+  }, [brandPalette, theme]);
 
   React.useEffect(() => {
     try {
@@ -810,12 +850,49 @@ export default function CarouselRenderer({
               </div>
             )}
 
-            <div className="mb-4 pb-4 border-b border-gray-100 dark:border-gray-700">
-              <BrandPalettePicker
-                value={brandPalette}
-                onChange={setBrandPalette}
-                variant="compact"
-              />
+            <div className="mb-4 pb-4 border-b border-gray-100 dark:border-gray-700 space-y-4">
+              <div>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2 leading-snug">
+                  הפלטה והגופן חלים על כל השקפים באותו אופן (רקע ואקסנט אחידים).
+                </p>
+                <BrandPalettePicker
+                  value={brandPalette}
+                  onChange={setBrandPalette}
+                  variant="compact"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">
+                  גופן לכל השקפים
+                </label>
+                <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto">
+                  {FONT_OPTIONS.map((font) => (
+                    <button
+                      key={font.id}
+                      type="button"
+                      onClick={() => setGlobalFont(font.id)}
+                      className={`w-full px-2.5 py-2 rounded-lg border text-right transition-colors flex items-center justify-between gap-2 ${
+                        globalFont === font.id
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 dark:border-blue-400'
+                          : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      <span
+                        className="text-sm font-semibold text-gray-900 dark:text-gray-100"
+                        style={{ fontFamily: `"${font.id}", sans-serif` }}
+                      >
+                        {font.label}
+                      </span>
+                      <span
+                        className="text-xs text-gray-500 dark:text-gray-300"
+                        style={{ fontFamily: `"${font.id}", sans-serif` }}
+                      >
+                        אבג
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">

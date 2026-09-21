@@ -7,7 +7,12 @@ import React from 'react';
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
-      <ThemeProvider attribute="class" defaultTheme="light">
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="light"
+        enableSystem={false}
+        storageKey="caruselai-theme"
+      >
         {children}
       </ThemeProvider>
     </SessionProvider>

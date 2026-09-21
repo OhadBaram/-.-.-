@@ -148,28 +148,28 @@ export default function FastPathWizard({
 
   return (
     <div
-      className="relative mx-auto max-w-xl overflow-hidden rounded-3xl border border-white/10 bg-[#0c0f14] text-zinc-100 shadow-2xl"
+      className="relative mx-auto max-w-xl overflow-hidden rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0c0f14] text-gray-900 dark:text-zinc-100 shadow-2xl"
       dir="rtl"
       style={{ fontFamily: 'Heebo, Assistant, sans-serif' }}
     >
       <div
-        className="pointer-events-none absolute inset-0 opacity-90"
+        className="pointer-events-none absolute inset-0 opacity-80 dark:opacity-90"
         aria-hidden
         style={{
           background:
-            'radial-gradient(ellipse 80% 50% at 100% -10%, rgba(99,102,241,0.22), transparent 55%), linear-gradient(180deg, #0c0f14 0%, #111827 100%)',
+            'radial-gradient(ellipse 80% 50% at 100% -10%, rgba(99,102,241,0.18), transparent 55%)',
         }}
       />
 
       <div className="relative p-5 md:p-8 space-y-6">
         <header className="space-y-2">
-          <p className="text-xs font-bold text-indigo-300/90">
+          <p className="text-xs font-bold text-indigo-600 dark:text-indigo-300/90">
             שלב {stepIndex} מתוך 3 · מסלול מהיר
           </p>
-          <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
             קרוסל. איי. אי
           </h1>
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-gray-500 dark:text-zinc-400">
             {userName
               ? `${userName}, ניצור קרוסלה מוכנה בדקות — בלי סיבוב מיותר.`
               : 'ניצור קרוסלה מוכנה בדקות — בלי סיבוב מיותר.'}
@@ -181,11 +181,11 @@ export default function FastPathWizard({
             <div>
               <h2
                 id="fast-target-title"
-                className="text-lg font-bold text-zinc-50"
+                className="text-lg font-bold text-gray-900 dark:text-zinc-50"
               >
                 איפה תפרסמו את הקרוסלה?
               </h2>
-              <p className="text-sm text-zinc-400 mt-1">
+              <p className="text-sm text-gray-500 dark:text-zinc-400 mt-1">
                 נכוון את הפורמט ואת ההורדה בהתאם. אפשר לשנות אחר כך בעורך.
               </p>
             </div>
@@ -201,8 +201,8 @@ export default function FastPathWizard({
                     onClick={() => selectTarget(id)}
                     className={`text-right rounded-2xl border px-4 py-4 transition ${
                       selected
-                        ? 'border-sky-400/60 bg-sky-500/15 text-sky-50'
-                        : 'border-white/10 bg-white/[0.03] text-zinc-200 hover:bg-white/5'
+                        ? 'border-sky-500 bg-sky-50 text-sky-950 dark:border-sky-400/60 dark:bg-sky-500/15 dark:text-sky-50'
+                        : 'border-gray-200 bg-gray-50 text-gray-800 hover:bg-gray-100 dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-200 dark:hover:bg-white/5'
                     } disabled:opacity-50`}
                   >
                     <div className="font-black text-base">{profile.labelHe}</div>
@@ -215,7 +215,7 @@ export default function FastPathWizard({
               type="button"
               disabled={isLoading}
               onClick={() => selectTarget(DEFAULT_PUBLISH_TARGET)}
-              className="text-sm font-bold text-zinc-400 hover:text-zinc-200 underline underline-offset-2 disabled:opacity-50"
+              className="text-sm font-bold text-gray-500 hover:text-gray-800 dark:text-zinc-400 dark:hover:text-zinc-200 underline underline-offset-2 disabled:opacity-50"
             >
               עדיין לא בטוחים — נתחיל באינסטגרם
             </button>
@@ -225,10 +225,13 @@ export default function FastPathWizard({
         {step === 'topic' ? (
           <section className="space-y-4" aria-labelledby="fast-topic-title">
             <div>
-              <h2 id="fast-topic-title" className="text-lg font-bold text-zinc-50">
+              <h2
+                id="fast-topic-title"
+                className="text-lg font-bold text-gray-900 dark:text-zinc-50"
+              >
                 על מה הקרוסלה?
               </h2>
-              <p className="text-sm text-zinc-400 mt-1">
+              <p className="text-sm text-gray-500 dark:text-zinc-400 mt-1">
                 יעד נבחר: {getPublishTargetProfile(publishTarget).labelHe}
               </p>
             </div>
@@ -240,7 +243,7 @@ export default function FastPathWizard({
               }}
               rows={3}
               placeholder="למשל: 5 טעויות שמרחיקות לקוחות מהעסק"
-              className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-base text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-400/50"
+              className="w-full rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/40 px-4 py-3 text-base text-gray-900 dark:text-zinc-100 placeholder:text-gray-400 dark:placeholder:text-zinc-600 focus:outline-none focus:border-indigo-400/50"
               disabled={isLoading}
             />
             <div className="flex flex-wrap gap-2">
@@ -253,14 +256,17 @@ export default function FastPathWizard({
                     setTopic(prompt);
                     setFormError(null);
                   }}
-                  className="text-xs px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 disabled:opacity-40"
+                  className="text-xs px-3 py-1.5 rounded-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-white/10 disabled:opacity-40"
                 >
                   {prompt}
                 </button>
               ))}
             </div>
             {formError ? (
-              <p className="text-sm text-red-300 font-medium" role="alert">
+              <p
+                className="text-sm text-red-600 dark:text-red-300 font-medium"
+                role="alert"
+              >
                 {formError}
               </p>
             ) : null}
@@ -277,7 +283,7 @@ export default function FastPathWizard({
                 type="button"
                 disabled={isLoading}
                 onClick={() => setStep('target')}
-                className="rounded-xl border border-white/15 px-4 py-3 text-sm font-bold text-zinc-300 hover:bg-white/5 disabled:opacity-40"
+                className="rounded-xl border border-gray-200 dark:border-white/15 px-4 py-3 text-sm font-bold text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-white/5 disabled:opacity-40"
               >
                 חזרה
               </button>
@@ -287,7 +293,7 @@ export default function FastPathWizard({
                 type="button"
                 disabled={isLoading}
                 onClick={onRequestFullPath}
-                className="font-bold text-sky-300 hover:text-sky-200 underline underline-offset-2 disabled:opacity-40"
+                className="font-bold text-sky-700 dark:text-sky-300 hover:text-sky-800 dark:hover:text-sky-200 underline underline-offset-2 disabled:opacity-40"
               >
                 שליטה מלאה (סגנון, כיוון, מספר)
               </button>
@@ -298,10 +304,13 @@ export default function FastPathWizard({
         {step === 'image' ? (
           <section className="space-y-4" aria-labelledby="fast-image-title">
             <div>
-              <h2 id="fast-image-title" className="text-lg font-bold text-zinc-50">
+              <h2
+                id="fast-image-title"
+                className="text-lg font-bold text-gray-900 dark:text-zinc-50"
+              >
                 הוסיפו תמונה אחת
               </h2>
-              <p className="text-sm text-zinc-400 mt-1">
+              <p className="text-sm text-gray-500 dark:text-zinc-400 mt-1">
                 זה מה שהופך את הקרוסלה לשלכם. אפשר גם בלי — תמיד אפשר להחליף
                 בעורך.
               </p>
@@ -313,12 +322,15 @@ export default function FastPathWizard({
               disabled={isLoading}
             />
             {coverImageDataUrl ? (
-              <p className="text-xs text-emerald-300/90 font-medium">
+              <p className="text-xs text-emerald-700 dark:text-emerald-300/90 font-medium">
                 מעולה. נשים אותה על שקף הפתיחה.
               </p>
             ) : null}
             {formError ? (
-              <p className="text-sm text-red-300 font-medium" role="alert">
+              <p
+                className="text-sm text-red-600 dark:text-red-300 font-medium"
+                role="alert"
+              >
                 {formError}
               </p>
             ) : null}
@@ -338,7 +350,7 @@ export default function FastPathWizard({
                   setCoverImageDataUrl(null);
                   submitFast(null);
                 }}
-                className="rounded-xl border border-white/15 px-4 py-3 text-sm font-bold text-zinc-300 hover:bg-white/5 disabled:opacity-40"
+                className="rounded-xl border border-gray-200 dark:border-white/15 px-4 py-3 text-sm font-bold text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-white/5 disabled:opacity-40"
               >
                 דלגו בינתיים
               </button>
@@ -347,7 +359,7 @@ export default function FastPathWizard({
               type="button"
               disabled={isLoading}
               onClick={() => setStep('topic')}
-              className="text-sm font-bold text-zinc-400 hover:text-zinc-200 underline underline-offset-2 disabled:opacity-40"
+              className="text-sm font-bold text-gray-500 hover:text-gray-800 dark:text-zinc-400 dark:hover:text-zinc-200 underline underline-offset-2 disabled:opacity-40"
             >
               חזרה לנושא
             </button>
