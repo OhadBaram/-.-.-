@@ -9,6 +9,50 @@ export function darkenHex(hex: string, amount = 60): string {
 export interface SlideOverride {
   fontSize?: number;
   textY?: number;
+  /** רקע שקף מפלטת המשתמש — גובר על ברירת בהיר/כהה */
+  surfaceBg?: string;
+}
+
+export function resolveSurfaceBg(
+  isDark: boolean,
+  override?: SlideOverride,
+  light = '#ffffff',
+  dark = '#111827'
+): string {
+  if (override?.surfaceBg) return override.surfaceBg;
+  return isDark ? dark : light;
+}
+
+/**
+ * object-fit: cover עם נקודת מיקוד.
+ * focalX / focalY: 0 = התחלה (שמאל/למעלה), 0.5 = מרכז, 1 = סוף.
+ * ברירת מחדל אנכית למעלה — שומרת על ראשים בתמונות אנשים.
+ */
+export function coverFitRect(
+  imgW: number,
+  imgH: number,
+  boxW: number,
+  boxH: number,
+  focalX = 0.5,
+  focalY = 0
+): { renderW: number; renderH: number; offsetX: number; offsetY: number } {
+  if (!imgW || !imgH || !boxW || !boxH) {
+    return { renderW: boxW, renderH: boxH, offsetX: 0, offsetY: 0 };
+  }
+  const imgRatio = imgW / imgH;
+  const boxRatio = boxW / boxH;
+  let renderW = boxW;
+  let renderH = boxH;
+  let offsetX = 0;
+  let offsetY = 0;
+  if (imgRatio > boxRatio) {
+    renderW = boxH * imgRatio;
+    offsetX = (boxW - renderW) * focalX;
+  } else {
+    renderH = boxW / imgRatio;
+    offsetY = (boxH - renderH) * focalY;
+  }
+  return { renderW, renderH, offsetX, offsetY };
 }
 
 /** RTL word-wrap: returns array of wrapped lines. */
@@ -64,7 +108,7 @@ export function drawMinimal(
   override?: SlideOverride,
   fontFamily: string = 'Heebo, sans-serif'
 ) {
-  const bg = isDark ? '#111827' : '#ffffff';
+  const bg = resolveSurfaceBg(isDark, override, '#ffffff', '#111827');
   const fg = isDark ? '#f9fafb' : '#111827';
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
@@ -110,7 +154,7 @@ export function drawBold(
   override?: SlideOverride,
   fontFamily: string = 'Heebo, sans-serif'
 ) {
-  const bg = isDark ? '#111827' : '#f9fafb';
+  const bg = resolveSurfaceBg(isDark, override, '#f9fafb', '#111827');
   const fg = isDark ? '#ffffff' : '#111827';
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
@@ -185,7 +229,7 @@ export function drawDarkLuxury(
   fontFamily: string = 'Heebo, sans-serif'
 ) {
   const gold = '#D4AF37';
-  const bg = isDark ? '#0a0a0a' : '#f7f3e8';
+  const bg = resolveSurfaceBg(isDark, override, '#f7f3e8', '#0a0a0a');
   const fg = isDark ? '#ffffff' : '#1a1a1a';
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
@@ -225,7 +269,7 @@ export function drawFrame(
   override?: SlideOverride,
   fontFamily: string = 'Heebo, sans-serif'
 ) {
-  const bg = isDark ? '#111827' : '#ffffff';
+  const bg = resolveSurfaceBg(isDark, override, '#ffffff', '#111827');
   const fg = isDark ? '#f9fafb' : '#111827';
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
@@ -317,7 +361,7 @@ export function drawQuote(
   override?: SlideOverride,
   fontFamily: string = 'Heebo, sans-serif'
 ) {
-  const bg = isDark ? '#111827' : '#ffffff';
+  const bg = resolveSurfaceBg(isDark, override, '#ffffff', '#111827');
   const fg = isDark ? '#f9fafb' : '#111827';
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
@@ -352,7 +396,7 @@ export function drawNumbered(
   override?: SlideOverride,
   fontFamily: string = 'Heebo, sans-serif'
 ) {
-  const bg = isDark ? '#111827' : '#ffffff';
+  const bg = resolveSurfaceBg(isDark, override, '#ffffff', '#111827');
   const fg = isDark ? '#f9fafb' : '#111827';
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
@@ -393,7 +437,7 @@ export function drawMagazine(
   override?: SlideOverride,
   fontFamily: string = 'Heebo, sans-serif'
 ) {
-  const bg = isDark ? '#111827' : '#ffffff';
+  const bg = resolveSurfaceBg(isDark, override, '#ffffff', '#111827');
   const fg = isDark ? '#f9fafb' : '#111827';
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
@@ -445,7 +489,7 @@ export function drawWaves(
   override?: SlideOverride,
   fontFamily: string = 'Heebo, sans-serif'
 ) {
-  const bg = isDark ? '#111827' : '#ffffff';
+  const bg = resolveSurfaceBg(isDark, override, '#ffffff', '#111827');
   const fg = isDark ? '#f9fafb' : '#111827';
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
@@ -526,27 +570,28 @@ export async function drawImageSplit(
   // Draw background image or placeholder
   if (imageUrl) {
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     img.src = imageUrl;
     await new Promise((resolve) => {
       img.onload = resolve;
       img.onerror = resolve;
     });
     if (shouldAbort?.()) return;
-    // object-fit: cover equivalent for canvas
-    const imgRatio = img.width / img.height;
-    const canvasRatio = W / splitY;
-    let renderW = W;
-    let renderH = splitY;
-    let offsetX = 0;
-    let offsetY = 0;
-    if (imgRatio > canvasRatio) {
-      renderW = splitY * imgRatio;
-      offsetX = (W - renderW) / 2;
-    } else {
-      renderH = W / imgRatio;
-      offsetY = (splitY - renderH) / 2;
-    }
+    // cover עם מיקוד עליון — לא חותך ראשים כמו center
+    const { renderW, renderH, offsetX, offsetY } = coverFitRect(
+      img.width,
+      img.height,
+      W,
+      splitY,
+      0.5,
+      0
+    );
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, W, splitY);
+    ctx.clip();
     ctx.drawImage(img, offsetX, offsetY, renderW, renderH);
+    ctx.restore();
   } else {
     drawImagePlacementMarker(ctx, 0, 0, W, splitY, isDark, fontFamily);
     strokeImagePlacementOutline(ctx, 0, 0, W, splitY, isDark);
@@ -695,15 +740,15 @@ export async function drawImageOrPlaceholder(
     let offsetX = 0;
     let offsetY = 0;
     if (img.width && img.height) {
-      const imgRatio = img.width / img.height;
-      const canvasRatio = w / h;
-      if (imgRatio > canvasRatio) {
-        renderW = h * imgRatio;
-        offsetX = (w - renderW) / 2;
-      } else {
-        renderH = w / imgRatio;
-        offsetY = (h - renderH) / 2;
-      }
+      // מיקוד עליון — מונע חיתוך ראשים ב־cover ממורכז
+      ({ renderW, renderH, offsetX, offsetY } = coverFitRect(
+        img.width,
+        img.height,
+        w,
+        h,
+        0.5,
+        0
+      ));
     }
     ctx.drawImage(img, x + offsetX, y + offsetY, renderW, renderH);
     ctx.restore();
@@ -818,7 +863,7 @@ export async function drawImagePolaroid(
   override: SlideOverride = {},
   imageUrl?: string, fontFamily: string = 'Heebo, sans-serif', shouldAbort?: () => boolean
 ): Promise<void> {
-  const bg = isDark ? '#111827' : '#f9fafb';
+  const bg = resolveSurfaceBg(isDark, override, '#f9fafb', '#111827');
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
@@ -891,7 +936,7 @@ export async function drawImageMagazine(
 ): Promise<void> {
   const splitY = H * 0.8;
   
-  const bg = isDark ? '#111827' : '#ffffff';
+  const bg = resolveSurfaceBg(isDark, override, '#ffffff', '#111827');
   ctx.fillStyle = bg;
   ctx.fillRect(0, splitY, W, H - splitY);
 
@@ -946,7 +991,7 @@ export async function drawImageArch(
   override: SlideOverride = {},
   imageUrl?: string, fontFamily: string = 'Heebo, sans-serif', shouldAbort?: () => boolean
 ): Promise<void> {
-  const bg = isDark ? '#111827' : '#f9fafb';
+  const bg = resolveSurfaceBg(isDark, override, '#f9fafb', '#111827');
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 

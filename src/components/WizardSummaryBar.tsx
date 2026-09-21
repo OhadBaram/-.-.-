@@ -63,8 +63,9 @@ export default function WizardSummaryBar({
             type="button"
             onClick={onChangeSettings}
             className="text-xs font-bold px-2.5 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600 transition"
+            title="חוזרים לאשף — הקרוסלה נשמרת"
           >
-            שנה
+            הגדרות אשף
           </button>
         </div>
       </div>

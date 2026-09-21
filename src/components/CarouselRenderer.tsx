@@ -6,6 +6,16 @@ import { saveAs } from 'file-saver';
 import { jsPDF } from 'jspdf';
 import SlideEditor from '@/components/SlideEditor';
 import CopilotWidget from '@/components/CopilotWidget';
+import BrandPalettePicker from '@/components/BrandPalettePicker';
+import { MAX_SLIDE_COUNT } from '@/lib/wizard';
+import {
+  clampPalette,
+  colorForSlide,
+  backgroundForSlide,
+  parseBrandPalette,
+  primaryBrandColor,
+  type BrandPalette,
+} from '@/lib/brand-palette';
 
 import {
   drawMinimal, drawBold, drawGradient, drawDarkLuxury, drawFrame, drawSplit,
@@ -240,11 +250,14 @@ function detectCarouselLayoutPreset(slides: Slide[]): CarouselLayoutPresetId {
 export interface SlideOverride {
   fontSize?: number;
   textY?: number;
+  surfaceBg?: string;
 }
 
 interface CarouselRendererProps {
   slides: Slide[];
   brandColor?: string;
+  brandPalette?: BrandPalette;
+  onBrandPaletteChange?: (palette: BrandPalette) => void;
   slideOverrides?: Record<number, SlideOverride>;
   onGoBack?: () => void;
 }
@@ -252,13 +265,28 @@ interface CarouselRendererProps {
 export default function CarouselRenderer({
   slides,
   brandColor: initialBrandColor = '#6366f1',
+  brandPalette: initialBrandPalette,
+  onBrandPaletteChange,
   slideOverrides: initialSlideOverrides = {},
   onGoBack,
 }: CarouselRendererProps) {
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const drawGenerationRef = useRef(0);
   const [isExporting, setIsExporting] = useState(false);
-  const [activeBrandColor, setActiveBrandColor] = useState(initialBrandColor);
+  const [brandPalette, setBrandPaletteState] = useState<BrandPalette>(() =>
+    clampPalette(
+      initialBrandPalette ?? parseBrandPalette(initialBrandColor)
+    )
+  );
+  const setBrandPalette = (next: BrandPalette | ((prev: BrandPalette) => BrandPalette)) => {
+    setBrandPaletteState((prev) => {
+      const resolved = typeof next === 'function' ? next(prev) : next;
+      const cleaned = clampPalette(resolved);
+      onBrandPaletteChange?.(cleaned);
+      return cleaned;
+    });
+  };
+  const activeBrandColor = primaryBrandColor(brandPalette);
   const [localSlides, setLocalSlides] = useState<Slide[]>(() => withDefaultTemplates(slides));
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window === 'undefined') return 'light';
@@ -269,11 +297,16 @@ export default function CarouselRenderer({
 
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [slideOverrides, setSlideOverrides] = useState<Record<number, { fontSize?: number; textY?: number }>>(initialSlideOverrides);
+  const [slideOverrides, setSlideOverrides] = useState<Record<number, SlideOverride>>(initialSlideOverrides);
   const [remixingIndex, setRemixingIndex] = useState<number | null>(null);
+  const [remixSuggestions, setRemixSuggestions] = useState<
+    Record<number, string>
+  >({});
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [advancedPanel, setAdvancedPanel] = useState<AdvancedPanelId>('layout');
   const [showMoreTemplates, setShowMoreTemplates] = useState(false);
+  const [dragFromIndex, setDragFromIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const activeSlide = localSlides[activeSlideIndex];
   const activeSlideTemplate = activeSlide ? getSlideTemplate(activeSlide) : DEFAULT_TEXT_TEMPLATE;
@@ -292,18 +325,44 @@ export default function CarouselRenderer({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ currentText }),
       });
-      if (!res.ok) throw new Error('Failed to remix');
-      const data = await res.json();
-      
-      const newSlides = [...localSlides];
-      newSlides[index] = { ...newSlides[index], text: data.newText };
-      setLocalSlides(newSlides);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || data.error || 'Failed to remix');
+      }
+      if (!data.newText) throw new Error('Empty remix result');
+
+      // המלצה בלבד — לא מחליפים את הטקסט עד שהמשתמש מאשר
+      setRemixSuggestions((prev) => ({ ...prev, [index]: data.newText }));
     } catch (err) {
       console.error(err);
       alert('אירעה שגיאה בשיכתוב השקף.');
     } finally {
       setRemixingIndex(null);
     }
+  };
+
+  const applyRemixSuggestion = (index: number) => {
+    const suggestion = remixSuggestions[index];
+    if (!suggestion) return;
+    setLocalSlides((prev) => {
+      const next = [...prev];
+      if (!next[index]) return prev;
+      next[index] = { ...next[index], text: suggestion };
+      return next;
+    });
+    setRemixSuggestions((prev) => {
+      const next = { ...prev };
+      delete next[index];
+      return next;
+    });
+  };
+
+  const dismissRemixSuggestion = (index: number) => {
+    setRemixSuggestions((prev) => {
+      const next = { ...prev };
+      delete next[index];
+      return next;
+    });
   };
 
   const drawSlide = useCallback(
@@ -321,15 +380,21 @@ export default function CarouselRenderer({
         generation !== undefined && generation !== drawGenerationRef.current;
       if (isStale()) return;
 
-      const currentOverride = override ?? slideOverrides[slideIndex] ?? {};
-      const isDark          = theme === 'dark';
-      const W               = CANVAS_WIDTH;
-      const H               = CANVAS_HEIGHT;
-      const text            = slide.text;
+      const isDark = theme === 'dark';
+      const W = CANVAS_WIDTH;
+      const H = CANVAS_HEIGHT;
+      const text = slide.text;
       // Quote family names so multi-word fonts (e.g. Playpen Sans Hebrew) work in canvas.
-      const fontFamily      = `"${globalFont}", sans-serif`;
+      const fontFamily = `"${globalFont}", sans-serif`;
       // רק תמונת השקף הנוכחי — אין נפילה לתמונה של שקף אחר
-      const slideImageUrl   = slide.imageUrl;
+      const slideImageUrl = slide.imageUrl;
+      const slideBrandColor = colorForSlide(brandPalette, slideIndex);
+      const currentOverride = {
+        ...(override ?? slideOverrides[slideIndex] ?? {}),
+        surfaceBg:
+          backgroundForSlide(brandPalette, slideIndex, isDark) ||
+          (override ?? slideOverrides[slideIndex] ?? {}).surfaceBg,
+      };
 
       if (typeof document !== 'undefined' && document.fonts?.load) {
         try {
@@ -345,33 +410,33 @@ export default function CarouselRenderer({
       ctx.globalAlpha = 1;
 
       switch (tpl) {
-        case 'minimal':     drawMinimal    (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
-        case 'bold':        drawBold       (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
-        case 'gradient':    drawGradient   (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
-        case 'dark-luxury': drawDarkLuxury (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
-        case 'frame':       drawFrame      (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
-        case 'split':       drawSplit      (ctx, W, H, text, activeBrandColor, isDark, slideIndex, currentOverride, fontFamily);  break;
-        case 'story':       drawStory      (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
-        case 'quote':       drawQuote      (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
-        case 'numbered':    drawNumbered   (ctx, W, H, text, activeBrandColor, isDark, slideIndex, currentOverride, fontFamily);  break;
-        case 'magazine':    drawMagazine   (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
-        case 'waves':       drawWaves      (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
-        case 'neon':        drawNeon       (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);              break;
-        case 'image-split': await drawImageSplit(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
-        case 'image-full-dark': await drawImageFullDark(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
-        case 'image-circle-profile': await drawImageCircle(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
-        case 'image-split-bottom': await drawImageSplitBottom(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
-        case 'image-polaroid': await drawImagePolaroid(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
-        case 'image-side': await drawImageSide(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
-        case 'image-magazine': await drawImageMagazine(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
-        case 'image-overlay': await drawImageOverlay(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
-        case 'image-arch': await drawImageArch(ctx, W, H, text, activeBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
-        default:            drawMinimal    (ctx, W, H, text, activeBrandColor, isDark, currentOverride, fontFamily);
+        case 'minimal':     drawMinimal    (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'bold':        drawBold       (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'gradient':    drawGradient   (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'dark-luxury': drawDarkLuxury (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'frame':       drawFrame      (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'split':       drawSplit      (ctx, W, H, text, slideBrandColor, isDark, slideIndex, currentOverride, fontFamily);  break;
+        case 'story':       drawStory      (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'quote':       drawQuote      (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'numbered':    drawNumbered   (ctx, W, H, text, slideBrandColor, isDark, slideIndex, currentOverride, fontFamily);  break;
+        case 'magazine':    drawMagazine   (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'waves':       drawWaves      (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'neon':        drawNeon       (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);              break;
+        case 'image-split': await drawImageSplit(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-full-dark': await drawImageFullDark(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-circle-profile': await drawImageCircle(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-split-bottom': await drawImageSplitBottom(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-polaroid': await drawImagePolaroid(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-side': await drawImageSide(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-magazine': await drawImageMagazine(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-overlay': await drawImageOverlay(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-arch': await drawImageArch(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        default:            drawMinimal    (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);
       }
 
       if (isStale()) return;
     },
-    [theme, activeBrandColor, slideOverrides, globalFont]
+    [theme, brandPalette, slideOverrides, globalFont]
   );
 
   React.useEffect(() => {
@@ -501,20 +566,123 @@ export default function CarouselRenderer({
 
   const toggleTheme = () => setTheme((t) => (t === 'light' ? 'dark' : 'light'));
 
+  const remapIndexRecord = <T,>(
+    prev: Record<number, T>,
+    mapIndex: (i: number) => number | null
+  ): Record<number, T> => {
+    const next: Record<number, T> = {};
+    Object.entries(prev).forEach(([key, value]) => {
+      const mapped = mapIndex(Number(key));
+      if (mapped != null) next[mapped] = value;
+    });
+    return next;
+  };
+
   const removeSlide = (index: number) => {
     if (localSlides.length <= 1) return;
     setLocalSlides((prev) => prev.filter((_, i) => i !== index));
-    setSlideOverrides((prev) => {
-      const next: Record<number, { fontSize?: number; textY?: number }> = {};
-      Object.entries(prev).forEach(([key, value]) => {
-        const i = Number(key);
-        if (i < index) next[i] = value;
-        else if (i > index) next[i - 1] = value;
-      });
-      return next;
-    });
+    setSlideOverrides((prev) =>
+      remapIndexRecord(prev, (i) => {
+        if (i === index) return null;
+        return i > index ? i - 1 : i;
+      })
+    );
+    setRemixSuggestions((prev) =>
+      remapIndexRecord(prev, (i) => {
+        if (i === index) return null;
+        return i > index ? i - 1 : i;
+      })
+    );
     setActiveSlideIndex((i) => Math.max(0, Math.min(i, localSlides.length - 2)));
     setEditingIndex(null);
+  };
+
+  const addSlide = (afterIndex: number = activeSlideIndex) => {
+    if (localSlides.length >= MAX_SLIDE_COUNT) return;
+    const source = localSlides[afterIndex] || localSlides[localSlides.length - 1];
+    const insertAt = Math.min(afterIndex + 1, localSlides.length);
+    const newSlide: Slide = {
+      id: `slide-${Date.now()}-${insertAt + 1}`,
+      text: 'שקף חדש — ערכו כאן',
+      backgroundColor: source?.backgroundColor || '#ffffff',
+      textColor: source?.textColor || '#111827',
+      template: source?.template || 'minimal',
+    };
+
+    setLocalSlides((prev) => {
+      const next = [...prev];
+      next.splice(insertAt, 0, newSlide);
+      return next;
+    });
+    setSlideOverrides((prev) =>
+      remapIndexRecord(prev, (i) => (i >= insertAt ? i + 1 : i))
+    );
+    setRemixSuggestions((prev) =>
+      remapIndexRecord(prev, (i) => (i >= insertAt ? i + 1 : i))
+    );
+    setActiveSlideIndex(insertAt);
+    setEditingIndex(null);
+  };
+
+  const reorderSlides = (fromIndex: number, toIndex: number) => {
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= localSlides.length ||
+      toIndex >= localSlides.length
+    ) {
+      return;
+    }
+
+    setLocalSlides((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+
+    const remapOverrideArray = <T,>(prev: Record<number, T>) => {
+      const ordered = localSlides.map((_, i) => prev[i]);
+      const [moved] = ordered.splice(fromIndex, 1);
+      ordered.splice(toIndex, 0, moved);
+      const next: Record<number, T> = {};
+      ordered.forEach((value, i) => {
+        if (value !== undefined) next[i] = value;
+      });
+      return next;
+    };
+
+    setSlideOverrides((prev) => remapOverrideArray(prev));
+    setRemixSuggestions((prev) => remapOverrideArray(prev));
+
+    setActiveSlideIndex((current) => {
+      if (current === fromIndex) return toIndex;
+      if (fromIndex < current && toIndex >= current) return current - 1;
+      if (fromIndex > current && toIndex <= current) return current + 1;
+      return current;
+    });
+
+    setEditingIndex((current) => {
+      if (current == null) return null;
+      if (current === fromIndex) return toIndex;
+      if (fromIndex < current && toIndex >= current) return current - 1;
+      if (fromIndex > current && toIndex <= current) return current + 1;
+      return current;
+    });
+
+    setRemixingIndex((current) => {
+      if (current == null) return null;
+      if (current === fromIndex) return toIndex;
+      if (fromIndex < current && toIndex >= current) return current - 1;
+      if (fromIndex > current && toIndex <= current) return current + 1;
+      return current;
+    });
+  };
+
+  const clearDragState = () => {
+    setDragFromIndex(null);
+    setDragOverIndex(null);
   };
 
   return (
@@ -570,31 +738,88 @@ export default function CarouselRenderer({
               </div>
             )}
 
-            <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">שקפים</h4>
+            <div className="mb-4 pb-4 border-b border-gray-100 dark:border-gray-700">
+              <BrandPalettePicker
+                value={brandPalette}
+                onChange={setBrandPalette}
+                variant="compact"
+              />
+            </div>
+
+            <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
+              שקפים
+            </h4>
+            <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-2">
+              גררו לשינוי סדר · לחצו לבחירה
+            </p>
             <div className="flex flex-col gap-2">
-              {localSlides.map((slide, i) => (
-                <div
-                  key={slide.id}
-                  onClick={() => setActiveSlideIndex(i)}
-                  className={`p-3 border rounded cursor-pointer transition-colors ${
-                    i === activeSlideIndex
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2 mb-0.5">
-                    <div className="font-bold text-sm text-gray-600 dark:text-gray-400">שקף {i + 1}</div>
-                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 shrink-0">
-                      {isImageTemplate(getSlideTemplate(slide))
-                        ? slide.imageUrl
-                          ? 'תמונה הועלתה'
-                          : 'ממתין לתמונה'
-                        : 'טקסט'}
-                    </span>
+              {localSlides.map((slide, i) => {
+                const isDragging = dragFromIndex === i;
+                const isDropTarget =
+                  dragOverIndex === i &&
+                  dragFromIndex != null &&
+                  dragFromIndex !== i;
+                return (
+                  <div
+                    key={slide.id}
+                    draggable
+                    onDragStart={(e) => {
+                      setDragFromIndex(i);
+                      e.dataTransfer.effectAllowed = 'move';
+                      e.dataTransfer.setData('text/plain', String(i));
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      if (dragOverIndex !== i) setDragOverIndex(i);
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverIndex === i) setDragOverIndex(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const from = dragFromIndex ?? Number(e.dataTransfer.getData('text/plain'));
+                      if (Number.isFinite(from)) reorderSlides(from, i);
+                      clearDragState();
+                    }}
+                    onDragEnd={clearDragState}
+                    onClick={() => setActiveSlideIndex(i)}
+                    className={`p-3 border rounded cursor-grab active:cursor-grabbing transition-all select-none ${
+                      i === activeSlideIndex
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    } ${isDragging ? 'opacity-40 scale-[0.98]' : ''} ${
+                      isDropTarget
+                        ? 'ring-2 ring-blue-400 border-blue-400'
+                        : ''
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className="text-gray-400 dark:text-gray-500 text-sm leading-none shrink-0"
+                          aria-hidden
+                        >
+                          ⋮⋮
+                        </span>
+                        <div className="font-bold text-sm text-gray-600 dark:text-gray-400">
+                          שקף {i + 1}
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 shrink-0">
+                        {isImageTemplate(getSlideTemplate(slide))
+                          ? slide.imageUrl
+                            ? 'תמונה הועלתה'
+                            : 'ממתין לתמונה'
+                          : 'טקסט'}
+                      </span>
+                    </div>
+                    <div className="text-sm text-gray-800 dark:text-gray-200 truncate pr-5">
+                      {slide.text}
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-800 dark:text-gray-200 truncate">{slide.text}</div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
 
@@ -670,9 +895,14 @@ export default function CarouselRenderer({
                       )}
                     </div>
 
-                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 space-y-3">
+                      <BrandPalettePicker
+                        value={brandPalette}
+                        onChange={setBrandPalette}
+                        variant="compact"
+                      />
                       <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
-                        ערכת צבעי שקפים
+                        מצב בהיר / כהה
                       </h4>
                       <button
                         type="button"
@@ -821,7 +1051,14 @@ export default function CarouselRenderer({
                     onChangeTemplate={handleChangeTemplateFromCopilot}
                     onChangeFont={(font) => setGlobalFont(font)}
                     onChangeColors={(color, newTheme) => {
-                      if (color) setActiveBrandColor(color);
+                      if (color) {
+                        setBrandPalette((prev) =>
+                          clampPalette({
+                            ...prev,
+                            accents: [color, ...prev.accents.slice(1)],
+                          })
+                        );
+                      }
                       if (newTheme === 'light' || newTheme === 'dark') setTheme(newTheme);
                     }}
                   />
@@ -838,8 +1075,13 @@ export default function CarouselRenderer({
         <div className="flex justify-between items-center p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm z-10 shrink-0">
           <div className="flex items-center gap-4">
             {onGoBack && (
-              <button onClick={onGoBack} className="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white transition px-2">
-                ← חזור
+              <button
+                type="button"
+                onClick={onGoBack}
+                className="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white transition px-2"
+                title="חוזרים לאשף — הקרוסלה נשמרת"
+              >
+                ← אשף
               </button>
             )}
             <h2 className="font-bold text-xl text-gray-800 dark:text-gray-100">
@@ -893,15 +1135,33 @@ export default function CarouselRenderer({
           {localSlides[activeSlideIndex] && (
             <div className="w-full max-w-xl">
               
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="font-bold text-gray-700 dark:text-gray-300">עריכת שקף {activeSlideIndex + 1}</h3>
-            <button 
-              onClick={() => removeSlide(activeSlideIndex)}
-              className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded text-sm transition-colors"
-              disabled={localSlides.length <= 1}
-            >
-              🗑️ מחק שקף זה
-            </button>
+          <div className="flex justify-between items-center mb-4 gap-2">
+            <h3 className="font-bold text-gray-700 dark:text-gray-300">
+              עריכת שקף {activeSlideIndex + 1}
+            </h3>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => addSlide(activeSlideIndex)}
+                disabled={localSlides.length >= MAX_SLIDE_COUNT}
+                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 p-2 rounded text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                title={
+                  localSlides.length >= MAX_SLIDE_COUNT
+                    ? `מקסימום ${MAX_SLIDE_COUNT} שקפים`
+                    : 'הוסף שקף אחרי הנוכחי'
+                }
+              >
+                + הוסף שקף
+              </button>
+              <button
+                type="button"
+                onClick={() => removeSlide(activeSlideIndex)}
+                className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded text-sm transition-colors disabled:opacity-40"
+                disabled={localSlides.length <= 1}
+              >
+                מחק שקף זה
+              </button>
+            </div>
           </div>
           <SlideEditor
                 slide={localSlides[activeSlideIndex]}
@@ -927,27 +1187,74 @@ export default function CarouselRenderer({
                 onImageUpload={handleSlideImageUpload}
                 onImageClear={handleSlideImageClear}
                 remixingIndex={remixingIndex}
+                remixSuggestion={remixSuggestions[activeSlideIndex]}
                 onRemix={handleRemix}
+                onApplyRemix={applyRemixSuggestion}
+                onDismissRemix={dismissRemixSuggestion}
               />
             </div>
           )}
         </div>
 
         {/* Bottom Filmstrip (Optional) */}
-        <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex gap-3 overflow-x-auto">
-          {localSlides.map((_, i) => (
-            <button 
-              key={i} 
-              onClick={() => setActiveSlideIndex(i)}
-              className={`shrink-0 w-12 h-12 rounded font-bold shadow-sm transition-colors ${
-                i === activeSlideIndex 
-                  ? 'bg-blue-600 text-white border-2 border-blue-600' 
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
-              }`}
-            >
-              {i + 1}
-            </button>
-          ))}
+        <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex gap-3 overflow-x-auto items-center">
+          {localSlides.map((slide, i) => {
+            const isDragging = dragFromIndex === i;
+            const isDropTarget =
+              dragOverIndex === i &&
+              dragFromIndex != null &&
+              dragFromIndex !== i;
+            return (
+              <button
+                key={slide.id}
+                type="button"
+                draggable
+                onDragStart={(e) => {
+                  setDragFromIndex(i);
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', String(i));
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  if (dragOverIndex !== i) setDragOverIndex(i);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const from =
+                    dragFromIndex ?? Number(e.dataTransfer.getData('text/plain'));
+                  if (Number.isFinite(from)) reorderSlides(from, i);
+                  clearDragState();
+                }}
+                onDragEnd={clearDragState}
+                onClick={() => setActiveSlideIndex(i)}
+                className={`shrink-0 w-12 h-12 rounded font-bold shadow-sm transition-all cursor-grab active:cursor-grabbing ${
+                  i === activeSlideIndex
+                    ? 'bg-blue-600 text-white border-2 border-blue-600'
+                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
+                } ${isDragging ? 'opacity-40' : ''} ${
+                  isDropTarget ? 'ring-2 ring-offset-1 ring-blue-400' : ''
+                }`}
+                title="גררו לשינוי סדר"
+              >
+                {i + 1}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => addSlide(activeSlideIndex)}
+            disabled={localSlides.length >= MAX_SLIDE_COUNT}
+            className="shrink-0 w-12 h-12 rounded border-2 border-dashed border-blue-400 text-blue-600 font-black text-xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title={
+              localSlides.length >= MAX_SLIDE_COUNT
+                ? `מקסימום ${MAX_SLIDE_COUNT} שקפים`
+                : 'הוסף שקף'
+            }
+            aria-label="הוסף שקף"
+          >
+            +
+          </button>
         </div>
       </div>
     </div>

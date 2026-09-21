@@ -11,6 +11,12 @@ import {
   formatWizardSummaryLine,
   type WizardPackageMeta,
 } from '@/lib/wizard';
+import {
+  clampPalette,
+  parseBrandPalette,
+  primaryBrandColor,
+  type BrandPalette,
+} from '@/lib/brand-palette';
 
 interface CarouselCreatorProps {
   userName?: string;
@@ -49,8 +55,14 @@ export default function CarouselCreator({
   const [copyFeedback, setCopyFeedback] = useState('');
   const [isApproved, setIsApproved] = useState(false);
   const [wizardMeta, setWizardMeta] = useState<WizardPackageMeta | null>(null);
+  const [showWizardOverDraft, setShowWizardOverDraft] = useState(false);
+  const [brandPalette, setBrandPalette] = useState<BrandPalette>(() =>
+    parseBrandPalette(brandColor)
+  );
 
-  const resetPackage = () => {
+  const hasDraft = Boolean(slides && slides.length > 0);
+
+  const clearPackage = () => {
     setSlides(null);
     setExplanation(null);
     setCaption('');
@@ -58,11 +70,42 @@ export default function CarouselCreator({
     setCopyFeedback('');
     setIsApproved(false);
     setWizardMeta(null);
+    setShowWizardOverDraft(false);
+  };
+
+  const goToWizardKeepDraft = () => {
+    setShowWizardOverDraft(true);
+  };
+
+  const resumeEditor = () => {
+    if (!hasDraft) return;
+    setShowWizardOverDraft(false);
+    setIsApproved(true);
+    setExplanation(null);
+  };
+
+  const discardDraftAndStayInWizard = () => {
+    const ok = window.confirm(
+      'למחוק את הקרוסלה שבעריכה ולהתחיל מחדש באשף? הפעולה אינה הפיכה.'
+    );
+    if (!ok) return;
+    clearPackage();
   };
 
   const handleGenerate = async (data: CreationWizardSubmitPayload) => {
+    if (hasDraft) {
+      const ok = window.confirm(
+        'יצירה מחדש תחליף את הקרוסלה שבעריכה. להמשיך?'
+      );
+      if (!ok) return;
+    }
+
     setIsLoading(true);
+    setShowWizardOverDraft(false);
     setWizardMeta(metaFromSubmit(data));
+    if (data.brandColors) {
+      setBrandPalette(clampPalette(data.brandColors));
+    }
 
     try {
       const res = await fetch('/api/generate', {
@@ -96,14 +139,20 @@ export default function CarouselCreator({
             null,
         });
       }
-      if (result.explanation) setExplanation(result.explanation);
-      else setIsApproved(true);
+      if (result.explanation) {
+        setExplanation(result.explanation);
+        setIsApproved(false);
+      } else {
+        setExplanation(null);
+        setIsApproved(true);
+      }
     } catch (error: unknown) {
       console.error(error);
       const message =
         error instanceof Error ? error.message : 'שגיאה לא ידועה';
       alert(`אירעה שגיאה ביצירת הקרוסלה: ${message}`);
-      setWizardMeta(null);
+      if (!hasDraft) setWizardMeta(null);
+      else setShowWizardOverDraft(true);
     } finally {
       setIsLoading(false);
     }
@@ -119,13 +168,40 @@ export default function CarouselCreator({
     }
   };
 
-  if (!slides) {
-    return isLoading ? (
-      <div className="min-h-screen bg-[#0c0f14] flex items-center justify-center p-4">
-        <SkeletonLoader />
-      </div>
-    ) : (
-      <div className="p-3 md:p-6 max-w-6xl mx-auto">
+  const wizardNode = (
+    <div className="p-3 md:p-6 max-w-6xl mx-auto space-y-3">
+      {hasDraft && showWizardOverDraft ? (
+        <div
+          className="rounded-2xl border border-amber-400/40 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 justify-between"
+          dir="rtl"
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-amber-900 dark:text-amber-100">
+              הקרוסלה שערכתם שמורה ({slides!.length} שקפים)
+            </p>
+            <p className="text-xs text-amber-800/80 dark:text-amber-200/80 mt-0.5">
+              אפשר לחזור לעורך בלי לאבד שינויים. יצירה מחדש תחליף אותה.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={resumeEditor}
+              className="text-sm font-bold px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-white transition"
+            >
+              חזרה לעורך
+            </button>
+            <button
+              type="button"
+              onClick={discardDraftAndStayInWizard}
+              className="text-sm font-bold px-4 py-2 rounded-xl border border-amber-500/50 text-amber-900 dark:text-amber-100 hover:bg-amber-100/80 dark:hover:bg-amber-900/50 transition"
+            >
+              מחק והתחל מחדש
+            </button>
+          </div>
+        </div>
+      ) : null}
+
         <CreationWizard
           userName={userName}
           onSubmit={handleGenerate}
@@ -134,11 +210,25 @@ export default function CarouselCreator({
           initialReferenceLink1={initialReferenceLink1}
           initialReferenceLink2={initialReferenceLink2}
           initialReferenceLink3={initialReferenceLink3}
+          initialBrandPalette={brandPalette}
         />
+    </div>
+  );
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#0c0f14] flex items-center justify-center p-4">
+        <SkeletonLoader />
       </div>
     );
   }
 
+  // אשף — מצב ראשוני, או חזרה מהעורך עם טיוטה שמורה
+  if (!hasDraft || showWizardOverDraft) {
+    return wizardNode;
+  }
+
+  // מסך סיכום חבילה לפני העורך
   if (!isApproved && explanation) {
     const hashtagLine = hashtags.join(' ');
     return (
@@ -214,10 +304,10 @@ export default function CarouselCreator({
             מעולה, בוא נראה את הקרוסלה
           </button>
           <button
-            onClick={resetPackage}
+            onClick={goToWizardKeepDraft}
             className="py-3 px-6 bg-white/5 hover:bg-white/10 text-zinc-200 border border-white/10 font-bold rounded-xl transition-colors text-lg"
           >
-            חזרה לאשף
+            חזרה לאשף (הקרוסלה נשמרת)
           </button>
         </div>
       </div>
@@ -229,16 +319,18 @@ export default function CarouselCreator({
       {wizardMeta ? (
         <WizardSummaryBar
           meta={wizardMeta}
-          onChangeSettings={resetPackage}
+          onChangeSettings={goToWizardKeepDraft}
           caption={caption}
           hashtags={hashtags}
         />
       ) : null}
       <div className="flex-1 min-h-0 relative">
         <CarouselRenderer
-          slides={slides}
-          brandColor={brandColor}
-          onGoBack={resetPackage}
+          slides={slides!}
+          brandColor={primaryBrandColor(brandPalette)}
+          brandPalette={brandPalette}
+          onBrandPaletteChange={setBrandPalette}
+          onGoBack={goToWizardKeepDraft}
         />
       </div>
     </div>
