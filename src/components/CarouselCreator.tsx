@@ -5,18 +5,23 @@ import CarouselRenderer, { Slide } from '@/components/CarouselRenderer';
 import CreationWizard, {
   type CreationWizardSubmitPayload,
 } from '@/components/CreationWizard';
+import FastPathWizard from '@/components/FastPathWizard';
+import type { CreationSubmitPayload } from '@/lib/creation-flow/build-payload';
 import SkeletonLoader from '@/components/SkeletonLoader';
 import WizardSummaryBar from '@/components/WizardSummaryBar';
-import {
-  formatWizardSummaryLine,
-  type WizardPackageMeta,
-} from '@/lib/wizard';
+import { type WizardPackageMeta } from '@/lib/wizard';
 import {
   clampPalette,
   parseBrandPalette,
   primaryBrandColor,
   type BrandPalette,
 } from '@/lib/brand-palette';
+import { applyCoverImageToSlides } from '@/lib/contracts/cover-image';
+import {
+  DEFAULT_PUBLISH_TARGET,
+  parsePublishTarget,
+  type PublishTarget,
+} from '@/lib/contracts/publish-target';
 
 interface CarouselCreatorProps {
   userName?: string;
@@ -28,7 +33,7 @@ interface CarouselCreatorProps {
 }
 
 function metaFromSubmit(
-  data: CreationWizardSubmitPayload
+  data: CreationWizardSubmitPayload | CreationSubmitPayload
 ): WizardPackageMeta {
   return {
     slideCount: data.slideCount,
@@ -52,10 +57,12 @@ export default function CarouselCreator({
   const [explanation, setExplanation] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
   const [hashtags, setHashtags] = useState<string[]>([]);
-  const [copyFeedback, setCopyFeedback] = useState('');
-  const [isApproved, setIsApproved] = useState(false);
   const [wizardMeta, setWizardMeta] = useState<WizardPackageMeta | null>(null);
   const [showWizardOverDraft, setShowWizardOverDraft] = useState(false);
+  const [publishTarget, setPublishTarget] = useState<PublishTarget>(
+    DEFAULT_PUBLISH_TARGET
+  );
+  const [wizardMode, setWizardMode] = useState<'fast' | 'full'>('fast');
   const [brandPalette, setBrandPalette] = useState<BrandPalette>(() =>
     parseBrandPalette(brandColor)
   );
@@ -67,10 +74,9 @@ export default function CarouselCreator({
     setExplanation(null);
     setCaption('');
     setHashtags([]);
-    setCopyFeedback('');
-    setIsApproved(false);
     setWizardMeta(null);
     setShowWizardOverDraft(false);
+    setPublishTarget(DEFAULT_PUBLISH_TARGET);
   };
 
   const goToWizardKeepDraft = () => {
@@ -80,8 +86,6 @@ export default function CarouselCreator({
   const resumeEditor = () => {
     if (!hasDraft) return;
     setShowWizardOverDraft(false);
-    setIsApproved(true);
-    setExplanation(null);
   };
 
   const discardDraftAndStayInWizard = () => {
@@ -92,7 +96,9 @@ export default function CarouselCreator({
     clearPackage();
   };
 
-  const handleGenerate = async (data: CreationWizardSubmitPayload) => {
+  const handleGenerate = async (
+    data: CreationWizardSubmitPayload | CreationSubmitPayload
+  ) => {
     if (hasDraft) {
       const ok = window.confirm(
         'יצירה מחדש תחליף את הקרוסלה שבעריכה. להמשיך?'
@@ -100,9 +106,11 @@ export default function CarouselCreator({
       if (!ok) return;
     }
 
+    const target = parsePublishTarget(data.publishTarget);
     setIsLoading(true);
     setShowWizardOverDraft(false);
     setWizardMeta(metaFromSubmit(data));
+    setPublishTarget(target);
     if (data.brandColors) {
       setBrandPalette(clampPalette(data.brandColors));
     }
@@ -111,7 +119,13 @@ export default function CarouselCreator({
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          publishTarget: target,
+          coverImageDataUrl: data.coverImageDataUrl,
+          coverImageApplyTo: data.coverImageApplyTo ?? 'first',
+          flowVariant: data.flowVariant ?? 'full',
+        }),
       });
 
       const result = await res.json();
@@ -120,32 +134,35 @@ export default function CarouselCreator({
         throw new Error(result.error || 'API error');
       }
 
-      setSlides(result.slides);
+      const rawSlides = Array.isArray(result.slides) ? result.slides : [];
+      const withCover = applyCoverImageToSlides(
+        rawSlides as Slide[],
+        data.coverImageDataUrl,
+        data.coverImageApplyTo ?? 'first'
+      );
+
+      setSlides(withCover);
       setCaption(typeof result.caption === 'string' ? result.caption : '');
       setHashtags(Array.isArray(result.hashtags) ? result.hashtags : []);
+      setPublishTarget(parsePublishTarget(result.publishTarget ?? target));
       if (result.wizardMeta && typeof result.wizardMeta === 'object') {
         setWizardMeta({
-          slideCount:
-            result.wizardMeta.slideCount ?? data.slideCount,
+          slideCount: result.wizardMeta.slideCount ?? data.slideCount,
           density: result.wizardMeta.density ?? data.density,
-          visualStyle:
-            result.wizardMeta.visualStyle ?? data.visualStyle,
+          visualStyle: result.wizardMeta.visualStyle ?? data.visualStyle,
           visualStyleCustom:
-            result.wizardMeta.visualStyleCustom ??
-            data.visualStyleCustom,
+            result.wizardMeta.visualStyleCustom ?? data.visualStyleCustom,
           directionTitle:
             result.wizardMeta.directionTitle ??
             data.narrativeDirection?.title ??
             null,
         });
       }
-      if (result.explanation) {
-        setExplanation(result.explanation);
-        setIsApproved(false);
-      } else {
-        setExplanation(null);
-        setIsApproved(true);
-      }
+      setExplanation(
+        typeof result.explanation === 'string' && result.explanation.trim()
+          ? result.explanation
+          : null
+      );
     } catch (error: unknown) {
       console.error(error);
       const message =
@@ -155,16 +172,6 @@ export default function CarouselCreator({
       else setShowWizardOverDraft(true);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const copyText = async (value: string, okMessage: string) => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopyFeedback(okMessage);
-      setTimeout(() => setCopyFeedback(''), 2200);
-    } catch {
-      setCopyFeedback('לא הצלחתי להעתיק — סמנו ידנית.');
     }
   };
 
@@ -202,16 +209,47 @@ export default function CarouselCreator({
         </div>
       ) : null}
 
-        <CreationWizard
+      {wizardMode === 'fast' ? (
+        <FastPathWizard
           userName={userName}
           onSubmit={handleGenerate}
           isLoading={isLoading}
+          onRequestFullPath={() => setWizardMode('full')}
           initialWebsiteUrl={initialWebsiteUrl}
           initialReferenceLink1={initialReferenceLink1}
           initialReferenceLink2={initialReferenceLink2}
           initialReferenceLink3={initialReferenceLink3}
           initialBrandPalette={brandPalette}
         />
+      ) : (
+        <div className="space-y-3">
+          <div
+            className="rounded-2xl border border-white/10 bg-[#111827] px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+            dir="rtl"
+          >
+            <p className="text-sm text-zinc-300">
+              מצב שליטה מלאה — צ׳אט, הגדרות וכיווני תוכן.
+            </p>
+            <button
+              type="button"
+              onClick={() => setWizardMode('fast')}
+              className="text-sm font-bold text-sky-300 hover:text-sky-200 underline underline-offset-2"
+            >
+              חזרה למסלול המהיר
+            </button>
+          </div>
+          <CreationWizard
+            userName={userName}
+            onSubmit={handleGenerate}
+            isLoading={isLoading}
+            initialWebsiteUrl={initialWebsiteUrl}
+            initialReferenceLink1={initialReferenceLink1}
+            initialReferenceLink2={initialReferenceLink2}
+            initialReferenceLink3={initialReferenceLink3}
+            initialBrandPalette={brandPalette}
+          />
+        </div>
+      )}
     </div>
   );
 
@@ -223,95 +261,8 @@ export default function CarouselCreator({
     );
   }
 
-  // אשף — מצב ראשוני, או חזרה מהעורך עם טיוטה שמורה
   if (!hasDraft || showWizardOverDraft) {
     return wizardNode;
-  }
-
-  // מסך סיכום חבילה לפני העורך
-  if (!isApproved && explanation) {
-    const hashtagLine = hashtags.join(' ');
-    return (
-      <div
-        className="p-6 md:p-8 max-w-3xl mx-auto mt-6 md:mt-10 rounded-3xl border border-white/10 bg-[#111827] shadow-2xl"
-        dir="rtl"
-      >
-        <h2 className="text-2xl md:text-3xl font-black mb-5 text-indigo-300">
-          החבילה מוכנה
-        </h2>
-        {wizardMeta ? (
-          <p className="text-sm text-zinc-400 mb-4">
-            {formatWizardSummaryLine(wizardMeta)}
-          </p>
-        ) : null}
-        <div className="text-zinc-300 text-lg leading-relaxed mb-6 bg-indigo-500/10 p-6 rounded-2xl border border-indigo-400/20">
-          {explanation}
-        </div>
-
-        {(caption || hashtags.length > 0) && (
-          <div className="space-y-4 mb-8">
-            {caption ? (
-              <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                <div className="flex items-center justify-between gap-3 mb-2">
-                  <h3 className="font-bold text-zinc-100">כיתוב לפוסט</h3>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void copyText(caption, 'הכיתוב הועתק')
-                    }
-                    className="text-xs font-bold text-indigo-200 hover:text-white transition"
-                  >
-                    העתק
-                  </button>
-                </div>
-                <p className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed">
-                  {caption}
-                </p>
-              </div>
-            ) : null}
-
-            {hashtags.length > 0 ? (
-              <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                <div className="flex items-center justify-between gap-3 mb-2">
-                  <h3 className="font-bold text-zinc-100">חבילת האשטאגים</h3>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void copyText(hashtagLine, 'ההאשטאגים הועתקו')
-                    }
-                    className="text-xs font-bold text-indigo-200 hover:text-white transition"
-                  >
-                    העתק
-                  </button>
-                </div>
-                <p className="text-sm text-sky-200/90 leading-relaxed break-words">
-                  {hashtagLine}
-                </p>
-              </div>
-            ) : null}
-
-            {copyFeedback ? (
-              <p className="text-xs text-emerald-300/90">{copyFeedback}</p>
-            ) : null}
-          </div>
-        )}
-
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button
-            onClick={() => setIsApproved(true)}
-            className="flex-1 py-3 px-4 bg-indigo-500 hover:bg-indigo-400 text-white font-bold rounded-xl transition-colors text-lg"
-          >
-            מעולה, בוא נראה את הקרוסלה
-          </button>
-          <button
-            onClick={goToWizardKeepDraft}
-            className="py-3 px-6 bg-white/5 hover:bg-white/10 text-zinc-200 border border-white/10 font-bold rounded-xl transition-colors text-lg"
-          >
-            חזרה לאשף (הקרוסלה נשמרת)
-          </button>
-        </div>
-      </div>
-    );
   }
 
   return (
@@ -322,6 +273,7 @@ export default function CarouselCreator({
           onChangeSettings={goToWizardKeepDraft}
           caption={caption}
           hashtags={hashtags}
+          explanation={explanation}
         />
       ) : null}
       <div className="flex-1 min-h-0 relative">
@@ -331,6 +283,8 @@ export default function CarouselCreator({
           brandPalette={brandPalette}
           onBrandPaletteChange={setBrandPalette}
           onGoBack={goToWizardKeepDraft}
+          publishTarget={publishTarget}
+          onPublishTargetChange={setPublishTarget}
         />
       </div>
     </div>

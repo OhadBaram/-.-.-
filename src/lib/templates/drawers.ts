@@ -673,7 +673,7 @@ function drawImagePlacementMarker(
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.direction = 'rtl';
-  ctx.fillText('כאן תופיע התמונה', cx, cy + bodyH / 2 + 14 * iconScale);
+  ctx.fillText('לחצו להוספת תמונה', cx, cy + bodyH / 2 + 14 * iconScale);
 }
 
 function strokeImagePlacementOutline(

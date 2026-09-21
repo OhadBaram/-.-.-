@@ -1,18 +1,25 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { generateText } from '@/lib/services/ai.service';
 import { scrapeUrls } from '@/lib/services/scraper.service';
+import { requireSession } from '@/lib/api/require-session';
+import {
+  enforceRateLimit,
+  rateLimitSubjectFromRequest,
+} from '@/lib/api/rate-limit';
 
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireSession();
+    if (!auth.ok) return auth.response;
+
+    const rateLimited = await enforceRateLimit({
+      bucket: 'analyze',
+      subject: rateLimitSubjectFromRequest(auth.user.email, req),
+    });
+    if (rateLimited) return rateLimited;
 
     const { websiteUrl, referenceLink1 } = await req.json();
 
@@ -42,7 +49,7 @@ ${scrapedContext}
     let aiProvider = 'openrouter';
     try {
       const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
+        where: { email: auth.user.email },
         include: { workspaces: { include: { workspace: true } } }
       });
       if (user && user.workspaces.length > 0) {

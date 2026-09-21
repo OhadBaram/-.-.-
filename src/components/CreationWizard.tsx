@@ -24,24 +24,11 @@ import {
   recommendPaletteLocal,
   type BrandPalette,
 } from '@/lib/brand-palette';
+import { buildCreationSubmitPayload } from '@/lib/creation-flow/build-payload';
+import type { CreationSubmitPayload } from '@/lib/creation-flow/build-payload';
 
-export interface CreationWizardSubmitPayload {
-  topic: string;
-  audience: string;
-  goal: string;
-  brand: string;
-  brandColors: BrandPalette;
-  slideCount: number;
-  density: WizardOptions['density'];
-  visualStyle: WizardOptions['visualStyle'];
-  visualStyleCustom: string;
-  useRecommendedStructure: boolean;
-  narrativeDirection: NarrativeDirection;
-  websiteUrl?: string;
-  referenceLink1?: string;
-  referenceLink2?: string;
-  referenceLink3?: string;
-}
+/** תואם ל־CreationSubmitPayload לתאימות לאחור עם CarouselCreator */
+export type CreationWizardSubmitPayload = CreationSubmitPayload;
 
 interface CreationWizardProps {
   userName?: string;
@@ -95,6 +82,68 @@ function ChatBubbleText({ text }: { text: string }) {
   );
 }
 
+function DirectionPicker({
+  directions,
+  selectedDirectionId,
+  onSelect,
+  stylesLoading,
+  researchNote,
+  compact = false,
+}: {
+  directions: NarrativeDirection[];
+  selectedDirectionId: string | null;
+  onSelect: (id: string) => void;
+  stylesLoading: boolean;
+  researchNote?: string;
+  compact?: boolean;
+}) {
+  if (stylesLoading) {
+    return (
+      <p className="text-sm text-zinc-500 animate-pulse">
+        מנתח את הנושא ומציע שני כיווני תוכן…
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-amber-200/90 border border-amber-400/25 bg-amber-500/10 rounded-xl px-3 py-2 leading-snug">
+        בחרו כיוון תוכן אחד — ואז «צור חבילה» למטה. זה השלב הבא אחרי ההגדרות.
+      </p>
+      {researchNote && !compact ? (
+        <p className="text-sm text-zinc-400 leading-relaxed">{researchNote}</p>
+      ) : null}
+      <div className={`grid gap-3 ${compact ? 'grid-cols-1' : 'sm:grid-cols-2'}`}>
+        {directions.map((dir) => {
+          const selected = selectedDirectionId === dir.id;
+          return (
+            <button
+              key={dir.id}
+              type="button"
+              onClick={() => onSelect(dir.id)}
+              className={`text-right rounded-2xl border px-4 py-3.5 transition ${
+                selected
+                  ? 'border-sky-400/60 bg-sky-500/15 text-sky-50 shadow-[0_0_24px_-12px_rgba(56,189,248,0.7)]'
+                  : 'border-white/10 bg-white/[0.03] text-zinc-200 hover:bg-white/5'
+              }`}
+            >
+              <div className="font-black text-base mb-1">{dir.title}</div>
+              <p className="text-sm opacity-90 leading-snug mb-1.5">
+                {dir.summary}
+              </p>
+              {!compact ? (
+                <p className="text-xs text-zinc-400 leading-snug">
+                  {dir.whyItWorks}
+                </p>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function CreationWizard({
   userName,
   isLoading,
@@ -119,7 +168,6 @@ export default function CreationWizard({
   const [inputText, setInputText] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [stylesLoading, setStylesLoading] = useState(false);
-  const [showClassicHint, setShowClassicHint] = useState(false);
   const [intakeReady, setIntakeReady] = useState(false);
   const [phase, setPhase] = useState<WizardPhase>('topic');
   const [researchNote, setResearchNote] = useState('');
@@ -138,6 +186,7 @@ export default function CreationWizard({
 
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const nextStepRef = useRef<HTMLDivElement>(null);
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
@@ -151,10 +200,26 @@ export default function CreationWizard({
       });
     };
     scroll();
-    // אחרי רינדור של «הסוכן חושב…» / כיוונים
     const t = window.setTimeout(scroll, 50);
     return () => window.clearTimeout(t);
   }, [messages, chatLoading, stylesLoading, phase, directions, researchNote]);
+
+  /** בנייד אחרי «המשך» — מביאים את בחירת הכיוון מול העיניים (ליד כפתור היצירה) */
+  useEffect(() => {
+    if (phase !== 'styles') return;
+    const scrollToNextStep = () => {
+      nextStepRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    };
+    const t1 = window.setTimeout(scrollToNextStep, 80);
+    const t2 = window.setTimeout(scrollToNextStep, 400);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [phase, stylesLoading, directions.length]);
 
   const patchOptions = (partial: Partial<WizardOptions>) => {
     setOptions((prev) => ({ ...prev, ...partial }));
@@ -434,33 +499,30 @@ export default function CreationWizard({
       return;
     }
 
-    const styleMeta = VISUAL_STYLE_OPTIONS.find(
-      (s) => s.id === options.visualStyle
-    );
-    const brandParts = [
-      styleMeta?.promptHint || styleMeta?.label || '',
-      options.visualStyle === 'custom' ? options.visualStyleCustom : '',
-    ]
-      .filter(Boolean)
-      .join(' | ');
-
-    onSubmit({
-      topic,
-      audience: options.audience,
-      goal: options.goal,
-      brand: brandParts,
-      brandColors: clampPalette(brandPalette),
-      slideCount: options.slideCount,
-      density: options.density,
-      visualStyle: options.visualStyle,
-      visualStyleCustom: options.visualStyleCustom,
-      useRecommendedStructure: options.useRecommendedStructure,
-      narrativeDirection: selected,
-      websiteUrl: initialWebsiteUrl,
-      referenceLink1: initialReferenceLink1,
-      referenceLink2: initialReferenceLink2,
-      referenceLink3: initialReferenceLink3,
-    });
+    try {
+      onSubmit(
+        buildCreationSubmitPayload({
+          topic,
+          options,
+          brandPalette,
+          narrativeDirection: selected,
+          flowVariant: 'full',
+          publishTarget: 'instagram',
+          websiteUrl: initialWebsiteUrl || undefined,
+          referenceLink1: initialReferenceLink1 || undefined,
+          referenceLink2: initialReferenceLink2 || undefined,
+          referenceLink3: initialReferenceLink3 || undefined,
+        })
+      );
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          text: 'חסר נושא או כיוון תוכן. השלימו לפני היצירה.',
+        },
+      ]);
+    }
   };
 
   const topicRecommendedCount = topicDraft
@@ -494,8 +556,8 @@ export default function CreationWizard({
     ? 'אשר המלצות והמשך'
     : 'המשך עם ההגדרות הסופיות';
   const continueHint = settingsMatchRecommended
-    ? 'מאשר את ההמלצה כפי שהיא בפאנל ומציע שני כיווני תוכן.'
-    : 'משתמש במה שבפאנל עכשיו (מקור האמת) ומציע שני כיווני תוכן.';
+    ? 'מאשר את ההמלצה בפאנל ומציג כאן שני כיווני תוכן לבחירה.'
+    : 'משתמש במה שבפאנל ומציג כאן שני כיווני תוכן לבחירה.';
 
   const busy = isLoading || chatLoading || stylesLoading;
 
@@ -598,51 +660,20 @@ export default function CreationWizard({
             ))}
 
             {phase === 'styles' ? (
-              <div className="space-y-3 mt-1 animate-[wizardRise_0.5s_ease-out]">
-                {stylesLoading ? (
-                  <p className="text-sm text-zinc-500 animate-pulse">
-                    מנתח את הנושא ומציע שני כיווני תוכן…
-                  </p>
-                ) : (
-                  <>
-                    <p className="text-xs text-amber-200/80 border border-amber-400/20 bg-amber-500/5 rounded-xl px-3 py-2">
-                      כיוון תוכן = המלצה לסיפור. מספר השקפים, הסטייל והצפיפות
-                      נקבעים בפאנל ההגדרות הסופיות.
-                    </p>
-                    {researchNote ? (
-                      <p className="text-sm text-zinc-400 leading-relaxed">
-                        {researchNote}
-                      </p>
-                    ) : null}
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {directions.map((dir) => {
-                        const selected = selectedDirectionId === dir.id;
-                        return (
-                          <button
-                            key={dir.id}
-                            type="button"
-                            onClick={() => setSelectedDirectionId(dir.id)}
-                            className={`text-right rounded-2xl border px-4 py-4 transition ${
-                              selected
-                                ? 'border-sky-400/60 bg-sky-500/15 text-sky-50 shadow-[0_0_24px_-12px_rgba(56,189,248,0.7)]'
-                                : 'border-white/10 bg-white/[0.03] text-zinc-200 hover:bg-white/5'
-                            }`}
-                          >
-                            <div className="font-black text-base mb-1">
-                              {dir.title}
-                            </div>
-                            <p className="text-sm opacity-90 leading-snug mb-2">
-                              {dir.summary}
-                            </p>
-                            <p className="text-xs text-zinc-400 leading-snug">
-                              {dir.whyItWorks}
-                            </p>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
+              <div className="space-y-3 mt-1 animate-[wizardRise_0.5s_ease-out] hidden lg:block">
+                <DirectionPicker
+                  directions={directions}
+                  selectedDirectionId={selectedDirectionId}
+                  onSelect={setSelectedDirectionId}
+                  stylesLoading={stylesLoading}
+                  researchNote={researchNote}
+                />
+              </div>
+            ) : null}
+
+            {phase === 'styles' ? (
+              <div className="lg:hidden mt-1 rounded-2xl border border-sky-400/30 bg-sky-500/10 px-4 py-3 text-sm text-sky-100 leading-snug">
+                שני כיווני התוכן מופיעים למטה ליד «צור חבילה» — גללו לשם אם צריך.
               </div>
             ) : null}
 
@@ -879,19 +910,13 @@ export default function CreationWizard({
                     key={style.id}
                     type="button"
                     onClick={() => {
-                      if (style.stub) {
-                        patchOptions({ visualStyle: 'minimal' });
-                        setShowClassicHint(true);
-                        setTimeout(() => setShowClassicHint(false), 3200);
-                        return;
-                      }
                       patchOptions({ visualStyle: style.id });
                     }}
                     className={`text-right rounded-xl border px-3 py-2.5 transition ${
                       selected
                         ? 'border-sky-400/50 bg-sky-500/10 text-sky-50'
                         : 'border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/5'
-                    } ${style.stub ? 'opacity-70' : ''}`}
+                    }`}
                   >
                     <div className="font-bold text-sm">{style.label}</div>
                     <div className="text-[11px] opacity-75 mt-0.5 leading-snug">
@@ -901,11 +926,6 @@ export default function CreationWizard({
                 );
               })}
             </div>
-            {showClassicHint ? (
-              <p className="text-xs text-amber-200/90 animate-[wizardPop_0.3s_ease-out]">
-                העלאת צילומי מסך כהשראה — בקרוב. בינתיים נבחר מינימליסטי.
-              </p>
-            ) : null}
             {options.visualStyle === 'custom' ? (
               <textarea
                 value={options.visualStyleCustom}
@@ -982,7 +1002,10 @@ export default function CreationWizard({
             </div>
           </details>
 
-          <div className="mt-auto pt-2 space-y-3 sticky bottom-0 pb-1">
+          <div
+            ref={nextStepRef}
+            className="mt-auto pt-2 space-y-3 sticky bottom-0 pb-1 bg-gradient-to-t from-[#0c0f14] via-[#0c0f14]/95 to-transparent"
+          >
             {phase === 'topic' ? (
               intakeReady && topicDraft ? (
                 <div className="space-y-2">
@@ -1006,18 +1029,49 @@ export default function CreationWizard({
                 </p>
               )
             ) : (
-              <button
-                type="button"
-                onClick={handleGenerate}
-                disabled={
-                  busy || !selectedDirectionId || directions.length === 0
-                }
-                className="w-full rounded-2xl bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white font-black text-lg py-4 shadow-[0_0_40px_-12px_rgba(99,102,241,0.8)] transition transform hover:-translate-y-0.5 active:translate-y-0"
-              >
-                {isLoading
-                  ? 'מייצר חבילה מלאה…'
-                  : 'צור חבילה ופתח בעורך'}
-              </button>
+              <div className="space-y-3 rounded-2xl border border-sky-400/30 bg-black/50 backdrop-blur-md p-3 shadow-[0_-8px_40px_-12px_rgba(0,0,0,0.8)]">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-black text-sky-100">
+                    שלב 3 · בחרו כיוון תוכן
+                  </h3>
+                  {selectedDirectionId ? (
+                    <span className="text-[11px] font-bold text-emerald-300">
+                      נבחר ✓
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-amber-200 animate-pulse">
+                      בחרו אחד
+                    </span>
+                  )}
+                </div>
+                <DirectionPicker
+                  directions={directions}
+                  selectedDirectionId={selectedDirectionId}
+                  onSelect={setSelectedDirectionId}
+                  stylesLoading={stylesLoading}
+                  researchNote={researchNote}
+                  compact
+                />
+                <button
+                  type="button"
+                  onClick={handleGenerate}
+                  disabled={
+                    busy || !selectedDirectionId || directions.length === 0
+                  }
+                  className="w-full rounded-2xl bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white font-black text-lg py-4 shadow-[0_0_40px_-12px_rgba(99,102,241,0.8)] transition transform hover:-translate-y-0.5 active:translate-y-0"
+                >
+                  {isLoading
+                    ? 'מייצר חבילה מלאה…'
+                    : selectedDirectionId
+                      ? 'צור חבילה ופתח בעורך'
+                      : 'בחרו כיוון כדי להמשיך'}
+                </button>
+                {!selectedDirectionId && !stylesLoading ? (
+                  <p className="text-center text-[11px] text-amber-200/90 leading-snug">
+                    לחצו על אחד משני הכיוונים למעלה — ואז על יצירת החבילה.
+                  </p>
+                ) : null}
+              </div>
             )}
             <p className="text-center text-[11px] text-zinc-600">
               החבילה נשמרת בעורך הקיים בפורמט אנכי מוכן לייצוא.

@@ -1,15 +1,23 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI, FunctionDeclaration, SchemaType } from '@google/generative-ai';
-import { getServerSession } from 'next-auth';
+import { requireSession } from '@/lib/api/require-session';
+import {
+  enforceRateLimit,
+  rateLimitSubjectFromRequest,
+} from '@/lib/api/rate-limit';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'dummy_key');
 
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession();
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireSession();
+    if (!auth.ok) return auth.response;
+
+    const rateLimited = await enforceRateLimit({
+      bucket: 'copilot',
+      subject: rateLimitSubjectFromRequest(auth.user.email, req),
+    });
+    if (rateLimited) return rateLimited;
 
     const body = await req.json();
     const { command, currentState } = body;

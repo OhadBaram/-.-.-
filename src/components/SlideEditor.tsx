@@ -1,11 +1,12 @@
 import React from 'react';
 import { Slide } from '@/components/CarouselRenderer';
 import { SlideOverride } from '@/lib/templates/drawers';
+import ImagePickerControl from '@/components/ImagePickerControl';
 
 interface SlideEditorProps {
   slide: Slide;
   index: number;
-  canvasRef: React.RefObject<HTMLCanvasElement>;
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
   isEditing: boolean;
   onToggleEdit: () => void;
   override: SlideOverride;
@@ -40,7 +41,6 @@ export default function SlideEditor({
 }: SlideEditorProps) {
   const currentFontSize = override.fontSize ?? 64;
   const currentTextY = override.textY ?? 50;
-  const slideIndexForUpload = index;
   const isRemixing = remixingIndex === index;
   const hasSuggestion = Boolean(remixSuggestion?.trim());
 
@@ -101,57 +101,24 @@ export default function SlideEditor({
         </div>
       )}
 
-      <div className="flex flex-wrap justify-between items-center mb-1 gap-2">
-        <label className="text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded cursor-pointer transition-colors border flex-1 text-center">
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const input = e.target;
-              const file = input.files?.[0];
-              if (file && onImageUpload) {
-                const reader = new FileReader();
-                const lockedIndex = slideIndexForUpload;
-                reader.onloadend = () => {
-                  onImageUpload(lockedIndex, reader.result as string);
-                  input.value = '';
-                };
-                reader.readAsDataURL(file);
-              }
+      <div className="flex flex-col gap-2 mb-1" dir="rtl">
+        {onImageUpload ? (
+          <ImagePickerControl
+            variant="compact"
+            compactLabel="העלאת תמונה לשקף זה"
+            value={slide.imageUrl ?? null}
+            onChange={(next) => {
+              if (next) onImageUpload(index, next);
+              else onImageClear?.(index);
             }}
           />
-          📸 העלאת תמונה לשקף זה
-        </label>
+        ) : null}
 
-        <button
-          type="button"
-          onClick={() =>
-            alert(
-              "פיצ'ר יצירת תמונות ב-AI (כמו Midjourney/DALL-E) נמצא בבטא סגורה וזמין למנויי פרימיום בלבד.\n\nלקבלת גישה, אנא פנה לתמיכה."
-            )
-          }
-          className="text-xs font-semibold text-white bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 px-2 py-1 rounded cursor-pointer transition-colors border border-transparent shadow-sm flex-1 text-center"
-        >
-          ✨ תמונה ב-AI (פרו)
-        </button>
-
-        {slide.imageUrl && (
-          <>
-            <span className="text-[10px] text-green-600 font-bold bg-green-50 px-2 py-1 rounded border border-green-200 whitespace-nowrap">
-              ✓ תמונה בשקף {index + 1}
-            </span>
-            {onImageClear && (
-              <button
-                type="button"
-                onClick={() => onImageClear(index)}
-                className="text-[10px] font-bold text-red-600 bg-red-50 hover:bg-red-100 px-2 py-1 rounded border border-red-200 whitespace-nowrap"
-              >
-                הסר תמונה
-              </button>
-            )}
-          </>
-        )}
+        {slide.imageUrl ? (
+          <span className="text-[10px] text-green-600 font-bold bg-green-50 px-2 py-1 rounded border border-green-200 whitespace-nowrap self-start">
+            ✓ תמונה בשקף {index + 1}
+          </span>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-2">
@@ -179,45 +146,28 @@ export default function SlideEditor({
               מייצר המלצה…
             </>
           ) : (
-            '✨ הצע ניסוח ב-AI'
+            '✨ שכתוב עם AI'
           )}
         </button>
 
         {hasSuggestion ? (
-          <div className="rounded-lg border border-violet-300 bg-violet-50 dark:bg-violet-950/40 dark:border-violet-700 p-3 space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[11px] font-bold text-violet-800 dark:text-violet-200">
-                המלצת ניסוח — עדיין לא הוחלפה בשקף
-              </p>
-              <button
-                type="button"
-                onClick={() => onDismissRemix(index)}
-                className="text-[10px] text-violet-600 hover:text-violet-900 dark:text-violet-300"
-              >
-                דחה
-              </button>
-            </div>
-            <p
-              className="text-sm text-violet-950 dark:text-violet-100 leading-relaxed whitespace-pre-wrap"
-              dir="rtl"
-            >
-              {remixSuggestion}
-            </p>
-            <div className="flex flex-wrap gap-2 pt-1">
+          <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-2 space-y-2" dir="rtl">
+            <p className="text-[11px] font-semibold text-indigo-900">המלצת ניסוח</p>
+            <p className="text-xs text-indigo-950 whitespace-pre-wrap">{remixSuggestion}</p>
+            <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => onApplyRemix(index)}
-                className="flex-1 min-w-[8rem] bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold px-3 py-2 rounded transition-colors"
+                className="flex-1 text-xs font-bold bg-indigo-600 text-white rounded px-2 py-1.5"
               >
-                החל בשקף
+                החל
               </button>
               <button
                 type="button"
-                onClick={() => onRemix(index, slide.text)}
-                disabled={isRemixing}
-                className="flex-1 min-w-[8rem] border border-violet-400 text-violet-800 dark:text-violet-200 bg-white/70 dark:bg-violet-900/30 hover:bg-violet-100 dark:hover:bg-violet-900/50 text-xs font-bold px-3 py-2 rounded transition-colors disabled:opacity-50"
+                onClick={() => onDismissRemix(index)}
+                className="flex-1 text-xs font-bold bg-white border border-indigo-200 text-indigo-800 rounded px-2 py-1.5"
               >
-                {isRemixing ? 'מייצר…' : 'הצע שוב'}
+                דחה
               </button>
             </div>
           </div>

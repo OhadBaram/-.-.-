@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { getTenantDB } from '@/lib/tenant-db';
 import { generateCarouselSchema } from '@/lib/validations';
@@ -14,12 +12,26 @@ import {
   type VisualStyleId,
   type WizardOptions,
 } from '@/lib/wizard';
+import { requireSession } from '@/lib/api/require-session';
+import {
+  enforceRateLimit,
+  rateLimitSubjectFromRequest,
+} from '@/lib/api/rate-limit';
 
 export const maxDuration = 60; // Allow function to run up to 60 seconds
 
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
+    const auth = await requireSession();
+    if (!auth.ok) return auth.response;
+
+    const rateLimited = await enforceRateLimit({
+      bucket: 'generate',
+      subject: rateLimitSubjectFromRequest(auth.user.email, req),
+    });
+    if (rateLimited) return rateLimited;
+
+    const session = auth.session;
     const body = await req.json();
     
     const validatedFields = generateCarouselSchema.safeParse(body);
@@ -39,6 +51,8 @@ export async function POST(req: Request) {
       visualStyleCustom,
       useRecommendedStructure,
       narrativeDirection,
+      publishTarget,
+      flowVariant,
     } = validatedFields.data;
     const websiteUrl = body.websiteUrl || null;
     const referenceLink1 = body.referenceLink1 || null;
@@ -246,9 +260,10 @@ ${
              data: {
                title: topic,
                topic,
-               targetAudience: audience,
+               targetAudience: audience ?? null,
                status: 'generated',
                slidesData: packagePayload,
+               workspace: { connect: { id: workspaceId } },
              }
            });
         }
@@ -264,9 +279,13 @@ ${
       hashtags,
       wizardMeta,
       narrativeDirection: packagePayload.narrativeDirection,
+      publishTarget,
+      flowVariant,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error generating carousel:', error);
-    return NextResponse.json({ error: error?.message || 'Failed to generate carousel' }, { status: 500 });
+    const message =
+      error instanceof Error ? error.message : 'Failed to generate carousel';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
