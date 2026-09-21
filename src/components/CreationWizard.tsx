@@ -39,6 +39,10 @@ interface CreationWizardProps {
   initialReferenceLink2?: string;
   initialReferenceLink3?: string;
   initialBrandPalette?: BrandPalette | string;
+  /** נושא שהועבר מהמסלול המהיר */
+  initialTopic?: string;
+  /** סנכרון נושא חזרה לטיוטה המשותפת (מעבר חזרה למסלול מהיר) */
+  onTopicChange?: (topic: string) => void;
 }
 
 interface ChatMessage {
@@ -153,8 +157,14 @@ export default function CreationWizard({
   initialReferenceLink2 = '',
   initialReferenceLink3 = '',
   initialBrandPalette,
+  initialTopic = '',
+  onTopicChange,
 }: CreationWizardProps) {
-  const [options, setOptions] = useState<WizardOptions>(DEFAULT_WIZARD_OPTIONS);
+  const seededTopic = initialTopic.trim();
+  const [options, setOptions] = useState<WizardOptions>(() => {
+    if (!seededTopic) return DEFAULT_WIZARD_OPTIONS;
+    return { ...DEFAULT_WIZARD_OPTIONS, ...buildIntakeSuggestions(seededTopic) };
+  });
   const [brandPalette, setBrandPalette] = useState<BrandPalette>(() => {
     if (Array.isArray(initialBrandPalette)) {
       return clampPalette(initialBrandPalette);
@@ -164,31 +174,47 @@ export default function CreationWizard({
     }
     return recommendPaletteLocal({ visualStyle: 'minimal' });
   });
-  const [topicDraft, setTopicDraft] = useState('');
+  const [topicDraft, setTopicDraft] = useState(seededTopic);
   const [inputText, setInputText] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [stylesLoading, setStylesLoading] = useState(false);
-  const [intakeReady, setIntakeReady] = useState(false);
+  const [intakeReady, setIntakeReady] = useState(Boolean(seededTopic));
   const [phase, setPhase] = useState<WizardPhase>('topic');
   const [researchNote, setResearchNote] = useState('');
   const [directions, setDirections] = useState<NarrativeDirection[]>([]);
   const [selectedDirectionId, setSelectedDirectionId] = useState<string | null>(
     null
   );
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: 'assistant',
-      text: userName
-        ? `היי ${userName}! אני כאן לייעוץ בלבד — נושא, המלצות, וכיוון תוכן. מה שקובע את צורת הקרוסלה זה רק פאנל «הגדרות סופיות». שלחו נושא אחד להתחלה.`
-        : 'היי! אני כאן לייעוץ בלבד — נושא, המלצות, וכיוון תוכן. מה שקובע את צורת הקרוסלה זה רק פאנל «הגדרות סופיות». שלחו נושא אחד להתחלה.',
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    const greeting = userName
+      ? `היי ${userName}! אני כאן לייעוץ בלבד — נושא, המלצות, וכיוון תוכן. מה שקובע את צורת הקרוסלה זה רק פאנל «הגדרות סופיות». שלחו נושא אחד להתחלה.`
+      : 'היי! אני כאן לייעוץ בלבד — נושא, המלצות, וכיוון תוכן. מה שקובע את צורת הקרוסלה זה רק פאנל «הגדרות סופיות». שלחו נושא אחד להתחלה.';
+
+    if (!seededTopic) {
+      return [{ role: 'assistant', text: greeting }];
+    }
+
+    return [
+      { role: 'assistant', text: greeting },
+      { role: 'user', text: seededTopic },
+      {
+        role: 'assistant',
+        text: `קלטתי את הנושא מהמסלול המהיר: «${seededTopic}». ההגדרות הסופיות בפאנל עודכנו לפי ההמלצה — אפשר לשנות ואז ללחוץ «המשך עם ההגדרות הסופיות».`,
+      },
+    ];
+  });
 
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const nextStepRef = useRef<HTMLDivElement>(null);
   const optionsRef = useRef(options);
   optionsRef.current = options;
+  const onTopicChangeRef = useRef(onTopicChange);
+  onTopicChangeRef.current = onTopicChange;
+
+  useEffect(() => {
+    onTopicChangeRef.current?.(topicDraft.trim());
+  }, [topicDraft]);
 
   useEffect(() => {
     const el = listRef.current;

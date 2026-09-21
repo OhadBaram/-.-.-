@@ -18,6 +18,11 @@ import {
 } from '@/lib/brand-palette';
 import { applyCoverImageToSlides } from '@/lib/contracts/cover-image';
 import {
+  EMPTY_WIZARD_DRAFT,
+  normalizeWizardDraft,
+  type WizardSharedDraft,
+} from '@/lib/creation-flow/wizard-draft';
+import {
   DEFAULT_PUBLISH_TARGET,
   parsePublishTarget,
   type PublishTarget,
@@ -63,6 +68,8 @@ export default function CarouselCreator({
     DEFAULT_PUBLISH_TARGET
   );
   const [wizardMode, setWizardMode] = useState<'fast' | 'full'>('fast');
+  const [wizardDraft, setWizardDraft] =
+    useState<WizardSharedDraft>(EMPTY_WIZARD_DRAFT);
   const [brandPalette, setBrandPalette] = useState<BrandPalette>(() =>
     parseBrandPalette(brandColor)
   );
@@ -211,10 +218,15 @@ export default function CarouselCreator({
 
       {wizardMode === 'fast' ? (
         <FastPathWizard
+          key={`fast-${wizardDraft.topic}-${wizardDraft.publishTarget}`}
           userName={userName}
           onSubmit={handleGenerate}
           isLoading={isLoading}
-          onRequestFullPath={() => setWizardMode('full')}
+          initialDraft={wizardDraft}
+          onRequestFullPath={(draft) => {
+            setWizardDraft(normalizeWizardDraft(draft));
+            setWizardMode('full');
+          }}
           initialWebsiteUrl={initialWebsiteUrl}
           initialReferenceLink1={initialReferenceLink1}
           initialReferenceLink2={initialReferenceLink2}
@@ -232,16 +244,24 @@ export default function CarouselCreator({
             </p>
             <button
               type="button"
-              onClick={() => setWizardMode('fast')}
+              onClick={() => {
+                setWizardDraft((prev) => normalizeWizardDraft(prev));
+                setWizardMode('fast');
+              }}
               className="text-sm font-bold text-sky-300 hover:text-sky-200 underline underline-offset-2"
             >
               חזרה למסלול המהיר
             </button>
           </div>
           <CreationWizard
+            key={`full-${wizardDraft.topic}`}
             userName={userName}
             onSubmit={handleGenerate}
             isLoading={isLoading}
+            initialTopic={wizardDraft.topic}
+            onTopicChange={(topic) =>
+              setWizardDraft((prev) => normalizeWizardDraft({ topic }, prev))
+            }
             initialWebsiteUrl={initialWebsiteUrl}
             initialReferenceLink1={initialReferenceLink1}
             initialReferenceLink2={initialReferenceLink2}
