@@ -325,6 +325,8 @@ export default function CarouselRenderer({
     onPublishTargetChange?.(next);
   };
   const publishProfile = getPublishTargetProfile(publishTarget);
+  /** בנייד: תצוגה מקדימה ועריכה לא יכולות לחלוק מסך בלי לדחוק זו את זו */
+  const [mobilePane, setMobilePane] = useState<'preview' | 'edit'>('preview');
 
   const activeSlide = localSlides[activeSlideIndex];
   const activeSlideTemplate = activeSlide ? getSlideTemplate(activeSlide) : DEFAULT_TEXT_TEMPLATE;
@@ -477,7 +479,7 @@ export default function CarouselRenderer({
         void drawSlide(canvas, slide, index, getSlideTemplate(slide), slideOverrides[index], generation);
       }
     });
-  }, [localSlides, drawSlide, slideOverrides, theme]);
+  }, [localSlides, drawSlide, slideOverrides, theme, mobilePane, brandPalette]);
 
   const redrawAllSlides = async () => {
     const generation = ++drawGenerationRef.current;
@@ -705,9 +707,38 @@ export default function CarouselRenderer({
 
   return (
     <div className="flex flex-col md:flex-row h-full min-h-0 w-full bg-gray-50 dark:bg-gray-900 overflow-hidden" dir="rtl">
-      
-      {/* סיידבר — עריכה מהירה כברירת מחדל */}
-      <div className="w-full md:w-80 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 overflow-y-auto order-last md:order-first flex flex-col min-h-0">
+      {/* לשוניות מובייל — תצוגה מול עריכה */}
+      <div className="md:hidden shrink-0 grid grid-cols-2 gap-1 p-2 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 z-30">
+        <button
+          type="button"
+          onClick={() => setMobilePane('preview')}
+          className={`rounded-xl py-2.5 text-sm font-bold transition ${
+            mobilePane === 'preview'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200'
+          }`}
+        >
+          תצוגה מקדימה
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobilePane('edit')}
+          className={`rounded-xl py-2.5 text-sm font-bold transition ${
+            mobilePane === 'edit'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200'
+          }`}
+        >
+          עריכה
+        </button>
+      </div>
+
+      {/* סיידבר — עריכה מהירה */}
+      <div
+        className={`w-full md:w-80 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 overflow-y-auto order-last md:order-first flex-col min-h-0 ${
+          mobilePane === 'edit' ? 'flex flex-1' : 'hidden'
+        } md:flex md:flex-none`}
+      >
         {/* ייצוא דביק בראש הסיידבר */}
         <div className="sticky top-0 z-20 flex flex-col gap-2 p-4 pb-3 bg-white/95 dark:bg-gray-800/95 backdrop-blur border-b border-gray-200 dark:border-gray-700">
           <label className="text-[11px] font-bold text-gray-500 dark:text-gray-400">
@@ -1111,10 +1142,13 @@ export default function CarouselRenderer({
       </div>
 
       {/* Central Stage */}
-      <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
-        {/* Top Bar */}
-        <div className="flex justify-between items-center p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm z-10 shrink-0">
-          <div className="flex items-center gap-4">
+      <div
+        className={`flex-col h-full min-h-0 overflow-hidden ${
+          mobilePane === 'preview' ? 'flex flex-1' : 'hidden'
+        } md:flex md:flex-1`}
+      >
+        <div className="flex flex-wrap justify-between items-center gap-2 p-3 md:p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm z-10 shrink-0">
+          <div className="flex items-center gap-3">
             {onGoBack && (
               <button
                 type="button"
@@ -1125,39 +1159,42 @@ export default function CarouselRenderer({
                 ← אשף
               </button>
             )}
-            <h2 className="font-bold text-xl text-gray-800 dark:text-gray-100">
+            <h2 className="font-bold text-lg md:text-xl text-gray-800 dark:text-gray-100">
               תצוגה מקדימה
             </h2>
           </div>
-          <div className="flex gap-4 items-center">
-            <button 
-              disabled={activeSlideIndex === localSlides.length - 1} 
-              onClick={() => setActiveSlideIndex(i => i + 1)}
-              className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
+          <div className="flex gap-2 md:gap-4 items-center">
+            <button
+              disabled={activeSlideIndex === localSlides.length - 1}
+              onClick={() => setActiveSlideIndex((i) => i + 1)}
+              className="px-3 md:px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 text-sm"
             >
               הבא
             </button>
-            <span className="text-gray-600 dark:text-gray-300 font-medium">שקף {activeSlideIndex + 1} מתוך {localSlides.length}</span>
-            <button 
-              disabled={activeSlideIndex === 0} 
-              onClick={() => setActiveSlideIndex(i => i - 1)}
-              className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
+            <span className="text-gray-600 dark:text-gray-300 font-medium text-sm whitespace-nowrap">
+              שקף {activeSlideIndex + 1} מתוך {localSlides.length}
+            </span>
+            <button
+              disabled={activeSlideIndex === 0}
+              onClick={() => setActiveSlideIndex((i) => i - 1)}
+              className="px-3 md:px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 text-sm"
             >
               הקודם
             </button>
           </div>
         </div>
 
-        {/* Canvas Area — background follows canvas theme (not next-themes) */}
         <div
-          className={`flex-1 flex flex-col justify-center items-center p-8 overflow-auto relative transition-colors duration-300 ${
+          className={`flex-1 flex flex-col justify-center items-center p-4 md:p-8 overflow-auto relative transition-colors duration-300 min-h-[50dvh] md:min-h-0 ${
             isCanvasDark ? 'bg-gray-950' : 'bg-gray-200'
           }`}
         >
           {localSlides.map((slide, i) => (
             <div
               key={`canvas-${i}-${slide.id}`}
-              className={`transition-opacity duration-300 ${i === activeSlideIndex ? 'block opacity-100' : 'hidden opacity-0'}`}
+              className={`transition-opacity duration-300 ${
+                i === activeSlideIndex ? 'block opacity-100' : 'hidden opacity-0'
+              }`}
             >
               <canvas
                 ref={(el) => {
@@ -1165,7 +1202,7 @@ export default function CarouselRenderer({
                 }}
                 width={1080}
                 height={1350}
-                className="max-h-[60vh] max-w-full object-contain shadow-2xl rounded"
+                className="max-h-[min(70dvh,720px)] md:max-h-[60vh] max-w-full w-auto object-contain shadow-2xl rounded"
               />
             </div>
           ))}
@@ -1186,40 +1223,38 @@ export default function CarouselRenderer({
           ) : null}
         </div>
 
-        {/* Slide Controls */}
-        <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex justify-center shadow-lg z-10 overflow-y-auto max-h-[35vh]">
+        <div className="hidden md:flex p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 justify-center shadow-lg z-10 overflow-y-auto max-h-[35vh]">
           {localSlides[activeSlideIndex] && (
             <div className="w-full max-w-xl">
-              
-          <div className="flex justify-between items-center mb-4 gap-2">
-            <h3 className="font-bold text-gray-700 dark:text-gray-300">
-              עריכת שקף {activeSlideIndex + 1}
-            </h3>
-            <div className="flex items-center gap-1 shrink-0">
-              <button
-                type="button"
-                onClick={() => addSlide(activeSlideIndex)}
-                disabled={localSlides.length >= MAX_SLIDE_COUNT}
-                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 p-2 rounded text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                title={
-                  localSlides.length >= MAX_SLIDE_COUNT
-                    ? `מקסימום ${MAX_SLIDE_COUNT} שקפים`
-                    : 'הוסף שקף אחרי הנוכחי'
-                }
-              >
-                + הוסף שקף
-              </button>
-              <button
-                type="button"
-                onClick={() => removeSlide(activeSlideIndex)}
-                className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded text-sm transition-colors disabled:opacity-40"
-                disabled={localSlides.length <= 1}
-              >
-                מחק שקף זה
-              </button>
-            </div>
-          </div>
-          <SlideEditor
+              <div className="flex justify-between items-center mb-4 gap-2">
+                <h3 className="font-bold text-gray-700 dark:text-gray-300">
+                  עריכת שקף {activeSlideIndex + 1}
+                </h3>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => addSlide(activeSlideIndex)}
+                    disabled={localSlides.length >= MAX_SLIDE_COUNT}
+                    className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 p-2 rounded text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    title={
+                      localSlides.length >= MAX_SLIDE_COUNT
+                        ? `מקסימום ${MAX_SLIDE_COUNT} שקפים`
+                        : 'הוסף שקף אחרי הנוכחי'
+                    }
+                  >
+                    + הוסף שקף
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeSlide(activeSlideIndex)}
+                    className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded text-sm transition-colors disabled:opacity-40"
+                    disabled={localSlides.length <= 1}
+                  >
+                    מחק שקף זה
+                  </button>
+                </div>
+              </div>
+              <SlideEditor
                 slide={localSlides[activeSlideIndex]}
                 index={activeSlideIndex}
                 canvasRef={{ current: null }}
@@ -1229,15 +1264,26 @@ export default function CarouselRenderer({
                   else {
                     setEditingIndex(activeSlideIndex);
                     if (!slideOverrides[activeSlideIndex]) {
-                      setSlideOverrides(prev => ({ ...prev, [activeSlideIndex]: { fontSize: 64, textY: 50 } }));
+                      setSlideOverrides((prev) => ({
+                        ...prev,
+                        [activeSlideIndex]: { fontSize: 64, textY: 50 },
+                      }));
                     }
                   }
                 }}
                 override={slideOverrides[activeSlideIndex] ?? {}}
-                onOverrideChange={(override) => setSlideOverrides(prev => ({ ...prev, [activeSlideIndex]: override }))}
+                onOverrideChange={(override) =>
+                  setSlideOverrides((prev) => ({
+                    ...prev,
+                    [activeSlideIndex]: override,
+                  }))
+                }
                 onTextChange={(text) => {
                   const newSlides = [...localSlides];
-                  newSlides[activeSlideIndex] = { ...newSlides[activeSlideIndex], text };
+                  newSlides[activeSlideIndex] = {
+                    ...newSlides[activeSlideIndex],
+                    text,
+                  };
                   setLocalSlides(newSlides);
                 }}
                 onImageUpload={handleSlideImageUpload}
@@ -1252,8 +1298,7 @@ export default function CarouselRenderer({
           )}
         </div>
 
-        {/* Bottom Filmstrip (Optional) */}
-        <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex gap-3 overflow-x-auto items-center">
+        <div className="p-3 md:p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex gap-3 overflow-x-auto items-center shrink-0">
           {localSlides.map((slide, i) => {
             const isDragging = dragFromIndex === i;
             const isDropTarget =
@@ -1311,8 +1356,90 @@ export default function CarouselRenderer({
           >
             +
           </button>
+          <button
+            type="button"
+            onClick={() => setMobilePane('edit')}
+            className="md:hidden shrink-0 mr-auto text-xs font-bold px-3 py-2 rounded-xl bg-blue-600 text-white"
+          >
+            לעריכה ←
+          </button>
         </div>
       </div>
+
+      {mobilePane === 'edit' && localSlides[activeSlideIndex] ? (
+        <div className="md:hidden shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 max-h-[42dvh] overflow-y-auto order-last">
+          <div className="flex justify-between items-center mb-2 gap-2">
+            <h3 className="font-bold text-gray-700 dark:text-gray-300 text-sm">
+              עריכת שקף {activeSlideIndex + 1}
+            </h3>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setMobilePane('preview')}
+                className="text-xs font-bold text-blue-600 px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30"
+              >
+                לתצוגה
+              </button>
+              <button
+                type="button"
+                onClick={() => addSlide(activeSlideIndex)}
+                disabled={localSlides.length >= MAX_SLIDE_COUNT}
+                className="text-blue-600 text-xs font-semibold px-2 py-1 disabled:opacity-40"
+              >
+                + שקף
+              </button>
+              <button
+                type="button"
+                onClick={() => removeSlide(activeSlideIndex)}
+                disabled={localSlides.length <= 1}
+                className="text-red-500 text-xs px-2 py-1 disabled:opacity-40"
+              >
+                מחק
+              </button>
+            </div>
+          </div>
+          <SlideEditor
+            slide={localSlides[activeSlideIndex]}
+            index={activeSlideIndex}
+            canvasRef={{ current: null }}
+            isEditing={editingIndex === activeSlideIndex}
+            onToggleEdit={() => {
+              if (editingIndex === activeSlideIndex) setEditingIndex(null);
+              else {
+                setEditingIndex(activeSlideIndex);
+                if (!slideOverrides[activeSlideIndex]) {
+                  setSlideOverrides((prev) => ({
+                    ...prev,
+                    [activeSlideIndex]: { fontSize: 64, textY: 50 },
+                  }));
+                }
+              }
+            }}
+            override={slideOverrides[activeSlideIndex] ?? {}}
+            onOverrideChange={(override) =>
+              setSlideOverrides((prev) => ({
+                ...prev,
+                [activeSlideIndex]: override,
+              }))
+            }
+            onTextChange={(text) => {
+              const newSlides = [...localSlides];
+              newSlides[activeSlideIndex] = {
+                ...newSlides[activeSlideIndex],
+                text,
+              };
+              setLocalSlides(newSlides);
+            }}
+            onImageUpload={handleSlideImageUpload}
+            onImageClear={handleSlideImageClear}
+            remixingIndex={remixingIndex}
+            remixSuggestion={remixSuggestions[activeSlideIndex]}
+            onRemix={handleRemix}
+            onApplyRemix={applyRemixSuggestion}
+            onDismissRemix={dismissRemixSuggestion}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
