@@ -41,6 +41,11 @@ export interface CreationWizardSubmitPayload {
   referenceLink1?: string;
   referenceLink2?: string;
   referenceLink3?: string;
+  /** ברירת מחדל: full — עד שמסלול מהיר יוטמע במלואו */
+  flowVariant?: 'fast' | 'full';
+  publishTarget?: 'instagram' | 'linkedin';
+  coverImageDataUrl?: string;
+  coverImageApplyTo?: 'first' | 'first_and_image_slots';
 }
 
 interface CreationWizardProps {
@@ -119,7 +124,6 @@ export default function CreationWizard({
   const [inputText, setInputText] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [stylesLoading, setStylesLoading] = useState(false);
-  const [showClassicHint, setShowClassicHint] = useState(false);
   const [intakeReady, setIntakeReady] = useState(false);
   const [phase, setPhase] = useState<WizardPhase>('topic');
   const [researchNote, setResearchNote] = useState('');
@@ -460,6 +464,8 @@ export default function CreationWizard({
       referenceLink1: initialReferenceLink1,
       referenceLink2: initialReferenceLink2,
       referenceLink3: initialReferenceLink3,
+      flowVariant: 'full',
+      publishTarget: 'instagram',
     });
   };
 
@@ -879,19 +885,13 @@ export default function CreationWizard({
                     key={style.id}
                     type="button"
                     onClick={() => {
-                      if (style.stub) {
-                        patchOptions({ visualStyle: 'minimal' });
-                        setShowClassicHint(true);
-                        setTimeout(() => setShowClassicHint(false), 3200);
-                        return;
-                      }
                       patchOptions({ visualStyle: style.id });
                     }}
                     className={`text-right rounded-xl border px-3 py-2.5 transition ${
                       selected
                         ? 'border-sky-400/50 bg-sky-500/10 text-sky-50'
                         : 'border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/5'
-                    } ${style.stub ? 'opacity-70' : ''}`}
+                    }`}
                   >
                     <div className="font-bold text-sm">{style.label}</div>
                     <div className="text-[11px] opacity-75 mt-0.5 leading-snug">
@@ -901,11 +901,6 @@ export default function CreationWizard({
                 );
               })}
             </div>
-            {showClassicHint ? (
-              <p className="text-xs text-amber-200/90 animate-[wizardPop_0.3s_ease-out]">
-                העלאת צילומי מסך כהשראה — בקרוב. בינתיים נבחר מינימליסטי.
-              </p>
-            ) : null}
             {options.visualStyle === 'custom' ? (
               <textarea
                 value={options.visualStyleCustom}

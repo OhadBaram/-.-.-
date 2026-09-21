@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
 import { wizardChatSchema } from '@/lib/validations';
 import { generateJson } from '@/lib/services/ai.service';
 import {
@@ -23,6 +21,11 @@ import {
   recommendedSlideCountForTopic,
   type WizardChatPhase,
 } from '@/lib/wizard-intake';
+import { requireSession } from '@/lib/api/require-session';
+import {
+  enforceRateLimit,
+  rateLimitSubjectFromRequest,
+} from '@/lib/api/rate-limit';
 
 export const maxDuration = 30;
 
@@ -50,10 +53,14 @@ function clampSlideCount(value: unknown): number | undefined {
 
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireSession();
+    if (!auth.ok) return auth.response;
+
+    const rateLimited = await enforceRateLimit({
+      bucket: 'wizard',
+      subject: rateLimitSubjectFromRequest(auth.user.email, req),
+    });
+    if (rateLimited) return rateLimited;
 
     const body = await req.json();
     const parsed = wizardChatSchema.safeParse(body);
@@ -135,7 +142,7 @@ export async function POST(req: Request) {
       .join('\n');
 
     const styleOptionsList = VISUAL_STYLE_OPTIONS.map(
-      (s) => `${s.id}=${s.label}${s.stub ? ' (בקרוב)' : ''}`
+      (s) => `${s.id}=${s.label}`
     ).join(', ');
     const densityOptionsList = DENSITY_OPTIONS.map(
       (d) => `${d.id}=${d.label}`

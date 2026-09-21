@@ -1,10 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-
+  // Typecheck runs in CI via `npm run typecheck` — keep build honest.
 };
 
 export default nextConfig;

@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { generateText } from '@/lib/services/ai.service';
+import { requireSession } from '@/lib/api/require-session';
+import {
+  enforceRateLimit,
+  rateLimitSubjectFromRequest,
+} from '@/lib/api/rate-limit';
 
 export const maxDuration = 15;
 
@@ -10,18 +13,15 @@ function normalizeAiConfig(provider: string, model: string) {
   let aiProvider = provider || process.env.DEFAULT_AI_PROVIDER || 'gemini';
   let aiModel = model || process.env.DEFAULT_AI_MODEL || 'gemini-3.8-flash';
 
-  // שמות ישנים / לא תואמים → ברירת מחדל יציבה
   if (aiModel === 'gemini-1.5-flash' || !aiModel) {
     aiModel = 'gemini-3.8-flash';
     aiProvider = 'gemini';
   }
 
-  // מודל בפורמט OpenRouter כשהספק Gemini — מנקים את הקידומת
   if (aiProvider === 'gemini' && aiModel.startsWith('google/')) {
     aiModel = aiModel.replace(/^google\//, '');
   }
 
-  // מודל Gemini גולמי כשהספק OpenRouter — מוסיפים קידומת
   if (
     aiProvider === 'openrouter' &&
     aiModel.startsWith('gemini-') &&
@@ -35,10 +35,14 @@ function normalizeAiConfig(provider: string, model: string) {
 
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireSession();
+    if (!auth.ok) return auth.response;
+
+    const rateLimited = await enforceRateLimit({
+      bucket: 'remix',
+      subject: rateLimitSubjectFromRequest(auth.user.email, req),
+    });
+    if (rateLimited) return rateLimited;
 
     const { currentText } = await req.json();
 
@@ -52,7 +56,7 @@ export async function POST(req: Request) {
 
     try {
       const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
+        where: { email: auth.user.email },
         include: { workspaces: { include: { workspace: true } } },
       });
       if (user && user.workspaces.length > 0) {

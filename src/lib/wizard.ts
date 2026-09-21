@@ -5,8 +5,7 @@ export type VisualStyleId =
   | 'bold'
   | 'luxury'
   | 'magazine'
-  | 'custom'
-  | 'screenshots';
+  | 'custom';
 
 export interface WizardOptions {
   slideCount: number;
@@ -56,7 +55,6 @@ export const VISUAL_STYLE_OPTIONS: {
   label: string;
   hint: string;
   promptHint: string;
-  stub?: boolean;
 }[] = [
   {
     id: 'minimal',
@@ -87,13 +85,6 @@ export const VISUAL_STYLE_OPTIONS: {
     label: 'תיאור חופשי',
     hint: 'תארו את המראה במילים',
     promptHint: '',
-  },
-  {
-    id: 'screenshots',
-    label: 'צילומי מסך',
-    hint: 'בקרוב — העלאת דוגמאות',
-    promptHint: 'סגנון כללי נקי עד שתהיה תמיכה בצילומי מסך.',
-    stub: true,
   },
 ];
 

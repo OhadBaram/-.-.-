@@ -16,6 +16,11 @@ import {
   primaryBrandColor,
   type BrandPalette,
 } from '@/lib/brand-palette';
+import {
+  DEFAULT_PUBLISH_TARGET,
+  getPublishTargetProfile,
+  type PublishTarget,
+} from '@/lib/contracts/publish-target';
 
 import {
   drawMinimal, drawBold, drawGradient, drawDarkLuxury, drawFrame, drawSplit,
@@ -260,6 +265,8 @@ interface CarouselRendererProps {
   onBrandPaletteChange?: (palette: BrandPalette) => void;
   slideOverrides?: Record<number, SlideOverride>;
   onGoBack?: () => void;
+  publishTarget?: PublishTarget;
+  onPublishTargetChange?: (target: PublishTarget) => void;
 }
 
 export default function CarouselRenderer({
@@ -269,6 +276,8 @@ export default function CarouselRenderer({
   onBrandPaletteChange,
   slideOverrides: initialSlideOverrides = {},
   onGoBack,
+  publishTarget: publishTargetProp = DEFAULT_PUBLISH_TARGET,
+  onPublishTargetChange,
 }: CarouselRendererProps) {
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const drawGenerationRef = useRef(0);
@@ -307,6 +316,14 @@ export default function CarouselRenderer({
   const [showMoreTemplates, setShowMoreTemplates] = useState(false);
   const [dragFromIndex, setDragFromIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [publishTarget, setPublishTargetState] = useState<PublishTarget>(
+    publishTargetProp
+  );
+  const setPublishTarget = (next: PublishTarget) => {
+    setPublishTargetState(next);
+    onPublishTargetChange?.(next);
+  };
+  const publishProfile = getPublishTargetProfile(publishTarget);
 
   const activeSlide = localSlides[activeSlideIndex];
   const activeSlideTemplate = activeSlide ? getSlideTemplate(activeSlide) : DEFAULT_TEXT_TEMPLATE;
@@ -692,19 +709,42 @@ export default function CarouselRenderer({
       <div className="w-full md:w-80 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 overflow-y-auto order-last md:order-first flex flex-col min-h-0">
         {/* ייצוא דביק בראש הסיידבר */}
         <div className="sticky top-0 z-20 flex flex-col gap-2 p-4 pb-3 bg-white/95 dark:bg-gray-800/95 backdrop-blur border-b border-gray-200 dark:border-gray-700">
+          <label className="text-[11px] font-bold text-gray-500 dark:text-gray-400">
+            יעד פרסום
+            <select
+              value={publishTarget}
+              onChange={(e) =>
+                setPublishTarget(e.target.value as PublishTarget)
+              }
+              className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1.5 text-sm font-semibold text-gray-800 dark:text-gray-100"
+            >
+              <option value="instagram">אינסטגרם</option>
+              <option value="linkedin">לינקדאין</option>
+            </select>
+          </label>
           <button
-            onClick={handleExportZip}
+            type="button"
+            onClick={
+              publishProfile.primaryExport === 'zip'
+                ? handleExportZip
+                : handleExportPdf
+            }
             disabled={isExporting}
             className="w-full px-4 py-2 bg-blue-600 text-white font-bold rounded hover:bg-blue-700 disabled:opacity-50"
           >
-            {isExporting ? 'מייצא...' : 'הורד קרוסלה (ZIP)'}
+            {isExporting ? 'מייצא...' : publishProfile.primaryCtaHe}
           </button>
           <button
-            onClick={handleExportPdf}
+            type="button"
+            onClick={
+              publishProfile.secondaryExport === 'zip'
+                ? handleExportZip
+                : handleExportPdf
+            }
             disabled={isExporting}
             className="w-full px-4 py-2 bg-indigo-600 text-white font-bold rounded hover:bg-indigo-700 disabled:opacity-50"
           >
-            {isExporting ? 'מייצא...' : 'הורד כ-PDF (ללינקדאין)'}
+            {isExporting ? 'מייצא...' : publishProfile.secondaryCtaHe}
           </button>
         </div>
 

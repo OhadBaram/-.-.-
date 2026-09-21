@@ -131,9 +131,9 @@ export function buildIntakeReply(topic: string): string {
       ? `בנושא יש ${items} פריטים — ממליץ על ${slides} שקפים (מספר הפריטים + שער + סיום).`
       : `המלצה ברירת מחדל: ${RECOMMENDED_SLIDE_COUNT} שקפים (שער + תוכן + סיום).`;
 
-  const styleLines = VISUAL_STYLE_OPTIONS.filter((s) => !s.stub)
-    .map((s) => `• ${s.label}${s.id === niche.style ? ' ⭐' : ''} — ${s.hint}`)
-    .join('\n');
+  const styleLines = VISUAL_STYLE_OPTIONS.map(
+    (s) => `• ${s.label}${s.id === niche.style ? ' ⭐' : ''} — ${s.hint}`
+  ).join('\n');
 
   return [
     `מעולה — «${topic.trim()}» יושב יפה בנישת ${niche.nicheLabel}.`,
@@ -148,7 +148,6 @@ export function buildIntakeReply(topic: string): string {
     niche.styleReason,
     `המלצה לנישה: ${styleLabel}.`,
     styleLines,
-    '• צילומי מסך / דוגמאות — בקרוב (בינתיים בחרו מתוך הרשימה או תארו בחופשי).',
     '• תיאור חופשי — כתבו איך תרצו שזה ייראה.',
     '',
     '## המלצה · צפיפות מידע',
@@ -196,7 +195,6 @@ export function parseUserOptionPicks(message: string): ParsedUserOptions {
 
   const lower = t.toLowerCase();
   for (const style of VISUAL_STYLE_OPTIONS) {
-    if (style.stub) continue;
     if (
       lower.includes(style.label.toLowerCase()) ||
       lower.includes(style.id)

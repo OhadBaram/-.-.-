@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
 import { proposeStylesSchema } from '@/lib/validations';
 import { generateJson } from '@/lib/services/ai.service';
 import {
   buildFallbackNarrativeDirections,
   type NarrativeDirection,
 } from '@/lib/wizard';
+import { requireSession } from '@/lib/api/require-session';
+import {
+  enforceRateLimit,
+  rateLimitSubjectFromRequest,
+} from '@/lib/api/rate-limit';
 
 export const maxDuration = 30;
 
@@ -42,10 +45,14 @@ function normalizeDirections(
 
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireSession();
+    if (!auth.ok) return auth.response;
+
+    const rateLimited = await enforceRateLimit({
+      bucket: 'wizard',
+      subject: rateLimitSubjectFromRequest(auth.user.email, req),
+    });
+    if (rateLimited) return rateLimited;
 
     const body = await req.json();
     const parsed = proposeStylesSchema.safeParse(body);

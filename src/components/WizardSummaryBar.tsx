@@ -11,6 +11,8 @@ interface WizardSummaryBarProps {
   onChangeSettings: () => void;
   caption?: string;
   hashtags?: string[];
+  /** הסבר אסטרטגיה מהיצירה — במגירה, לא כשער */
+  explanation?: string | null;
 }
 
 export default function WizardSummaryBar({
@@ -18,12 +20,17 @@ export default function WizardSummaryBar({
   onChangeSettings,
   caption = '',
   hashtags = [],
+  explanation = null,
 }: WizardSummaryBarProps) {
   const [showCaptionPanel, setShowCaptionPanel] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState('');
 
   const summary = formatWizardSummaryLine(meta);
-  const hasCaptionPack = Boolean(caption.trim()) || hashtags.length > 0;
+  const explanationText = explanation?.trim() || '';
+  const hasCaptionPack =
+    Boolean(caption.trim()) ||
+    hashtags.length > 0 ||
+    Boolean(explanationText);
   const hashtagLine = hashtags.join(' ');
 
   const copyText = async (value: string, okMessage: string) => {
@@ -72,8 +79,19 @@ export default function WizardSummaryBar({
 
       {showCaptionPanel && hasCaptionPack ? (
         <div className="px-3 pb-3 md:px-4 space-y-3 border-t border-gray-100 dark:border-gray-700/80 bg-gray-50/80 dark:bg-gray-900/40">
-          {caption.trim() ? (
+          {explanationText ? (
             <div className="pt-3">
+              <h3 className="text-xs font-bold text-gray-800 dark:text-gray-100 mb-1.5">
+                למה החבילה הזו
+              </h3>
+              <p className="text-xs text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed max-h-28 overflow-y-auto">
+                {explanationText}
+              </p>
+            </div>
+          ) : null}
+
+          {caption.trim() ? (
+            <div className={explanationText ? '' : 'pt-3'}>
               <div className="flex items-center justify-between gap-3 mb-1.5">
                 <h3 className="text-xs font-bold text-gray-800 dark:text-gray-100">
                   כיתוב לפוסט
@@ -93,7 +111,7 @@ export default function WizardSummaryBar({
           ) : null}
 
           {hashtags.length > 0 ? (
-            <div className={caption.trim() ? '' : 'pt-3'}>
+            <div className={caption.trim() || explanationText ? '' : 'pt-3'}>
               <div className="flex items-center justify-between gap-3 mb-1.5">
                 <h3 className="text-xs font-bold text-gray-800 dark:text-gray-100">
                   האשטאגים
