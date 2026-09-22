@@ -1,6 +1,6 @@
 import React from 'react';
 import { Slide } from '@/components/CarouselRenderer';
-import { SlideOverride } from '@/lib/templates/drawers';
+import { ImageShapeType, SlideOverride, VibeEffectType } from '@/lib/templates/drawers';
 import ImagePickerControl from '@/components/ImagePickerControl';
 
 interface SlideEditorProps {
@@ -159,7 +159,7 @@ export default function SlideEditor({
                 <button
                   key={shape.id}
                   type="button"
-                  onClick={() => onOverrideChange({ ...override, imageShape: shape.id as any })}
+                  onClick={() => onOverrideChange({ ...override, imageShape: shape.id as ImageShapeType })}
                   className={`py-1 px-1.5 rounded text-[11px] font-bold border transition-colors ${
                     currentShape === shape.id
                       ? 'bg-indigo-600 text-white border-indigo-600'
@@ -189,7 +189,7 @@ export default function SlideEditor({
             <button
               key={vibe.id}
               type="button"
-              onClick={() => onOverrideChange({ ...override, vibeEffect: vibe.id as any })}
+              onClick={() => onOverrideChange({ ...override, vibeEffect: vibe.id as VibeEffectType })}
               className={`py-1 px-1 rounded text-[11px] font-bold border transition-colors truncate ${
                 currentVibe === vibe.id
                   ? 'bg-indigo-600 text-white border-indigo-600'
