@@ -1,8 +1,8 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import Link from 'next/link';
 import CarouselCreator from '@/components/CarouselCreator';
+import { buildBrandLearnedFacts } from '@/lib/brand-learned-summary';
 
 export default async function CreateCarouselPage() {
   const session = await getServerSession(authOptions);
@@ -31,6 +31,15 @@ export default async function CreateCarouselPage() {
     });
   }
 
+  const learnedBrand = buildBrandLearnedFacts({
+    brandIdentity: workspace?.brandIdentity,
+    brandColor: workspace?.brandColor,
+    websiteUrl: workspace?.websiteUrl,
+    referenceLink1: workspace?.referenceLink1,
+    referenceLink2: workspace?.referenceLink2,
+    referenceLink3: workspace?.referenceLink3,
+  });
+
   return (
     <main className="min-h-screen bg-[#0c0f14]" dir="rtl">
       <CarouselCreator
@@ -40,6 +49,7 @@ export default async function CreateCarouselPage() {
         initialReferenceLink2={workspace?.referenceLink2 || ''}
         initialReferenceLink3={workspace?.referenceLink3 || ''}
         brandColor={workspace?.brandColor || '#6366f1'}
+        learnedBrand={learnedBrand}
       />
     </main>
   );

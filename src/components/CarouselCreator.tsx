@@ -27,6 +27,7 @@ import {
   parsePublishTarget,
   type PublishTarget,
 } from '@/lib/contracts/publish-target';
+import type { BrandLearnedFacts } from '@/lib/brand-learned-summary';
 
 interface CarouselCreatorProps {
   userName?: string;
@@ -35,6 +36,7 @@ interface CarouselCreatorProps {
   initialReferenceLink2: string;
   initialReferenceLink3: string;
   brandColor: string;
+  learnedBrand?: BrandLearnedFacts;
 }
 
 function metaFromSubmit(
@@ -56,6 +58,7 @@ export default function CarouselCreator({
   initialReferenceLink3,
   brandColor,
   userName,
+  learnedBrand,
 }: CarouselCreatorProps) {
   const [slides, setSlides] = useState<Slide[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -252,6 +255,7 @@ export default function CarouselCreator({
           initialReferenceLink2={initialReferenceLink2}
           initialReferenceLink3={initialReferenceLink3}
           initialBrandPalette={brandPalette}
+          learnedBrand={learnedBrand}
         />
       ) : (
         <div className="space-y-3 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:space-y-0 lg:gap-3">
