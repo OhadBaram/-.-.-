@@ -1,18 +1,50 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Slide, TemplateId } from './CarouselRenderer';
+import {
+  COPILOT_QUICK_PROMPTS,
+  type CopilotQuickPromptId,
+  buildCopilotQuickCommand,
+} from '@/lib/copilot/quick-prompts';
 
-interface CopilotWidgetProps {
+export interface CopilotActionHandlers {
+  onUpdateSlideText: (index: number, text: string) => void;
+  onChangeTemplate: (tpl: TemplateId, slideIndex?: number) => void;
+  onChangeFont: (font: string) => void;
+  onChangeColors: (color: string, theme: string) => void;
+  onAddSlide?: (afterIndex: number, text?: string) => void;
+  onRemoveSlide?: (index: number) => void;
+  onReorderSlide?: (fromIndex: number, toIndex: number) => void;
+  onApplyLayoutPreset?: (
+    presetId: 'first-and-last' | 'first-only' | 'all-images' | 'no-images'
+  ) => void;
+  onSetActiveSlide?: (index: number) => void;
+  onSetSlideTypography?: (
+    index: number,
+    patch: { fontSize?: number; textY?: number }
+  ) => void;
+}
+
+interface CopilotWidgetProps extends CopilotActionHandlers {
   slides: Slide[];
   template: TemplateId;
   globalFont: string;
   brandColor: string;
   theme: string;
-  onUpdateSlideText: (index: number, text: string) => void;
-  onChangeTemplate: (tpl: TemplateId, slideIndex?: number) => void;
-  onChangeFont: (font: string) => void;
-  onChangeColors: (color: string, theme: string) => void;
+  activeSlideIndex?: number;
+  /** dock = סיידבר/עמודה; panel = לשונית מובייל מלאה */
+  variant?: 'dock' | 'panel';
+}
+
+type ChatMessage = { role: 'user' | 'assistant'; text: string };
+
+function asNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function asString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value : null;
 }
 
 export default function CopilotWidget({
@@ -21,24 +53,31 @@ export default function CopilotWidget({
   globalFont,
   brandColor,
   theme,
+  activeSlideIndex = 0,
+  variant = 'dock',
   onUpdateSlideText,
   onChangeTemplate,
   onChangeFont,
   onChangeColors,
+  onAddSlide,
+  onRemoveSlide,
+  onReorderSlide,
+  onApplyLayoutPreset,
+  onSetActiveSlide,
+  onSetSlideTypography,
 }: CopilotWidgetProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const [messages, setMessages] = useState<
-    { role: 'user' | 'assistant'; text: string }[]
-  >([
+  const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      text: 'היי! אני סוכן ה-AI שלך. רוצה שאשנה פונט? אחליף תבנית? או אערוך משפט בשקף 3? פשוט תגיד לי!',
+      text: 'היי! אני העוזר של הקרוסלה. אפשר לקצר טקסט, לשנות גופן/צבע/תבנית, להוסיף שקף או לעבור על כולם — לחצו על הצעה או כתבו חופשי.',
     },
   ]);
   const [inputText, setInputText] = useState('');
+  const [showAllPrompts, setShowAllPrompts] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -46,6 +85,8 @@ export default function CopilotWidget({
   const listRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
 
   const scrollChatToBottom = () => {
     requestAnimationFrame(() => {
@@ -66,6 +107,101 @@ export default function CopilotWidget({
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
+
+  const visiblePrompts = useMemo(() => {
+    const primary = COPILOT_QUICK_PROMPTS.slice(0, 6);
+    return showAllPrompts ? COPILOT_QUICK_PROMPTS : primary;
+  }, [showAllPrompts]);
+
+  const applyActions = (
+    actions: { name: string; args?: Record<string, unknown> }[]
+  ) => {
+    for (const action of actions) {
+      const args = action.args || {};
+      switch (action.name) {
+        case 'update_slide_text': {
+          const idx = asNumber(args.slideIndex);
+          const text = asString(args.newText);
+          if (idx != null && text) onUpdateSlideText(idx, text);
+          break;
+        }
+        case 'update_many_slide_texts': {
+          const updates = Array.isArray(args.updates) ? args.updates : [];
+          for (const item of updates) {
+            if (!item || typeof item !== 'object') continue;
+            const row = item as Record<string, unknown>;
+            const idx = asNumber(row.slideIndex);
+            const text = asString(row.newText);
+            if (idx != null && text) onUpdateSlideText(idx, text);
+          }
+          break;
+        }
+        case 'change_template': {
+          const tpl = asString(args.templateId) as TemplateId | null;
+          if (!tpl) break;
+          const idx = asNumber(args.slideIndex);
+          onChangeTemplate(tpl, idx ?? undefined);
+          break;
+        }
+        case 'change_font': {
+          const font = asString(args.fontFamily);
+          if (font) onChangeFont(font);
+          break;
+        }
+        case 'update_colors': {
+          const color = asString(args.brandColor) || brandColor;
+          const nextTheme = asString(args.theme) || theme;
+          onChangeColors(color, nextTheme);
+          break;
+        }
+        case 'set_layout_preset': {
+          const preset = asString(args.presetId);
+          if (
+            preset === 'first-and-last' ||
+            preset === 'first-only' ||
+            preset === 'all-images' ||
+            preset === 'no-images'
+          ) {
+            onApplyLayoutPreset?.(preset);
+          }
+          break;
+        }
+        case 'add_slide': {
+          const after =
+            asNumber(args.afterIndex) ??
+            Math.max(0, slides.length - 1);
+          onAddSlide?.(after, asString(args.text) ?? undefined);
+          break;
+        }
+        case 'remove_slide': {
+          const idx = asNumber(args.slideIndex);
+          if (idx != null) onRemoveSlide?.(idx);
+          break;
+        }
+        case 'reorder_slide': {
+          const from = asNumber(args.fromIndex);
+          const to = asNumber(args.toIndex);
+          if (from != null && to != null) onReorderSlide?.(from, to);
+          break;
+        }
+        case 'set_active_slide': {
+          const idx = asNumber(args.slideIndex);
+          if (idx != null) onSetActiveSlide?.(idx);
+          break;
+        }
+        case 'set_slide_typography': {
+          const idx = asNumber(args.slideIndex);
+          if (idx == null) break;
+          const fontSize = asNumber(args.fontSize) ?? undefined;
+          const textY = asNumber(args.textY) ?? undefined;
+          onSetSlideTypography?.(idx, { fontSize, textY });
+          break;
+        }
+        default:
+          break;
+      }
+    }
+  };
 
   const startRecordingTimer = () => {
     setRecordingSeconds(0);
@@ -99,7 +235,9 @@ export default function CopilotWidget({
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: 'audio/webm',
+        });
         stream.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
         await handleAudioUpload(audioBlob);
@@ -158,9 +296,12 @@ export default function CopilotWidget({
   };
 
   const executeCopilotCommand = async (command: string) => {
-    const newMessages = [
-      ...messages,
-      { role: 'user' as const, text: command },
+    const trimmed = command.trim();
+    if (!trimmed || isLoading) return;
+
+    const newMessages: ChatMessage[] = [
+      ...messagesRef.current,
+      { role: 'user', text: trimmed },
     ];
     setMessages(newMessages);
     setIsLoading(true);
@@ -171,7 +312,7 @@ export default function CopilotWidget({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          command,
+          command: trimmed,
           currentState: {
             slides: slides.map((s) => ({
               id: s.id,
@@ -179,47 +320,52 @@ export default function CopilotWidget({
               template: s.template ?? 'minimal',
               hasImage: Boolean(s.imageUrl),
             })),
+            activeSlideIndex,
             activeSlideTemplate: template,
             globalFont,
             brandColor,
             theme,
+            slideCount: slides.length,
           },
         }),
       });
       const data = await res.json();
 
-      if (data.text) {
-        setMessages([
-          ...newMessages,
-          { role: 'assistant', text: data.text },
-        ]);
+      if (!res.ok) {
+        throw new Error(data.error || 'Copilot failed');
       }
 
-      if (data.actions) {
-        data.actions.forEach((action: any) => {
-          if (action.name === 'update_slide_text') {
-            onUpdateSlideText(action.args.slideIndex, action.args.newText);
-          } else if (action.name === 'change_template') {
-            onChangeTemplate(action.args.templateId, action.args.slideIndex);
-          } else if (action.name === 'change_font') {
-            onChangeFont(action.args.fontFamily);
-          } else if (action.name === 'update_colors') {
-            onChangeColors(action.args.brandColor, action.args.theme);
-          }
-        });
+      if (Array.isArray(data.actions) && data.actions.length) {
+        applyActions(data.actions);
       }
+
+      setMessages([
+        ...newMessages,
+        {
+          role: 'assistant',
+          text:
+            typeof data.text === 'string' && data.text.trim()
+              ? data.text
+              : 'ביצעתי את השינויים.',
+        },
+      ]);
     } catch (err) {
       console.error(err);
       setMessages([
         ...newMessages,
         {
           role: 'assistant',
-          text: 'סליחה, אירעה שגיאה בעיבוד הבקשה.',
+          text: 'סליחה, אירעה שגיאה בעיבוד הבקשה. נסו שוב בעוד רגע.',
         },
       ]);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const runQuickPrompt = (id: CopilotQuickPromptId) => {
+    const command = buildCopilotQuickCommand(id, activeSlideIndex);
+    if (command) void executeCopilotCommand(command);
   };
 
   const formatTimer = (seconds: number) => {
@@ -230,30 +376,77 @@ export default function CopilotWidget({
     return `${m}:${s}`;
   };
 
+  const busy = isLoading || isTranscribing;
+  const isPanel = variant === 'panel';
+
   return (
-    <div className="w-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col h-64 md:h-72 shadow-inner">
-      <div className="bg-indigo-600 p-3 flex justify-between items-center text-white">
-        <span className="font-bold flex items-center gap-2">✨ AI Copilot</span>
+    <div
+      className={`w-full bg-white dark:bg-gray-900 rounded-2xl border border-indigo-200 dark:border-indigo-500/40 overflow-hidden flex flex-col shadow-md ${
+        isPanel
+          ? 'h-full min-h-0 rounded-none border-0 shadow-none'
+          : 'h-full min-h-[22rem]'
+      }`}
+      dir="rtl"
+    >
+      <div className="bg-gradient-to-l from-indigo-600 to-violet-600 p-3 flex justify-between items-center text-white shrink-0">
+        <div className="min-w-0">
+          <p className="font-black text-sm md:text-base leading-tight">
+            עוזר הקרוסלה
+          </p>
+          <p className="text-[11px] text-indigo-100/90 mt-0.5 truncate">
+            שקף {activeSlideIndex + 1} מתוך {slides.length} · לחצו הצעה או כתבו
+          </p>
+        </div>
         {isRecording ? (
-          <span className="text-xs font-bold bg-red-500/90 px-2 py-0.5 rounded-full animate-pulse flex items-center gap-1.5">
+          <span className="text-xs font-bold bg-red-500/90 px-2 py-0.5 rounded-full animate-pulse flex items-center gap-1.5 shrink-0">
             <span className="w-2 h-2 rounded-full bg-white" />
             מקליט {formatTimer(recordingSeconds)}
           </span>
-        ) : null}
+        ) : (
+          <span className="text-[10px] font-bold bg-white/15 px-2 py-1 rounded-full shrink-0">
+            AI
+          </span>
+        )}
+      </div>
+
+      <div className="shrink-0 px-3 pt-3 pb-2 border-b border-indigo-100 dark:border-indigo-900/40 bg-indigo-50/60 dark:bg-indigo-950/20">
+        <p className="text-[11px] font-bold text-indigo-900 dark:text-indigo-200 mb-2">
+          הצעות מהירות
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {visiblePrompts.map((prompt) => (
+            <button
+              key={prompt.id}
+              type="button"
+              disabled={busy || isRecording}
+              onClick={() => runQuickPrompt(prompt.id)}
+              className="text-[11px] font-bold px-2.5 py-1.5 rounded-full border border-indigo-200 dark:border-indigo-500/40 bg-white dark:bg-gray-900 text-indigo-800 dark:text-indigo-100 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition disabled:opacity-40"
+            >
+              {prompt.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setShowAllPrompts((v) => !v)}
+            className="text-[11px] font-bold px-2.5 py-1.5 rounded-full text-indigo-600 dark:text-indigo-300 underline underline-offset-2"
+          >
+            {showAllPrompts ? 'פחות' : 'עוד הצעות'}
+          </button>
+        </div>
       </div>
 
       <div
         ref={listRef}
-        className="flex-1 overflow-y-auto p-4 flex flex-col gap-3"
+        className="flex-1 min-h-0 overflow-y-auto p-3 md:p-4 flex flex-col gap-3"
       >
         {messages.map((msg, i) => (
           <div
-            key={i}
-            className={`p-2 rounded-lg text-sm ${
+            key={`${msg.role}-${i}`}
+            className={`p-2.5 rounded-xl text-sm leading-relaxed ${
               msg.role === 'assistant'
-                ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-900 dark:text-indigo-200 self-start'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 self-end'
-            } max-w-[85%]`}
+                ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-900 dark:text-indigo-100 self-start'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100 self-end'
+            } max-w-[90%]`}
           >
             {msg.text}
           </div>
@@ -283,24 +476,22 @@ export default function CopilotWidget({
 
         {isLoading ? (
           <div className="text-xs text-indigo-500 dark:text-indigo-300 self-start animate-pulse font-medium">
-            הבוט חושב…
+            העוזר חושב…
           </div>
         ) : null}
 
         <div ref={bottomRef} className="h-px shrink-0" aria-hidden />
       </div>
 
-      <div className="p-3 border-t border-gray-200 dark:border-gray-700 flex gap-2 items-center">
+      <div className="p-3 border-t border-gray-200 dark:border-gray-700 flex gap-2 items-center shrink-0 bg-white dark:bg-gray-900">
         <button
           type="button"
           onClick={toggleRecording}
-          disabled={isLoading || isTranscribing}
+          disabled={busy}
           aria-pressed={isRecording}
           aria-label={isRecording ? 'עצור הקלטה ושלח' : 'התחל הקלטה'}
           title={
-            isRecording
-              ? 'לחצו לעצירה ושליחה'
-              : 'לחצו להתחלת הקלטה'
+            isRecording ? 'לחצו לעצירה ושליחה' : 'לחצו להתחלת הקלטה'
           }
           className={`relative p-2.5 rounded-full transition-all disabled:opacity-40 ${
             isRecording
@@ -317,27 +508,31 @@ export default function CopilotWidget({
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
-          onKeyDown={(e) =>
-            e.key === 'Enter' &&
-            inputText &&
-            !isRecording &&
-            executeCopilotCommand(inputText)
-          }
+          onKeyDown={(e) => {
+            if (
+              e.key === 'Enter' &&
+              inputText.trim() &&
+              !isRecording &&
+              !busy
+            ) {
+              void executeCopilotCommand(inputText);
+            }
+          }}
           disabled={isRecording}
           placeholder={
             isRecording
               ? 'מקליט… לחצו שוב על המיקרופון'
-              : 'הקלידו פקודה או לחצו על המיקרופון…'
+              : 'למשל: קצר את שקף 2 / צבע כחול / הוסף שקף…'
           }
-          className="flex-1 bg-gray-50 dark:bg-gray-800 border-none text-sm rounded-lg px-3 focus:ring-0 disabled:opacity-60"
+          className="flex-1 bg-gray-50 dark:bg-gray-800 border-none text-sm rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-indigo-400/40 disabled:opacity-60"
         />
         <button
           type="button"
-          onClick={() => inputText && executeCopilotCommand(inputText)}
-          disabled={isRecording || isLoading || !inputText.trim()}
-          className="bg-indigo-600 text-white p-2 rounded-lg hover:bg-indigo-700 disabled:opacity-40"
+          onClick={() => void executeCopilotCommand(inputText)}
+          disabled={isRecording || busy || !inputText.trim()}
+          className="bg-indigo-600 text-white px-3 py-2.5 rounded-lg hover:bg-indigo-700 disabled:opacity-40 font-bold text-sm"
         >
-          ➤
+          שלח
         </button>
       </div>
     </div>

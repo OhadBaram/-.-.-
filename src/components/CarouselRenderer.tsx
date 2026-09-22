@@ -326,7 +326,9 @@ export default function CarouselRenderer({
   };
   const publishProfile = getPublishTargetProfile(publishTarget);
   /** בנייד: תצוגה מקדימה ועריכה לא יכולות לחלוק מסך בלי לדחוק זו את זו */
-  const [mobilePane, setMobilePane] = useState<'preview' | 'edit'>('preview');
+  const [mobilePane, setMobilePane] = useState<'preview' | 'edit' | 'copilot'>(
+    'preview'
+  );
 
   const activeSlide = localSlides[activeSlideIndex];
   const activeSlideTemplate = activeSlide ? getSlideTemplate(activeSlide) : DEFAULT_TEXT_TEMPLATE;
@@ -657,13 +659,16 @@ export default function CarouselRenderer({
     setEditingIndex(null);
   };
 
-  const addSlide = (afterIndex: number = activeSlideIndex) => {
+  const addSlide = (
+    afterIndex: number = activeSlideIndex,
+    text?: string
+  ) => {
     if (localSlides.length >= MAX_SLIDE_COUNT) return;
     const source = localSlides[afterIndex] || localSlides[localSlides.length - 1];
     const insertAt = Math.min(afterIndex + 1, localSlides.length);
     const newSlide: Slide = {
       id: `slide-${Date.now()}-${insertAt + 1}`,
-      text: 'שקף חדש — ערכו כאן',
+      text: text?.trim() || 'שקף חדש — ערכו כאן',
       backgroundColor: source?.backgroundColor || '#ffffff',
       textColor: source?.textColor || '#111827',
       template: source?.template || 'minimal',
@@ -745,6 +750,56 @@ export default function CarouselRenderer({
     setDragOverIndex(null);
   };
 
+  const copilotProps = {
+    slides: localSlides,
+    template: activeSlideTemplate,
+    globalFont,
+    brandColor: activeBrandColor,
+    theme,
+    activeSlideIndex,
+    onUpdateSlideText: (index: number, text: string) => {
+      setLocalSlides((prev) => {
+        if (!prev[index]) return prev;
+        const next = [...prev];
+        next[index] = { ...next[index], text };
+        return next;
+      });
+    },
+    onChangeTemplate: handleChangeTemplateFromCopilot,
+    onChangeFont: (font: string) => setGlobalFont(font),
+    onChangeColors: (color: string, newTheme: string) => {
+      if (color) {
+        setBrandPalette((prev) =>
+          clampPalette({
+            ...prev,
+            accents: [color, ...prev.accents.slice(1)],
+          })
+        );
+      }
+      if (newTheme === 'light' || newTheme === 'dark') setTheme(newTheme);
+    },
+    onAddSlide: (afterIndex: number, text?: string) => addSlide(afterIndex, text),
+    onRemoveSlide: (index: number) => removeSlide(index),
+    onReorderSlide: (from: number, to: number) => reorderSlides(from, to),
+    onApplyLayoutPreset: (
+      presetId: 'first-and-last' | 'first-only' | 'all-images' | 'no-images'
+    ) => applyLayoutPreset(presetId),
+    onSetActiveSlide: (index: number) => {
+      if (index >= 0 && index < localSlides.length) {
+        setActiveSlideIndex(index);
+      }
+    },
+    onSetSlideTypography: (
+      index: number,
+      patch: { fontSize?: number; textY?: number }
+    ) => {
+      setSlideOverrides((prev) => ({
+        ...prev,
+        [index]: { ...(prev[index] ?? {}), ...patch },
+      }));
+    },
+  };
+
   return (
     <div className="flex flex-col md:flex-row h-full min-h-0 w-full bg-gray-50 dark:bg-gray-900 overflow-hidden" dir="rtl">
       {/* המלצה במובייל — לעריכה מלאה עדיף מחשב */}
@@ -753,13 +808,13 @@ export default function CarouselRenderer({
         role="note"
       >
         <p className="text-[11px] font-semibold text-amber-950 dark:text-amber-100 leading-snug">
-          לעריכה נוחה של צבעים, גופן וצ׳אט — מומלץ לפתוח במחשב. כאן אפשר לתקן
-          טקסט ולראות תצוגה.
+          מומלץ לפתוח במחשב לעריכה מלאה. בטלפון: לשונית «עוזר AI» לשכתובים
+          מהירים, «עריכה» לצבעים, ו«תצוגה» לראות את השקף.
         </p>
       </div>
 
-      {/* לשוניות מובייל — תצוגה מול עריכה */}
-      <div className="md:hidden shrink-0 grid grid-cols-2 gap-1 p-2 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 z-30">
+      {/* לשוניות מובייל — תצוגה / עריכה / עוזר */}
+      <div className="md:hidden shrink-0 grid grid-cols-3 gap-1 p-2 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 z-30">
         <button
           type="button"
           onClick={() => setMobilePane('preview')}
@@ -769,7 +824,7 @@ export default function CarouselRenderer({
               : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200'
           }`}
         >
-          תצוגה מקדימה
+          תצוגה
         </button>
         <button
           type="button"
@@ -781,6 +836,17 @@ export default function CarouselRenderer({
           }`}
         >
           עריכה
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobilePane('copilot')}
+          className={`rounded-xl py-2.5 text-sm font-bold transition ${
+            mobilePane === 'copilot'
+              ? 'bg-indigo-600 text-white shadow-sm'
+              : 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-700'
+          }`}
+        >
+          עוזר AI
         </button>
       </div>
 
@@ -831,7 +897,14 @@ export default function CarouselRenderer({
           </button>
         </div>
 
-        <div className="p-4 flex flex-col gap-5 md:flex-1 md:min-h-0 md:overflow-y-auto">
+        {/* עוזר AI — מיקום ראשי במחשב */}
+        <div className="hidden md:flex md:flex-1 md:min-h-0 md:flex-col border-b border-indigo-100 dark:border-indigo-900/40 bg-indigo-50/40 dark:bg-indigo-950/20">
+          <div className="flex-1 min-h-0 p-3">
+            <CopilotWidget {...copilotProps} variant="dock" />
+          </div>
+        </div>
+
+        <div className="p-4 flex flex-col gap-5 md:max-h-[42%] md:overflow-y-auto md:shrink-0">
           {/* עריכה מהירה */}
           <section>
             <h3 className="font-bold mb-1 text-gray-800 dark:text-gray-200">עריכה מהירה</h3>
@@ -1198,37 +1271,6 @@ export default function CarouselRenderer({
             )}
           </section>
         </div>
-
-        {/* צ׳אט דביק בתחתית הסיידבר במחשב — תמיד גלוי */}
-        <div className="shrink-0 border-t border-gray-200 dark:border-gray-700 p-3 bg-white dark:bg-gray-800 md:sticky md:bottom-0">
-          <CopilotWidget
-            slides={localSlides}
-            template={activeSlideTemplate}
-            globalFont={globalFont}
-            brandColor={activeBrandColor}
-            theme={theme}
-            onUpdateSlideText={(index, text) => {
-              const newSlides = [...localSlides];
-              if (newSlides[index]) {
-                newSlides[index] = { ...newSlides[index], text };
-                setLocalSlides(newSlides);
-              }
-            }}
-            onChangeTemplate={handleChangeTemplateFromCopilot}
-            onChangeFont={(font) => setGlobalFont(font)}
-            onChangeColors={(color, newTheme) => {
-              if (color) {
-                setBrandPalette((prev) =>
-                  clampPalette({
-                    ...prev,
-                    accents: [color, ...prev.accents.slice(1)],
-                  })
-                );
-              }
-              if (newTheme === 'light' || newTheme === 'dark') setTheme(newTheme);
-            }}
-          />
-        </div>
       </div>
 
       {/* Central Stage */}
@@ -1456,8 +1498,21 @@ export default function CarouselRenderer({
           >
             לעריכה ←
           </button>
+          <button
+            type="button"
+            onClick={() => setMobilePane('copilot')}
+            className="md:hidden shrink-0 text-xs font-bold px-3 py-2 rounded-xl bg-indigo-600 text-white"
+          >
+            עוזר AI
+          </button>
         </div>
       </div>
+
+      {mobilePane === 'copilot' ? (
+        <div className="md:hidden flex flex-1 min-h-0 flex-col order-last bg-white dark:bg-gray-900">
+          <CopilotWidget {...copilotProps} variant="panel" />
+        </div>
+      ) : null}
 
       {mobilePane === 'edit' && localSlides[activeSlideIndex] ? (
         <div className="md:hidden shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 max-h-[42dvh] overflow-y-auto order-last">
