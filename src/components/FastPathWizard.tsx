@@ -26,6 +26,8 @@ import {
 import { recommendedSlideCountForTopic } from '@/lib/wizard-intake';
 import type { WizardSharedDraft } from '@/lib/creation-flow/wizard-draft';
 import { normalizeWizardDraft } from '@/lib/creation-flow/wizard-draft';
+import BrandLearnedSummary from '@/components/BrandLearnedSummary';
+import type { BrandLearnedFacts } from '@/lib/brand-learned-summary';
 
 const QUICK_TOPICS = [
   '5 טעויות שמרחיקות לקוחות מהעסק',
@@ -49,6 +51,8 @@ export interface FastPathWizardProps {
   initialBrandPalette?: BrandPalette | string;
   /** טיוטה שנשמרה ממעבר קודם / מסלול מלא */
   initialDraft?: WizardSharedDraft;
+  /** סיכום למידת מותג למשתמש חוזר */
+  learnedBrand?: BrandLearnedFacts;
 }
 
 function initialPalette(
@@ -78,6 +82,7 @@ export default function FastPathWizard({
   initialReferenceLink3 = '',
   initialBrandPalette,
   initialDraft,
+  learnedBrand,
 }: FastPathWizardProps) {
   const seeded = normalizeWizardDraft(initialDraft);
   const [step, setStep] = useState<FastStep>(() =>
@@ -184,6 +189,10 @@ export default function FastPathWizard({
               : 'ניצור קרוסלה מוכנה בדקות — בלי סיבוב מיותר.'}
           </p>
         </header>
+
+        {learnedBrand && step === 'target' ? (
+          <BrandLearnedSummary facts={learnedBrand} variant="wizard" />
+        ) : null}
 
         {step === 'target' ? (
           <section className="space-y-4" aria-labelledby="fast-target-title">
