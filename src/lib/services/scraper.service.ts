@@ -7,7 +7,7 @@ export async function scrapeUrls(urls: string[]): Promise<string> {
 
   const scrapePromises = urlsToScrape.map(async (url) => {
     const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), 25000); 
+    const id = setTimeout(() => controller.abort(), 5000); 
     try {
       const res = await fetch(`https://r.jina.ai/${url}`, { 
         signal: controller.signal,

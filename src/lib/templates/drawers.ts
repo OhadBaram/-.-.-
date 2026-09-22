@@ -6,11 +6,30 @@ export function darkenHex(hex: string, amount = 60): string {
   const b = Math.max(0, parseInt(c.substring(4, 6), 16) - amount);
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
+export type ImageShapeType = 'rect' | 'circle' | 'ellipse' | 'rounded' | 'arch';
+export type VibeEffectType = 'none' | 'luxury' | 'tech' | 'warm' | 'glow' | 'dynamic';
+
 export interface SlideOverride {
   fontSize?: number;
   textY?: number;
   /** רקע שקף מפלטת המשתמש — גובר על ברירת בהיר/כהה */
   surfaceBg?: string;
+  /** זום / קירוב או הרחקה של התמונה: 1.0 ברירת מחדל, 0.5–2.5 */
+  imageScale?: number;
+  /** היסט אופקי של התמונה באחוזים (-50 עד 50) לחיתוך והזזה */
+  imageOffsetX?: number;
+  /** היסט אנכי של התמונה באחוזים (-50 עד 50) לחיתוך והזזה */
+  imageOffsetY?: number;
+  /** חיתוך חלק עליון באחוזים (למשל 20 = חיתוך 20% מלמעלה) */
+  cropTopPercent?: number;
+  /** חיתוך חלק תחתון באחוזים */
+  cropBottomPercent?: number;
+  /** צורת שיבוץ התמונה: מלבן, עיגול, אליפסה, מעוגל, קשת */
+  imageShape?: ImageShapeType;
+  /** אפקט וייב ואווירה ויזואלית לשקף */
+  vibeEffect?: VibeEffectType;
+  /** תמונה שנייה לשקף בתבניות מרובות תמונות */
+  secondImageUrl?: string;
 }
 
 export function resolveSurfaceBg(
@@ -567,35 +586,8 @@ export async function drawImageSplit(
 ): Promise<void> {
   const splitY = H * 0.65;
 
-  // Draw background image or placeholder
-  if (imageUrl) {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.src = imageUrl;
-    await new Promise((resolve) => {
-      img.onload = resolve;
-      img.onerror = resolve;
-    });
-    if (shouldAbort?.()) return;
-    // cover עם מיקוד עליון — לא חותך ראשים כמו center
-    const { renderW, renderH, offsetX, offsetY } = coverFitRect(
-      img.width,
-      img.height,
-      W,
-      splitY,
-      0.5,
-      0
-    );
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, 0, W, splitY);
-    ctx.clip();
-    ctx.drawImage(img, offsetX, offsetY, renderW, renderH);
-    ctx.restore();
-  } else {
-    drawImagePlacementMarker(ctx, 0, 0, W, splitY, isDark, fontFamily);
-    strokeImagePlacementOutline(ctx, 0, 0, W, splitY, isDark);
-  }
+  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, splitY, isDark, undefined, fontFamily, shouldAbort, override);
+  if (shouldAbort?.()) return;
 
   // Draw bottom split — darken brand panel in canvas dark mode
   ctx.fillStyle = isDark ? darkenHex(brandColor, 55) : brandColor;
@@ -647,7 +639,8 @@ function drawImagePlacementMarker(
   h: number,
   isDark: boolean,
   fontFamily: string,
-  buildPath?: ClipPathBuilder
+  buildPath?: ClipPathBuilder,
+  customLabel?: string
 ) {
   const accent = isDark ? '#9ca3af' : '#64748b';
   const fill = isDark ? '#1f2937' : '#e2e8f0';
@@ -673,7 +666,7 @@ function drawImagePlacementMarker(
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.direction = 'rtl';
-  ctx.fillText('לחצו להוספת תמונה', cx, cy + bodyH / 2 + 14 * iconScale);
+  ctx.fillText(customLabel || 'לחצו להוספת תמונה', cx, cy + bodyH / 2 + 14 * iconScale);
 }
 
 function strokeImagePlacementOutline(
@@ -710,15 +703,55 @@ export async function drawImageOrPlaceholder(
   isDark: boolean,
   clipPath?: ClipPathBuilder,
   fontFamily: string = 'Heebo, sans-serif',
-  shouldAbort?: () => boolean
+  shouldAbort?: () => boolean,
+  override?: SlideOverride,
+  placeholderLabel?: string
 ) {
+  // Apply Top / Bottom Crop to bounding box
+  const cropTop = Math.max(0, Math.min(60, override?.cropTopPercent ?? 0));
+  const cropBottom = Math.max(0, Math.min(60, override?.cropBottomPercent ?? 0));
+  const topCutPx = (cropTop / 100) * h;
+  const bottomCutPx = (cropBottom / 100) * h;
+
+  const actualY = y + topCutPx;
+  const actualH = Math.max(20, h - topCutPx - bottomCutPx);
+
   ctx.save();
   if (clipPath) {
     clipPath();
     ctx.clip();
+  } else if (override?.imageShape === 'circle') {
+    const radius = Math.min(w, actualH) / 2;
+    const cx = x + w / 2;
+    const cy = actualY + actualH / 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.clip();
+  } else if (override?.imageShape === 'ellipse') {
+    const rx = w / 2;
+    const ry = actualH / 2;
+    const cx = x + rx;
+    const cy = actualY + ry;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.clip();
+  } else if (override?.imageShape === 'rounded') {
+    ctx.beginPath();
+    ctx.roundRect(x, actualY, w, actualH, 32);
+    ctx.clip();
+  } else if (override?.imageShape === 'arch') {
+    const radius = w / 2;
+    ctx.beginPath();
+    ctx.moveTo(x, actualY + radius);
+    ctx.arcTo(x, actualY, x + radius, actualY, radius);
+    ctx.arcTo(x + w, actualY, x + w, actualY + radius, radius);
+    ctx.lineTo(x + w, actualY + actualH);
+    ctx.lineTo(x, actualY + actualH);
+    ctx.closePath();
+    ctx.clip();
   } else {
     ctx.beginPath();
-    ctx.rect(x, y, w, h);
+    ctx.rect(x, actualY, w, actualH);
     ctx.clip();
   }
 
@@ -750,10 +783,23 @@ export async function drawImageOrPlaceholder(
         0
       ));
     }
-    ctx.drawImage(img, x + offsetX, y + offsetY, renderW, renderH);
+
+    // זום ומיקום תמונה (קירוב/הרחקה, חיתוך והזזה)
+    const scale = Math.max(0.2, Math.min(4.0, override?.imageScale ?? 1.0));
+    const extraOffsetX = ((override?.imageOffsetX ?? 0) / 100) * w;
+    const extraOffsetY = ((override?.imageOffsetY ?? 0) / 100) * h;
+
+    const scaledW = renderW * scale;
+    const scaledH = renderH * scale;
+    const centerX = x + w / 2;
+    const centerY = y + h / 2;
+    const drawX = centerX - scaledW / 2 + (offsetX + (w - renderW) * 0) * scale + extraOffsetX;
+    const drawY = centerY - scaledH / 2 + offsetY * scale + extraOffsetY;
+
+    ctx.drawImage(img, drawX, drawY, scaledW, scaledH);
     ctx.restore();
   } else {
-    drawImagePlacementMarker(ctx, x, y, w, h, isDark, fontFamily, clipPath);
+    drawImagePlacementMarker(ctx, x, y, w, h, isDark, fontFamily, clipPath, placeholderLabel);
     ctx.restore();
     // Outline after restore so dashed border isn't half-clipped away
     strokeImagePlacementOutline(ctx, x, y, w, h, isDark, clipPath);
@@ -770,7 +816,7 @@ export async function drawImageFullDark(
   override: SlideOverride = {},
   imageUrl?: string, fontFamily: string = 'Heebo, sans-serif', shouldAbort?: () => boolean
 ): Promise<void> {
-  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, H, isDark, undefined, fontFamily, shouldAbort);
+  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, H, isDark, undefined, fontFamily, shouldAbort, override);
   if (shouldAbort?.()) return;
   
   const grad = ctx.createLinearGradient(0, 0, 0, H);
@@ -812,7 +858,7 @@ export async function drawImageCircle(
   await drawImageOrPlaceholder(ctx, imageUrl, cx - radius, cy - radius, radius * 2, radius * 2, isDark, () => {
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-  }, fontFamily, shouldAbort);
+  }, fontFamily, shouldAbort, override);
   if (shouldAbort?.()) return;
 
   const fontSize = override.fontSize ?? 64;
@@ -840,7 +886,7 @@ export async function drawImageSplitBottom(
   ctx.fillStyle = isDark ? darkenHex(brandColor, 50) : brandColor;
   ctx.fillRect(0, 0, W, splitY);
   
-  await drawImageOrPlaceholder(ctx, imageUrl, 0, splitY, W, H - splitY, isDark, undefined, fontFamily, shouldAbort);
+  await drawImageOrPlaceholder(ctx, imageUrl, 0, splitY, W, H - splitY, isDark, undefined, fontFamily, shouldAbort, override);
   if (shouldAbort?.()) return;
 
   const fontSize = override.fontSize ?? 64;
@@ -885,7 +931,7 @@ export async function drawImagePolaroid(
   const imgW = pw - margin * 2;
   const imgH = ph - margin - bottomMargin;
   
-  await drawImageOrPlaceholder(ctx, imageUrl, px + margin, py + margin, imgW, imgH, isDark, undefined, fontFamily, shouldAbort);
+  await drawImageOrPlaceholder(ctx, imageUrl, px + margin, py + margin, imgW, imgH, isDark, undefined, fontFamily, shouldAbort, override);
   if (shouldAbort?.()) return;
 
   const fontSize = override.fontSize ?? 48;
@@ -911,7 +957,7 @@ export async function drawImageSide(
   ctx.fillStyle = isDark ? darkenHex(brandColor, 50) : brandColor;
   ctx.fillRect(0, 0, W / 2, H);
 
-  await drawImageOrPlaceholder(ctx, imageUrl, W / 2, 0, W / 2, H, isDark, undefined, fontFamily, shouldAbort);
+  await drawImageOrPlaceholder(ctx, imageUrl, W / 2, 0, W / 2, H, isDark, undefined, fontFamily, shouldAbort, override);
   if (shouldAbort?.()) return;
 
   const fontSize = override.fontSize ?? 54;
@@ -940,7 +986,7 @@ export async function drawImageMagazine(
   ctx.fillStyle = bg;
   ctx.fillRect(0, splitY, W, H - splitY);
 
-  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, splitY, isDark, undefined, fontFamily, shouldAbort);
+  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, splitY, isDark, undefined, fontFamily, shouldAbort, override);
   if (shouldAbort?.()) return;
 
   const fontSize = override.fontSize ?? 90;
@@ -963,7 +1009,7 @@ export async function drawImageOverlay(
   override: SlideOverride = {},
   imageUrl?: string, fontFamily: string = 'Heebo, sans-serif', shouldAbort?: () => boolean
 ): Promise<void> {
-  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, H, isDark, undefined, fontFamily, shouldAbort);
+  await drawImageOrPlaceholder(ctx, imageUrl, 0, 0, W, H, isDark, undefined, fontFamily, shouldAbort, override);
   if (shouldAbort?.()) return;
   
   ctx.globalAlpha = isDark ? 0.72 : 0.5;
@@ -1020,4 +1066,348 @@ export async function drawImageArch(
   const textY = override.textY !== undefined ? (H * (override.textY / 100)) : defaultTextY;
   
   drawWrappedText(ctx, text, W / 2, textY, W * 0.85, fontSize * 1.4);
+}
+
+
+export async function drawImageDualSplit(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  text: string,
+  brandColor: string,
+  isDark: boolean,
+  override: SlideOverride = {},
+  imageUrl?: string,
+  fontFamily: string = 'Heebo, sans-serif',
+  shouldAbort?: () => boolean
+): Promise<void> {
+  const bg = resolveSurfaceBg(isDark, override, '#f8fafc', '#0f172a');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const topH = H * 0.62;
+  const pad = 40;
+  const gap = 24;
+  const colW = (W - (pad * 2) - gap) / 2;
+  const colH = topH - pad;
+
+  // Image 1
+  await drawImageOrPlaceholder(
+    ctx,
+    imageUrl,
+    pad,
+    pad,
+    colW,
+    colH,
+    isDark,
+    () => {
+      ctx.beginPath();
+      ctx.roundRect(pad, pad, colW, colH, 20);
+    },
+    fontFamily,
+    shouldAbort,
+    override,
+    'תמונה 1'
+  );
+  if (shouldAbort?.()) return;
+
+  // Image 2
+  const col2X = pad + colW + gap;
+  await drawImageOrPlaceholder(
+    ctx,
+    override.secondImageUrl,
+    col2X,
+    pad,
+    colW,
+    colH,
+    isDark,
+    () => {
+      ctx.beginPath();
+      ctx.roundRect(col2X, pad, colW, colH, 20);
+    },
+    fontFamily,
+    shouldAbort,
+    override,
+    'תמונה 2'
+  );
+  if (shouldAbort?.()) return;
+
+  // Bottom text card
+  const bottomCardY = topH + 20;
+  const bottomCardH = H - bottomCardY - pad;
+  ctx.fillStyle = isDark ? darkenHex(brandColor, 60) : brandColor;
+  ctx.beginPath();
+  ctx.roundRect(pad, bottomCardY, W - pad * 2, bottomCardH, 24);
+  ctx.fill();
+
+  const fontSize = override.fontSize ?? 58;
+  ctx.font = `bold ${fontSize}px ${fontFamily}`;
+  ctx.fillStyle = '#ffffff';
+  ctx.textBaseline = 'middle';
+  const defaultTextY = bottomCardY + bottomCardH / 2;
+  const textY = override.textY !== undefined ? (H * (override.textY / 100)) : defaultTextY;
+  drawWrappedText(ctx, text, W / 2, textY, (W - pad * 2) * 0.88, fontSize * 1.35);
+}
+
+export async function drawImageCompare(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  text: string,
+  brandColor: string,
+  isDark: boolean,
+  override: SlideOverride = {},
+  imageUrl?: string,
+  fontFamily: string = 'Heebo, sans-serif',
+  shouldAbort?: () => boolean
+): Promise<void> {
+  const bg = resolveSurfaceBg(isDark, override, '#f8fafc', '#111827');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const topH = H * 0.68;
+  const pad = 36;
+  const gap = 20;
+  const colW = (W - (pad * 2) - gap) / 2;
+  const colH = topH - pad;
+
+  // "לפני" - Image 1 (Right in RTL)
+  const col1X = pad + colW + gap;
+  await drawImageOrPlaceholder(
+    ctx,
+    imageUrl,
+    col1X,
+    pad,
+    colW,
+    colH,
+    isDark,
+    () => {
+      ctx.beginPath();
+      ctx.roundRect(col1X, pad, colW, colH, 20);
+    },
+    fontFamily,
+    shouldAbort,
+    override,
+    'תמונה 1 (לפני)'
+  );
+  if (shouldAbort?.()) return;
+
+  // Badge "לפני"
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.68)';
+  ctx.beginPath();
+  ctx.roundRect(col1X + colW - 130, pad + 20, 110, 48, 12);
+  ctx.fill();
+  ctx.font = `bold 28px ${fontFamily}`;
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('לפני', col1X + colW - 75, pad + 44);
+  ctx.restore();
+
+  // "אחרי" - Image 2 (Left in RTL)
+  const col2X = pad;
+  await drawImageOrPlaceholder(
+    ctx,
+    override.secondImageUrl,
+    col2X,
+    pad,
+    colW,
+    colH,
+    isDark,
+    () => {
+      ctx.beginPath();
+      ctx.roundRect(col2X, pad, colW, colH, 20);
+    },
+    fontFamily,
+    shouldAbort,
+    override,
+    'תמונה 2 (אחרי)'
+  );
+  if (shouldAbort?.()) return;
+
+  // Badge "אחרי"
+  ctx.save();
+  ctx.fillStyle = brandColor;
+  ctx.beginPath();
+  ctx.roundRect(col2X + colW - 130, pad + 20, 110, 48, 12);
+  ctx.fill();
+  ctx.font = `bold 28px ${fontFamily}`;
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('אחרי', col2X + colW - 75, pad + 44);
+  ctx.restore();
+
+  // Bottom text area
+  const bottomY = topH + 30;
+  const fontSize = override.fontSize ?? 56;
+  ctx.font = `bold ${fontSize}px ${fontFamily}`;
+  ctx.fillStyle = isDark ? '#f8fafc' : '#0f172a';
+  ctx.textBaseline = 'middle';
+  const defaultTextY = bottomY + (H - bottomY) / 2;
+  const textY = override.textY !== undefined ? (H * (override.textY / 100)) : defaultTextY;
+  drawWrappedText(ctx, text, W / 2, textY, W * 0.88, fontSize * 1.35);
+}
+
+export async function drawImageGrid2(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  text: string,
+  brandColor: string,
+  isDark: boolean,
+  override: SlideOverride = {},
+  imageUrl?: string,
+  fontFamily: string = 'Heebo, sans-serif',
+  shouldAbort?: () => boolean
+): Promise<void> {
+  const bg = resolveSurfaceBg(isDark, override, '#f8fafc', '#111827');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const pad = 40;
+  const topH = H * 0.58;
+  const img1H = (topH - 20) * 0.58;
+  const img2H = (topH - 20) * 0.42;
+
+  // Top large photo
+  await drawImageOrPlaceholder(
+    ctx,
+    imageUrl,
+    pad,
+    pad,
+    W - pad * 2,
+    img1H,
+    isDark,
+    () => {
+      ctx.beginPath();
+      ctx.roundRect(pad, pad, W - pad * 2, img1H, 20);
+    },
+    fontFamily,
+    shouldAbort,
+    override,
+    'תמונה ראשית'
+  );
+  if (shouldAbort?.()) return;
+
+  // Middle secondary photo
+  const img2Y = pad + img1H + 20;
+  await drawImageOrPlaceholder(
+    ctx,
+    override.secondImageUrl,
+    pad,
+    img2Y,
+    W - pad * 2,
+    img2H,
+    isDark,
+    () => {
+      ctx.beginPath();
+      ctx.roundRect(pad, img2Y, W - pad * 2, img2H, 20);
+    },
+    fontFamily,
+    shouldAbort,
+    override,
+    'תמונה משנית'
+  );
+  if (shouldAbort?.()) return;
+
+  // Accent dividing bar
+  const barY = img2Y + img2H + 30;
+  ctx.fillStyle = brandColor;
+  ctx.fillRect(W / 2 - 40, barY, 80, 8);
+
+  // Bottom text
+  const fontSize = override.fontSize ?? 54;
+  ctx.font = `bold ${fontSize}px ${fontFamily}`;
+  ctx.fillStyle = isDark ? '#f8fafc' : '#0f172a';
+  ctx.textBaseline = 'middle';
+  const defaultTextY = barY + 30 + (H - barY - 30) / 2;
+  const textY = override.textY !== undefined ? (H * (override.textY / 100)) : defaultTextY;
+  drawWrappedText(ctx, text, W / 2, textY, W * 0.88, fontSize * 1.35);
+}
+
+/**
+ * מצייר אלמנטי אווירה ווייב ויזואליים עשירים על גבי השקף (יוקרה, טכנולוגיה, הילה, וייב דינמי)
+ */
+export function drawVibeDecoration(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  vibe: VibeEffectType | undefined,
+  brandColor: string,
+  isDark: boolean
+) {
+  if (!vibe || vibe === 'none') return;
+
+  ctx.save();
+  if (vibe === 'luxury') {
+    // זהב, ניצוצות עדינים ומסגרות יוקרה
+    ctx.strokeStyle = 'rgba(212, 175, 55, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(28, 28, W - 56, H - 56);
+    
+    // ניצוצות (Sparkles)
+    const sparkles = [[80, 80], [W - 80, 100], [120, H - 120], [W - 100, H - 80], [W / 2, 60]];
+    for (const [sx, sy] of sparkles) {
+      ctx.fillStyle = 'rgba(255, 223, 128, 0.7)';
+      ctx.beginPath();
+      ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 223, 128, 0.5)';
+      ctx.beginPath();
+      ctx.moveTo(sx - 12, sy); ctx.lineTo(sx + 12, sy);
+      ctx.moveTo(sx, sy - 12); ctx.lineTo(sx, sy + 12);
+      ctx.stroke();
+    }
+  } else if (vibe === 'glow') {
+    // הילה זוהרת רכה (Aura glow)
+    const radGrad = ctx.createRadialGradient(W / 2, H * 0.4, 80, W / 2, H * 0.4, W * 0.65);
+    radGrad.addColorStop(0, brandColor + '33');
+    radGrad.addColorStop(0.6, brandColor + '11');
+    radGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = radGrad;
+    ctx.fillRect(0, 0, W, H);
+  } else if (vibe === 'tech') {
+    // רשת הייטק עתידנית מודרנית
+    ctx.strokeStyle = isDark ? 'rgba(56, 189, 248, 0.12)' : 'rgba(14, 165, 233, 0.12)';
+    ctx.lineWidth = 1;
+    const step = 60;
+    for (let x = 0; x <= W; x += step) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    for (let y = 0; y <= H; y += step) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+    // Tech corner brackets
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 3;
+    const bSize = 30;
+    // top right
+    ctx.beginPath(); ctx.moveTo(W - 30 - bSize, 30); ctx.lineTo(W - 30, 30); ctx.lineTo(W - 30, 30 + bSize); ctx.stroke();
+    // top left
+    ctx.beginPath(); ctx.moveTo(30 + bSize, 30); ctx.lineTo(30, 30); ctx.lineTo(30, 30 + bSize); ctx.stroke();
+  } else if (vibe === 'warm') {
+    // שקיעה חמימה ואינטימית
+    const warmGrad = ctx.createLinearGradient(0, 0, W, H);
+    warmGrad.addColorStop(0, 'rgba(251, 146, 60, 0.18)');
+    warmGrad.addColorStop(0.5, 'rgba(244, 63, 94, 0.12)');
+    warmGrad.addColorStop(1, 'rgba(168, 85, 247, 0.1)');
+    ctx.fillStyle = warmGrad;
+    ctx.fillRect(0, 0, W, H);
+  } else if (vibe === 'dynamic') {
+    // אנרגטי עם קווים דינמיים
+    ctx.strokeStyle = brandColor + '30';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(0, H * 0.2);
+    ctx.bezierCurveTo(W * 0.3, H * 0.1, W * 0.7, H * 0.3, W, H * 0.15);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(0, H * 0.85);
+    ctx.bezierCurveTo(W * 0.4, H * 0.95, W * 0.6, H * 0.75, W, H * 0.9);
+    ctx.stroke();
+  }
+  ctx.restore();
 }

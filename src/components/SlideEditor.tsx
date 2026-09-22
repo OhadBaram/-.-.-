@@ -20,6 +20,8 @@ interface SlideEditorProps {
   onRemix: (index: number, text: string) => void;
   onApplyRemix: (index: number) => void;
   onDismissRemix: (index: number) => void;
+  /** תבנית ויזואלית נוכחית של השקף */
+  template?: string;
   /** stack = מובייל / צר; split = מחשב — מלל והמלצת AI זה לצד זה */
   layout?: 'stack' | 'split';
 }
@@ -40,6 +42,7 @@ export default function SlideEditor({
   onDismissRemix,
   onImageUpload,
   onImageClear,
+  template,
   layout = 'stack',
 }: SlideEditorProps) {
   const currentFontSize = override.fontSize ?? 64;
@@ -48,11 +51,18 @@ export default function SlideEditor({
   const hasSuggestion = Boolean(remixSuggestion?.trim());
   const isSplit = layout === 'split';
 
+  const currentScale = Math.round((override.imageScale ?? 1.0) * 100);
+  const currentCropTop = override.cropTopPercent ?? 0;
+  const currentShape = override.imageShape ?? 'rect';
+  const currentVibe = override.vibeEffect ?? 'none';
+  const isMultiImage = ['image-dual-split', 'image-compare', 'image-grid-2'].includes(template || '');
+
   const typographyControls = isEditing ? (
     <div
       className="flex flex-col gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-xs"
       dir="rtl"
     >
+      {/* גופן ומיקום טקסט */}
       <div className="flex flex-col gap-1">
         <div className="flex justify-between items-center text-gray-700 dark:text-gray-300 font-medium">
           <span>גודל גופן</span>
@@ -89,6 +99,108 @@ export default function SlideEditor({
           className="w-full accent-indigo-600 cursor-pointer"
         />
       </div>
+
+      {/* שליטה בתמונה — חיתוך, קירוב, הרחקה וצורות */}
+      {slide.imageUrl ? (
+        <div className="pt-2 border-t border-gray-200 dark:border-gray-700 flex flex-col gap-2">
+          <p className="font-bold text-[11px] text-indigo-700 dark:text-indigo-300">
+            התאמת תמונה וחיתוך
+          </p>
+          
+          {/* זום (קירוב / הרחקה) */}
+          <div className="flex flex-col gap-1">
+            <div className="flex justify-between items-center text-gray-700 dark:text-gray-300">
+              <span>קירוב / הרחקה (זום)</span>
+              <span className="font-mono text-[11px] text-gray-500">{currentScale}%</span>
+            </div>
+            <input
+              type="range"
+              min={50}
+              max={200}
+              step={5}
+              value={currentScale}
+              onChange={(e) =>
+                onOverrideChange({ ...override, imageScale: Number(e.target.value) / 100 })
+              }
+              className="w-full accent-indigo-600 cursor-pointer"
+            />
+          </div>
+
+          {/* חיתוך חלק עליון */}
+          <div className="flex flex-col gap-1">
+            <div className="flex justify-between items-center text-gray-700 dark:text-gray-300">
+              <span>חיתוך חלק עליון</span>
+              <span className="font-mono text-[11px] text-gray-500">{currentCropTop}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={50}
+              step={5}
+              value={currentCropTop}
+              onChange={(e) =>
+                onOverrideChange({ ...override, cropTopPercent: Number(e.target.value) })
+              }
+              className="w-full accent-indigo-600 cursor-pointer"
+            />
+          </div>
+
+          {/* צורת שיבוץ התמונה */}
+          <div className="flex flex-col gap-1 mt-1">
+            <span className="text-[11px] text-gray-600 dark:text-gray-300 font-medium">צורת תמונה:</span>
+            <div className="grid grid-cols-3 gap-1">
+              {[
+                { id: 'rect', label: 'מלבן' },
+                { id: 'circle', label: 'עיגול' },
+                { id: 'ellipse', label: 'אליפסה' },
+                { id: 'rounded', label: 'מעוגל' },
+                { id: 'arch', label: 'קשת' },
+              ].map((shape) => (
+                <button
+                  key={shape.id}
+                  type="button"
+                  onClick={() => onOverrideChange({ ...override, imageShape: shape.id as any })}
+                  className={`py-1 px-1.5 rounded text-[11px] font-bold border transition-colors ${
+                    currentShape === shape.id
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {shape.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* בחירת וייב ואפקט לשקף */}
+      <div className="pt-2 border-t border-gray-200 dark:border-gray-700 flex flex-col gap-1">
+        <span className="font-bold text-[11px] text-indigo-700 dark:text-indigo-300">וייב ואווירה ויזואלית</span>
+        <div className="grid grid-cols-3 gap-1">
+          {[
+            { id: 'none', label: 'רגיל' },
+            { id: 'luxury', label: '✨ יוקרתי' },
+            { id: 'glow', label: '🔮 הילה' },
+            { id: 'tech', label: '⚡ הייטק' },
+            { id: 'warm', label: '🌅 שקיעה' },
+            { id: 'dynamic', label: '🌊 דינמי' },
+          ].map((vibe) => (
+            <button
+              key={vibe.id}
+              type="button"
+              onClick={() => onOverrideChange({ ...override, vibeEffect: vibe.id as any })}
+              className={`py-1 px-1 rounded text-[11px] font-bold border transition-colors truncate ${
+                currentVibe === vibe.id
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {vibe.label}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   ) : null;
 
@@ -97,7 +209,7 @@ export default function SlideEditor({
       {onImageUpload ? (
         <ImagePickerControl
           variant="compact"
-          compactLabel="העלאת תמונה לשקף זה"
+          compactLabel={isMultiImage ? "תמונה ראשית (1)" : "העלאת תמונה לשקף זה"}
           value={slide.imageUrl ?? null}
           onChange={(next) => {
             if (next) onImageUpload(index, next);
@@ -105,11 +217,33 @@ export default function SlideEditor({
           }}
         />
       ) : null}
-      {slide.imageUrl ? (
-        <span className="text-[10px] text-green-600 font-bold bg-green-50 px-2 py-1 rounded border border-green-200 whitespace-nowrap self-start">
-          ✓ תמונה בשקף {index + 1}
-        </span>
+
+      {/* תמונה שנייה בתבניות מרובות תמונות */}
+      {isMultiImage && onImageUpload ? (
+        <div className="mt-1">
+          <ImagePickerControl
+            variant="compact"
+            compactLabel="תמונה משנית (2)"
+            value={override.secondImageUrl ?? null}
+            onChange={(next) => {
+              onOverrideChange({ ...override, secondImageUrl: next || undefined });
+            }}
+          />
+        </div>
       ) : null}
+
+      <div className="flex flex-wrap gap-1.5 items-center">
+        {slide.imageUrl ? (
+          <span className="text-[10px] text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded border border-green-200 whitespace-nowrap">
+            ✓ תמונה 1
+          </span>
+        ) : null}
+        {isMultiImage && override.secondImageUrl ? (
+          <span className="text-[10px] text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded border border-purple-200 whitespace-nowrap">
+            ✓ תמונה 2
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 

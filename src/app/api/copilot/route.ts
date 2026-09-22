@@ -13,12 +13,39 @@ import {
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'dummy_key');
 
 const TEMPLATE_IDS =
-  'minimal, bold, gradient, dark-luxury, frame, split, story, quote, numbered, magazine, waves, neon, image-split, image-full-dark, image-circle-profile, image-split-bottom, image-polaroid, image-side, image-magazine, image-overlay, image-arch';
+  'minimal, bold, gradient, dark-luxury, frame, split, story, quote, numbered, magazine, waves, neon, image-split, image-full-dark, image-circle-profile, image-split-bottom, image-polaroid, image-side, image-magazine, image-overlay, image-arch, image-dual-split, image-compare, image-grid-2';
 
 const FONT_IDS =
   'Heebo, Assistant, Rubik, Varela Round, Playpen Sans Hebrew, Gveret Levin, Solitreo, Fredoka';
 
 const LAYOUT_PRESETS = 'first-and-last, first-only, all-images, no-images';
+
+const TEMPLATE_HEBREW_NAMES: Record<string, string> = {
+  'minimal': 'מינימליסטי',
+  'bold': 'נועז',
+  'gradient': 'גרדיאנט',
+  'dark-luxury': 'יוקרה כהה',
+  'frame': 'ממוסגר',
+  'split': 'מפוצל',
+  'story': 'סיפור',
+  'quote': 'ציטוט',
+  'numbered': 'ממוספר',
+  'magazine': 'מגזין',
+  'waves': 'גלים',
+  'neon': 'ניאון',
+  'image-split': 'חצי תמונה',
+  'image-full-dark': 'תמונת רקע כהה',
+  'image-circle-profile': 'תמונת פרופיל',
+  'image-split-bottom': 'פיצול תחתון',
+  'image-polaroid': 'פולארויד',
+  'image-side': 'חצי רוחב',
+  'image-magazine': 'שער מגזין',
+  'image-overlay': 'תמונה עם שכבה',
+  'image-arch': 'מסגרת קשת',
+  'image-dual-split': 'פיצול 2 תמונות',
+  'image-compare': 'השוואה לפני/אחרי',
+  'image-grid-2': 'גריד 2 תמונות',
+};
 
 function buildToolDeclarations(): FunctionDeclaration[] {
   return [
@@ -116,6 +143,45 @@ function buildToolDeclarations(): FunctionDeclaration[] {
       },
     },
     {
+      name: 'set_image_transform',
+      description:
+        'Adjust image framing on a slide: zoom in/out (scale 0.5 to 2.5), pan/crop offsets, shape (circle, ellipse, rounded, arch, rect), top crop percentage, and visual vibe.',
+      parameters: {
+        type: SchemaType.OBJECT,
+        properties: {
+          slideIndex: {
+            type: SchemaType.NUMBER,
+            description: '0-based slide index',
+          },
+          scale: {
+            type: SchemaType.NUMBER,
+            description: 'Zoom scale: 1.0 default, 1.3 is zoom in (+30%), 0.8 is zoom out (-20%)',
+          },
+          cropTopPercent: {
+            type: SchemaType.NUMBER,
+            description: 'Percentage to crop from the top (e.g. 20 for cutting 20% off top)',
+          },
+          shape: {
+            type: SchemaType.STRING,
+            description: "Shape mask. One of: 'rect', 'circle', 'ellipse', 'rounded', 'arch'",
+          },
+          vibe: {
+            type: SchemaType.STRING,
+            description: "Atmosphere vibe effect. One of: 'none', 'luxury', 'glow', 'tech', 'warm', 'dynamic'",
+          },
+          offsetX: {
+            type: SchemaType.NUMBER,
+            description: 'Horizontal pan offset in percent (-50 to 50)',
+          },
+          offsetY: {
+            type: SchemaType.NUMBER,
+            description: 'Vertical pan offset in percent (-50 to 50)',
+          },
+        },
+        required: ['slideIndex'],
+      },
+    },
+    {
       name: 'set_layout_preset',
       description:
         'Apply a carousel image-layout preset that decides which slides use image templates.',
@@ -205,6 +271,101 @@ function buildToolDeclarations(): FunctionDeclaration[] {
   ];
 }
 
+function formatDetailedActionSummary(
+  actions: { name: string; args: Record<string, unknown> }[]
+): string[] {
+  const details: string[] = [];
+  for (const a of actions) {
+    const sIdx = typeof a.args.slideIndex === 'number' ? a.args.slideIndex + 1 : null;
+    switch (a.name) {
+      case 'update_slide_text': {
+        const txt = typeof a.args.newText === 'string' ? a.args.newText.trim() : '';
+        const preview = txt.length > 60 ? txt.slice(0, 57) + '…' : txt;
+        details.push(`שקף ${sIdx ?? 1}: שוכתב הטקסט ל-«${preview}»`);
+        break;
+      }
+      case 'update_many_slide_texts': {
+        const count = Array.isArray(a.args.updates) ? a.args.updates.length : 0;
+        details.push(`עודכנו ושוכתבו הטקסטים ב-${count} שקפים בהתאם להוראה`);
+        break;
+      }
+      case 'change_template': {
+        const tplName = TEMPLATE_HEBREW_NAMES[String(a.args.templateId)] || a.args.templateId;
+        if (sIdx != null) {
+          details.push(`שקף ${sIdx}: שונתה התבנית הויזואלית ל-'${tplName}'`);
+        } else {
+          details.push(`כל השקפים: שונתה התבנית הויזואלית ל-'${tplName}'`);
+        }
+        break;
+      }
+      case 'change_font': {
+        details.push(`עודכן הגופן הראשי ל-'${a.args.fontFamily}'`);
+        break;
+      }
+      case 'update_colors': {
+        const themeLabel = a.args.theme === 'dark' ? 'עיצוב כהה' : 'עיצוב בהיר';
+        details.push(`עודכנו צבע המותג (${a.args.brandColor}) ומצב התצוגה (${themeLabel})`);
+        break;
+      }
+      case 'set_image_transform': {
+        const parts: string[] = [];
+        if (typeof a.args.scale === 'number') {
+          const pct = Math.round(Number(a.args.scale) * 100);
+          if (pct > 100) parts.push(`קירוב תמונה (זום ${pct}%)`);
+          else if (pct < 100) parts.push(`הרחקת תמונה (זום ${pct}%)`);
+          else parts.push(`איפוס זום ל-100%`);
+        }
+        if (typeof a.args.cropTopPercent === 'number' && Number(a.args.cropTopPercent) > 0) {
+          parts.push(`חיתוך ${a.args.cropTopPercent}% מהחלק העליון`);
+        }
+        if (a.args.shape) {
+          const shapeHebrew: Record<string, string> = {
+            circle: 'עיגול', ellipse: 'אליפסה', rounded: 'מסגרת מעוגלת', arch: 'קשת', rect: 'מלבן'
+          };
+          parts.push(`שיבוץ בצורת ${shapeHebrew[String(a.args.shape)] || a.args.shape}`);
+        }
+        if (a.args.vibe && a.args.vibe !== 'none') {
+          const vibeHebrew: Record<string, string> = {
+            luxury: 'יוקרתי ומנצנץ', glow: 'הילה זוהרת', tech: 'הייטק עתידני', warm: 'שקיעה חמימה', dynamic: 'דינמי'
+          };
+          parts.push(`החלת וייב '${vibeHebrew[String(a.args.vibe)] || a.args.vibe}'`);
+        }
+        if (typeof a.args.offsetX === 'number' || typeof a.args.offsetY === 'number') {
+          parts.push(`כיוונון מיקום וחיתוך`);
+        }
+        details.push(`שקף ${sIdx ?? 1}: ${parts.length ? parts.join(', ') : 'התאמת הגדרות תמונה'}`);
+        break;
+      }
+      case 'add_slide': {
+        details.push(`נוסף שקף חדש לקרוסלה`);
+        break;
+      }
+      case 'remove_slide': {
+        details.push(`הוסר שקף ${sIdx ?? 1}`);
+        break;
+      }
+      case 'reorder_slide': {
+        const from = Number(a.args.fromIndex) + 1;
+        const to = Number(a.args.toIndex) + 1;
+        details.push(`סדר שקפים עודכן: שקף ${from} הועבר למיקום ${to}`);
+        break;
+      }
+      case 'set_slide_typography': {
+        details.push(`שקף ${sIdx ?? 1}: כוונון גודל גופן ומיקום אנכי`);
+        break;
+      }
+      case 'set_layout_preset': {
+        details.push(`הוחלפה פריסת התמונות בקרוסלה`);
+        break;
+      }
+      default: {
+        details.push(`בוצעה פעולה: ${a.name}`);
+      }
+    }
+  }
+  return details;
+}
+
 export async function POST(req: Request) {
   try {
     const auth = await requireSession();
@@ -234,24 +395,41 @@ export async function POST(req: Request) {
         ? currentState.activeSlideIndex
         : 0;
 
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-3.8-flash',
-      tools: [{ functionDeclarations: buildToolDeclarations() }],
-      systemInstruction: `אתה עוזר העריכה של CaruselAI — קרוסלות אינסטגרם/לינקדאין בעברית.
-תפקידך: להבין בקשות בעברית ולהפעיל כלים כדי לשנות את הקרוסלה.
-כל תשובת טקסט למשתמש — בעברית בלבד, קצרה וידידותית (מה שינית).
-כללות:
-- אינדקסי שקפים הם 0-based בכלים. כשהמשתמש אומר «שקף 1» הכוונה לאינדקס 0.
-- השקף הפעיל כרגע: ${activeSlideIndex + 1} (אינדקס ${activeSlideIndex}). סה״כ ${slideCount} שקפים.
-- כשמבקשים לקצר/לשכתב את כולם — השתמש ב־update_many_slide_texts עם טקסט חדש לכל שקף.
-- כשמבקשים לשכתב שקף אחד — update_slide_text.
-- אל תמציא תבניות/גופנים שלא ברשימה.
-- אם הבקשה לא ברורה — שאל שאלה קצרה בעברית בלי לקרוא לכלים.
-מצב נוכחי: ${JSON.stringify(currentState)}`,
-    });
+    const systemInstruction = `אתה עוזר העריכה והקריאייטיב של CaruselAI — קרוסלות אינסטגרם/לינקדאין בעברית.
+תפקידך: להבין במדויק את בקשת המשתמש ולהפעיל את הכלים המתאימים ביותר.
+חשוב מאוד:
+1. אל תענה לעולם בתשובות גנריות קצרות כמו "ביצעתי את השינויים".
+2. הסבר בקצרה מה הבנת מהבקשה ומה הצעד שנקטת.
+3. אינדקסי שקפים הם 0-based בכלים. כשהמשתמש אומר «שקף 1» הכוונה לאינדקס 0.
+4. השקף הפעיל כרגע: ${activeSlideIndex + 1} (אינדקס ${activeSlideIndex}). סה״כ ${slideCount} שקפים.
+5. לשליטה בתמונה (זום, חיתוך עליון, צורה כגון עיגול/אליפסה, וייב כגון יוקרתי/הייטק) — השתמש ב־set_image_transform.
+6. תבניות מרובות תמונות זמינות: image-dual-split (פיצול 2 תמונות), image-compare (השוואה לפני/אחרי), image-grid-2 (גריד 2 תמונות).
+7. לשינוי טקסט בשקף בודד: update_slide_text. לשכתוב מרובה שקפים: update_many_slide_texts.
+מצב נוכחי של הקרוסלה: ${JSON.stringify(currentState)}`;
 
-    const result = await model.generateContent(command);
-    const response = result.response;
+    const modelsToTry = ['gemini-3.6-flash', 'gemini-3.8-flash'];
+    let response: any = null;
+    let lastError: any = null;
+
+    for (const m of modelsToTry) {
+      try {
+        const model = genAI.getGenerativeModel({
+          model: m,
+          tools: [{ functionDeclarations: buildToolDeclarations() }],
+          systemInstruction,
+        });
+        const result = await model.generateContent(command);
+        response = result.response;
+        break;
+      } catch (err: any) {
+        console.warn(`Copilot model ${m} failed: ${err?.message || err}. Trying next...`);
+        lastError = err;
+      }
+    }
+
+    if (!response) {
+      throw lastError || new Error('All models failed');
+    }
 
     const actions: { name: string; args: Record<string, unknown> }[] = [];
     const calls = response.functionCalls();
@@ -265,21 +443,45 @@ export async function POST(req: Request) {
       }
     }
 
-    let text = actions.length
-      ? 'ביצעתי את השינויים.'
-      : 'לא הבנתי לגמרי — נסו לנסח אחרת או לבחור אחת מההצעות למטה.';
-    try {
-      const respText = response.text();
-      if (respText) text = respText;
-    } catch {
-      // Gemini throws when response is tool-only
+    // Build comprehensive Hebrew response details
+    const actionDetails = formatDetailedActionSummary(actions);
+    let summaryText = '';
+    if (actionDetails.length > 0) {
+      summaryText = actionDetails.map((item) => `✓ ${item}`).join('\n');
     }
 
-    return NextResponse.json({ text, actions });
-  } catch (error) {
+    let modelThought = '';
+    try {
+      const respText = response.text()?.trim();
+      if (respText && respText !== 'ביצעתי את השינויים.') {
+        modelThought = respText;
+      }
+    } catch {
+      // Gemini throws when only tool calls are returned
+    }
+
+    let text = '';
+    if (actions.length > 0) {
+      if (modelThought) {
+        text = `${modelThought}\n\nפעולות שבוצעו בפועל:\n${summaryText}`;
+      } else {
+        text = `הבנתי את הבקשה. להלן הפעולות שבוצעו במדויק:\n${summaryText}`;
+      }
+    } else if (modelThought) {
+      text = modelThought;
+    } else {
+      text = 'לא זוהתה פעולה לביצוע. אפשר לבקש למשל: «קצר את שקף 2», «קרב את התמונה ל-130%», «שנה לצורת עיגול» או «החלף תבנית ליוקרתי».';
+    }
+
+    return NextResponse.json({
+      text,
+      actions,
+      summary: summaryText,
+    });
+  } catch (error: any) {
     console.error('Copilot error:', error);
     return NextResponse.json(
-      { error: 'Failed to process copilot command' },
+      { error: error?.message || 'Failed to process copilot command' },
       { status: 500 }
     );
   }

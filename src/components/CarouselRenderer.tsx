@@ -28,7 +28,9 @@ import {
   drawStory, drawQuote, drawNumbered, drawMagazine, drawWaves, drawNeon,
   drawImageSplit,
   drawImageFullDark, drawImageCircle, drawImageSplitBottom, drawImagePolaroid,
-  drawImageSide, drawImageMagazine, drawImageOverlay, drawImageArch
+  drawImageSide, drawImageMagazine, drawImageOverlay, drawImageArch,
+  drawImageDualSplit, drawImageCompare, drawImageGrid2, drawVibeDecoration,
+  type SlideOverride
 } from '@/lib/templates/drawers';
 
 export interface Slide {
@@ -62,7 +64,10 @@ export type TemplateId =
   | 'image-side'
   | 'image-magazine'
   | 'image-overlay'
-  | 'image-arch';
+  | 'image-arch'
+  | 'image-dual-split'
+  | 'image-compare'
+  | 'image-grid-2';
 
 interface TemplateOption {
   id: TemplateId;
@@ -89,6 +94,9 @@ const TEMPLATES: TemplateOption[] = [
   { id: 'numbered',     label: 'ממוספר'       },
   { id: 'magazine',     label: 'מגזין'        },
   { id: 'image-arch',           label: 'מסגרת קשת' },
+  { id: 'image-dual-split',     label: 'פיצול 2 תמונות' },
+  { id: 'image-compare',        label: 'השוואה לפני/אחרי' },
+  { id: 'image-grid-2',         label: 'גריד 2 תמונות' },
   { id: 'waves',        label: 'גלים'         },
   { id: 'neon',         label: 'ניאון'        },
 ];
@@ -253,11 +261,7 @@ function detectCarouselLayoutPreset(slides: Slide[]): CarouselLayoutPresetId {
   return 'custom';
 }
 
-export interface SlideOverride {
-  fontSize?: number;
-  textY?: number;
-  surfaceBg?: string;
-}
+export type { SlideOverride } from "@/lib/templates/drawers";
 
 interface CarouselRendererProps {
   slides: Slide[];
@@ -411,7 +415,7 @@ export default function CarouselRenderer({
       // רק תמונת השקף הנוכחי — אין נפילה לתמונה של שקף אחר
       const slideImageUrl = slide.imageUrl;
       const slideBrandColor = colorForSlide(brandPalette, slideIndex);
-      const currentOverride = {
+      const currentOverride: SlideOverride = {
         ...(override ?? slideOverrides[slideIndex] ?? {}),
         surfaceBg:
           backgroundForSlide(brandPalette, slideIndex, isDark) ||
@@ -453,8 +457,13 @@ export default function CarouselRenderer({
         case 'image-magazine': await drawImageMagazine(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
         case 'image-overlay': await drawImageOverlay(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
         case 'image-arch': await drawImageArch(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-dual-split': await drawImageDualSplit(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-compare': await drawImageCompare(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
+        case 'image-grid-2': await drawImageGrid2(ctx, W, H, text, slideBrandColor, isDark, currentOverride, slideImageUrl, fontFamily, isStale); break;
         default:            drawMinimal    (ctx, W, H, text, slideBrandColor, isDark, currentOverride, fontFamily);
       }
+
+      drawVibeDecoration(ctx, W, H, currentOverride.vibeEffect, slideBrandColor, isDark);
 
       if (isStale()) return;
     },
@@ -1390,6 +1399,7 @@ export default function CarouselRenderer({
               </div>
               <SlideEditor
                 layout="split"
+                template={activeSlideTemplate}
                 slide={localSlides[activeSlideIndex]}
                 index={activeSlideIndex}
                 canvasRef={{ current: null }}
@@ -1547,6 +1557,7 @@ export default function CarouselRenderer({
             </div>
           </div>
           <SlideEditor
+            template={activeSlideTemplate}
             slide={localSlides[activeSlideIndex]}
             index={activeSlideIndex}
             canvasRef={{ current: null }}

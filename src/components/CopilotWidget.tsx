@@ -24,6 +24,18 @@ export interface CopilotActionHandlers {
     index: number,
     patch: { fontSize?: number; textY?: number }
   ) => void;
+  onSetImageTransform?: (
+    slideIndex: number,
+    transform: {
+      scale?: number;
+      cropTopPercent?: number;
+      cropBottomPercent?: number;
+      shape?: string;
+      vibe?: string;
+      offsetX?: number;
+      offsetY?: number;
+    }
+  ) => void;
 }
 
 interface CopilotWidgetProps extends CopilotActionHandlers {
@@ -65,6 +77,7 @@ export default function CopilotWidget({
   onApplyLayoutPreset,
   onSetActiveSlide,
   onSetSlideTypography,
+  onSetImageTransform,
 }: CopilotWidgetProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -195,6 +208,19 @@ export default function CopilotWidget({
           const fontSize = asNumber(args.fontSize) ?? undefined;
           const textY = asNumber(args.textY) ?? undefined;
           onSetSlideTypography?.(idx, { fontSize, textY });
+          break;
+        }
+        case 'set_image_transform': {
+          const idx = asNumber(args.slideIndex) ?? activeSlideIndex;
+          onSetImageTransform?.(idx, {
+            scale: asNumber(args.scale) ?? undefined,
+            cropTopPercent: asNumber(args.cropTopPercent) ?? undefined,
+            cropBottomPercent: asNumber(args.cropBottomPercent) ?? undefined,
+            shape: asString(args.shape) ?? undefined,
+            vibe: asString(args.vibe) ?? undefined,
+            offsetX: asNumber(args.offsetX) ?? undefined,
+            offsetY: asNumber(args.offsetY) ?? undefined,
+          });
           break;
         }
         default:
@@ -448,7 +474,7 @@ export default function CopilotWidget({
                 : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100 self-end'
             } max-w-[90%]`}
           >
-            {msg.text}
+            <div className="whitespace-pre-wrap">{msg.text}</div>
           </div>
         ))}
 
