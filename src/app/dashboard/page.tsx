@@ -2,6 +2,8 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import Link from 'next/link';
+import BrandLearnedSummary from '@/components/BrandLearnedSummary';
+import { buildBrandLearnedFacts } from '@/lib/brand-learned-summary';
 
 export default async function DashboardPage({ searchParams }: { searchParams?: { workspaceId?: string } }) {
   const session = await getServerSession(authOptions);
@@ -17,7 +19,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
 
   const workspaceId = searchParams?.workspaceId;
 
-  let user = await prisma.user.findUnique({
+  const user = await prisma.user.findUnique({
     where: { email: session.user.email }
   });
 
@@ -96,6 +98,15 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
   const usage = await getWorkspaceUsage(userWorkspace.id, user.id);
   const usagePercent = Math.min((usage.usageCount / usage.limit) * 100, 100);
 
+  const learnedBrand = buildBrandLearnedFacts({
+    brandIdentity: userWorkspace.brandIdentity,
+    brandColor: userWorkspace.brandColor,
+    websiteUrl: userWorkspace.websiteUrl,
+    referenceLink1: userWorkspace.referenceLink1,
+    referenceLink2: userWorkspace.referenceLink2,
+    referenceLink3: userWorkspace.referenceLink3,
+  });
+
   return (
     <main className="min-h-screen p-8 bg-gray-50 dark:bg-gray-900" dir="rtl">
       <header className="mb-8 flex justify-between items-center">
@@ -126,6 +137,10 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
           )}
         </div>
       </header>
+
+      <section className="mb-8 max-w-2xl">
+        <BrandLearnedSummary facts={learnedBrand} variant="dashboard" />
+      </section>
 
       {/* Usage Bar */}
       <section className="mb-8 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border dark:border-gray-700 border-gray-100 dark:border-gray-700 flex flex-col gap-3">
