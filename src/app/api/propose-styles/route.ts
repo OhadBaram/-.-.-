@@ -3,6 +3,7 @@ import { proposeStylesSchema } from '@/lib/validations';
 import { generateJson } from '@/lib/services/ai.service';
 import {
   buildFallbackNarrativeDirections,
+  buildTopicFidelityConstraint,
   type NarrativeDirection,
 } from '@/lib/wizard';
 import { requireSession } from '@/lib/api/require-session';
@@ -67,6 +68,8 @@ export async function POST(req: Request) {
     const aiProvider = process.env.DEFAULT_AI_PROVIDER || 'gemini';
     const aiModel = process.env.DEFAULT_AI_MODEL || 'gemini-3.8-flash';
 
+    const topicFidelity = buildTopicFidelityConstraint(topic);
+
     const prompt = `
 אתה אסטרטג תוכן לקרוסלות אינסטגרם בעברית (פורמט אנכי 1080×1350).
 המשתמש נתן נושא אחד. הצע בדיוק 2 כיווני סגנון נרטיביים שונים — לא סגנון ויזואלי, אלא מבנה תוכן.
@@ -74,24 +77,26 @@ export async function POST(req: Request) {
 נושא: ${topic}
 קהל: ${audience || 'לא צוין'}
 מטרה: ${goal || 'לא צוינה'}
+${topicFidelity}
 
 הסתמך על ידע כללי של מה שעובד בנישה (שמירות, שיתופים, גלילה עד הסוף). אין צורך בסריקת אינסטגרם אמיתית — נמק מהיגיון שיווקי.
+שני הכיוונים חייבים להישאר על הנושא המדויק (למשל קורס/מוצר ספציפי) — לא להרחיב לקטגוריה ההורה.
 
 שני הכיוונים צריכים להיות מובחנים, למשל:
 - רשימה חינוכית / טיפים ממוספרים
 - קשת סיפור אישית / מסע שינוי
-אפשר גם זוויות אחרות שמתאימות לנושא (מיתוס מול מציאות, לפני־אחרי, שאלות ותשובות) — כל עוד יש בדיוק 2.
+אפשר גם זוויות אחרות שמתאימות לנושא (מיתוס מול מציאות, לפני־אחרי, שאלות ותשובות) — כל עוד יש בדיוק 2 וכל כיוון נשאר על אותו נושא מדויק.
 
 החזר JSON בלבד:
 {
-  "researchNote": "משפט־שניים בעברית: למה כיוונים כאלה מתאימים לנושא",
+  "researchNote": "משפט־שניים בעברית: למה כיוונים כאלה מתאימים לנושא המדויק",
   "directions": [
     {
       "id": "slug-באנגלית-קצר",
       "title": "כותרת כיוון בעברית",
-      "summary": "משפט אחד מה הקרוסלה תעשה",
+      "summary": "משפט אחד מה הקרוסלה תעשה — חייב להזכיר את הנושא המדויק",
       "whyItWorks": "משפט אחד למה זה עובד בנישה",
-      "structureHint": "הנחיית מבנה קצרה לקופירייטר (שער / תוכן / הוכחה / CTA)"
+      "structureHint": "הנחיית מבנה קצרה לקופירייטר (שער / תוכן / הוכחה / CTA) כולל תזכורת להישאר על הנושא המדויק"
     }
   ]
 }
