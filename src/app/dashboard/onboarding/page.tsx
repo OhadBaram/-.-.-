@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ensureHttps } from '@/lib/normalize-url';
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -36,10 +37,16 @@ export default function OnboardingPage() {
   const handleNextStep2 = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // נרמול לפני שליחה: דומיין בלי פרוטוקול נדחה בוולידציית הדפדפן
+    const normalizedWebsite = ensureHttps(websiteUrl);
+    const normalizedReference = ensureHttps(referenceLink1);
+    setWebsiteUrl(normalizedWebsite);
+    setReferenceLink1(normalizedReference);
     
-    // If no URLs provided, just skip analysis and go to final save
-    if (!websiteUrl && !referenceLink1) {
-      handleFinalSave('');
+    // אם אין קישורים — דילוג על ניתוח ושמירה סופית
+    if (!normalizedWebsite && !normalizedReference) {
+      handleFinalSave('', '', '');
       return;
     }
 
@@ -50,7 +57,10 @@ export default function OnboardingPage() {
       const res = await fetch('/api/analyze-brand', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ websiteUrl, referenceLink1 }),
+        body: JSON.stringify({
+          websiteUrl: normalizedWebsite,
+          referenceLink1: normalizedReference,
+        }),
       });
 
       if (!res.ok) throw new Error('שגיאה בניתוח המותג');
@@ -65,7 +75,11 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleFinalSave = async (finalBrandIdentity = brandIdentity) => {
+  const handleFinalSave = async (
+    finalBrandIdentity = brandIdentity,
+    finalWebsiteUrl = websiteUrl,
+    finalReferenceLink1 = referenceLink1
+  ) => {
     setLoading(true);
     setError('');
 
@@ -76,8 +90,8 @@ export default function OnboardingPage() {
         body: JSON.stringify({ 
           name, 
           phone,
-          websiteUrl,
-          referenceLink1,
+          websiteUrl: ensureHttps(finalWebsiteUrl),
+          referenceLink1: ensureHttps(finalReferenceLink1),
           brandIdentity: finalBrandIdentity
         }),
       });
@@ -133,7 +147,8 @@ export default function OnboardingPage() {
         )}
 
         {step === 2 && (
-          <form onSubmit={handleNextStep2} className="space-y-6 animate-fade-in">
+          // ולידציית דפדפן כבויה כאן — הנרמול קורה בטיפול בשליחה
+          <form noValidate onSubmit={handleNextStep2} className="space-y-6 animate-fade-in">
             <div className="text-center mb-8">
               <div className="inline-block bg-indigo-50 text-indigo-700 font-bold px-3 py-1 rounded-full text-sm mb-3">למידת מותג אוטומטית</div>
               <h1 className="text-2xl font-black text-gray-900 mb-3">תן ל-AI ללמוד אותך 🧠</h1>
@@ -146,12 +161,28 @@ export default function OnboardingPage() {
             <div className="space-y-5">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">כתובת אתר העסק</label>
-                <input type="url" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-left bg-gray-50 focus:bg-white transition-colors" placeholder="https://your-website.com" dir="ltr" />
+                <input
+                  type="url"
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  onBlur={() => setWebsiteUrl(ensureHttps(websiteUrl))}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-left bg-gray-50 focus:bg-white transition-colors"
+                  placeholder="https://your-website.com"
+                  dir="ltr"
+                />
               </div>
               
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">קישור לפוסט/קרוסלה אהובה באינסטגרם</label>
-                <input type="url" value={referenceLink1} onChange={(e) => setReferenceLink1(e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-left bg-gray-50 focus:bg-white transition-colors" placeholder="https://instagram.com/p/..." dir="ltr" />
+                <input
+                  type="url"
+                  value={referenceLink1}
+                  onChange={(e) => setReferenceLink1(e.target.value)}
+                  onBlur={() => setReferenceLink1(ensureHttps(referenceLink1))}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-left bg-gray-50 focus:bg-white transition-colors"
+                  placeholder="https://instagram.com/p/..."
+                  dir="ltr"
+                />
               </div>
             </div>
 
