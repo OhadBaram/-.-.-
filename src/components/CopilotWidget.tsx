@@ -24,6 +24,8 @@ export interface CopilotActionHandlers {
     index: number,
     patch: { fontSize?: number; textY?: number }
   ) => void;
+  onSetSlideImage?: (index: number, imageUrl: string) => void;
+  carouselId?: string;
   onSetImageTransform?: (
     slideIndex: number,
     transform: {
@@ -45,6 +47,7 @@ interface CopilotWidgetProps extends CopilotActionHandlers {
   brandColor: string;
   theme: string;
   activeSlideIndex?: number;
+  carouselId?: string;
   /** dock = סיידבר/עמודה; panel = לשונית מובייל מלאה */
   variant?: 'dock' | 'panel';
 }
@@ -78,6 +81,8 @@ export default function CopilotWidget({
   onSetActiveSlide,
   onSetSlideTypography,
   onSetImageTransform,
+  onSetSlideImage,
+  carouselId,
 }: CopilotWidgetProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -126,7 +131,7 @@ export default function CopilotWidget({
     return showAllPrompts ? COPILOT_QUICK_PROMPTS : primary;
   }, [showAllPrompts]);
 
-  const applyActions = (
+  const applyActions = async (
     actions: { name: string; args?: Record<string, unknown> }[]
   ) => {
     for (const action of actions) {
@@ -221,6 +226,30 @@ export default function CopilotWidget({
             offsetX: asNumber(args.offsetX) ?? undefined,
             offsetY: asNumber(args.offsetY) ?? undefined,
           });
+          break;
+        }
+        case 'generate_slide_image': {
+          const idx = asNumber(args.slideIndex) ?? activeSlideIndex;
+          const prompt = asString(args.prompt);
+          if (prompt && onSetSlideImage) {
+            try {
+              const imgRes = await fetch('/api/generate-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  prompt,
+                  slideText: slides[idx]?.text,
+                  carouselId,
+                }),
+              });
+              const imgData = await imgRes.json();
+              if (imgData.ok && imgData.imageUrl) {
+                onSetSlideImage(idx, imgData.imageUrl);
+              }
+            } catch (err) {
+              console.warn('Failed to generate image via copilot:', err);
+            }
+          }
           break;
         }
         default:
@@ -362,7 +391,7 @@ export default function CopilotWidget({
       }
 
       if (Array.isArray(data.actions) && data.actions.length) {
-        applyActions(data.actions);
+        await applyActions(data.actions);
       }
 
       setMessages([

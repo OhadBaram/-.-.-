@@ -56,15 +56,27 @@ export interface FastPathWizardProps {
 }
 
 function initialPalette(
-  initialBrandPalette?: BrandPalette | string
+  initialBrandPalette?: BrandPalette | string,
+  topic?: string
 ): BrandPalette {
   if (Array.isArray(initialBrandPalette)) {
     return clampPalette(initialBrandPalette);
   }
   if (typeof initialBrandPalette === 'string') {
-    return parseBrandPalette(initialBrandPalette);
+    const parsed = parseBrandPalette(initialBrandPalette);
+    if (topic?.trim()) {
+      return recommendPaletteLocal({
+        visualStyle: 'minimal',
+        topic,
+        seedColor: parsed.accents[0],
+      });
+    }
+    return parsed;
   }
-  return recommendPaletteLocal({ visualStyle: 'minimal' });
+  return recommendPaletteLocal({
+    visualStyle: 'minimal',
+    topic: topic || null,
+  });
 }
 
 /**
@@ -98,7 +110,7 @@ export default function FastPathWizard({
   const [formError, setFormError] = useState<string | null>(null);
   const [options] = useState<WizardOptions>(DEFAULT_WIZARD_OPTIONS);
   const [brandPalette] = useState<BrandPalette>(() =>
-    initialPalette(initialBrandPalette)
+    initialPalette(initialBrandPalette, seeded.topic)
   );
 
   const topicTrimmed = topic.trim();
@@ -110,6 +122,17 @@ export default function FastPathWizard({
     if (!topicTrimmed) return options.slideCount;
     return recommendedSlideCountForTopic(topicTrimmed);
   }, [topicTrimmed, options.slideCount]);
+
+  /** פלטה לפי נושא — שומרת אקסנט מהמותג כ־seed */
+  const paletteForTopic = useMemo(
+    () =>
+      recommendPaletteLocal({
+        visualStyle: options.visualStyle,
+        topic: topicTrimmed || null,
+        seedColor: brandPalette.accents[0],
+      }),
+    [topicTrimmed, options.visualStyle, brandPalette.accents]
+  );
 
   const selectTarget = (target: PublishTarget) => {
     setPublishTarget(target);
@@ -136,7 +159,7 @@ export default function FastPathWizard({
           ...options,
           slideCount: slideHint,
         },
-        brandPalette,
+        brandPalette: paletteForTopic,
         narrativeDirection: defaultNarrativeDirection(topicTrimmed),
         flowVariant: 'fast',
         publishTarget,
@@ -360,28 +383,32 @@ export default function FastPathWizard({
                 {formError}
               </p>
             ) : null}
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                type="button"
-                disabled={isLoading}
-                onClick={() => submitFast()}
-                className="flex-1 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-bold py-3 disabled:opacity-40 transition"
-              >
-                {isLoading ? 'יוצרים…' : 'צור חבילה ופתח בעורך'}
-              </button>
-              <button
-                type="button"
-                disabled={isLoading}
-                onClick={() => {
-                  setCoverImageDataUrl(null);
-                  submitFast(null);
-                }}
-                className="rounded-xl border border-gray-200 dark:border-white/15 px-4 py-3 text-sm font-bold text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-white/5 disabled:opacity-40"
-              >
-                דלגו בינתיים
-              </button>
-            </div>
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => submitFast()}
+              className="w-full rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-bold py-3 disabled:opacity-40 transition"
+            >
+              {isLoading
+                ? 'יוצרים…'
+                : coverImageDataUrl
+                  ? 'צור חבילה עם התמונה'
+                  : 'צור חבילה בלי תמונה'}
+            </button>
             <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+              {coverImageDataUrl ? (
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => {
+                    setCoverImageDataUrl(null);
+                    submitFast(null);
+                  }}
+                  className="font-bold text-gray-500 hover:text-gray-800 dark:text-zinc-400 dark:hover:text-zinc-200 underline underline-offset-2 disabled:opacity-40"
+                >
+                  המשך בלי תמונה
+                </button>
+              ) : null}
               <button
                 type="button"
                 disabled={isLoading}

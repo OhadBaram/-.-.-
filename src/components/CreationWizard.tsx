@@ -175,10 +175,22 @@ export default function CreationWizard({
       return clampPalette(initialBrandPalette);
     }
     if (typeof initialBrandPalette === 'string') {
-      return parseBrandPalette(initialBrandPalette);
+      const parsed = parseBrandPalette(initialBrandPalette);
+      if (seededTopic) {
+        return recommendPaletteLocal({
+          visualStyle: 'minimal',
+          topic: seededTopic,
+          seedColor: parsed.accents[0],
+        });
+      }
+      return parsed;
     }
-    return recommendPaletteLocal({ visualStyle: 'minimal' });
+    return recommendPaletteLocal({
+      visualStyle: 'minimal',
+      topic: seededTopic || null,
+    });
   });
+  const paletteTouchedRef = useRef(false);
   const [topicDraft, setTopicDraft] = useState(seededTopic);
   const [inputText, setInputText] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
@@ -220,6 +232,24 @@ export default function CreationWizard({
   useEffect(() => {
     onTopicChangeRef.current?.(topicDraft.trim());
   }, [topicDraft]);
+
+  /** כשהנושא/הסגנון משתנים ולא נגעו בפלטה ידנית — ממליצים מחדש לפי הנושא */
+  useEffect(() => {
+    if (paletteTouchedRef.current) return;
+    const topic = topicDraft.trim();
+    if (!topic) return;
+    setBrandPalette(
+      recommendPaletteLocal({
+        visualStyle: options.visualStyle,
+        topic,
+        seedColor: Array.isArray(initialBrandPalette)
+          ? initialBrandPalette[0]
+          : typeof initialBrandPalette === 'string'
+            ? parseBrandPalette(initialBrandPalette).accents[0]
+            : undefined,
+      })
+    );
+  }, [topicDraft, options.visualStyle, initialBrandPalette]);
 
   useEffect(() => {
     const el = listRef.current;
@@ -975,7 +1005,10 @@ export default function CreationWizard({
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
             <BrandPalettePicker
               value={brandPalette}
-              onChange={setBrandPalette}
+              onChange={(next) => {
+                paletteTouchedRef.current = true;
+                setBrandPalette(next);
+              }}
               visualStyle={options.visualStyle}
               topic={topicDraft}
               variant="default"

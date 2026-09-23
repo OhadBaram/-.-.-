@@ -76,6 +76,7 @@ export default function CarouselCreator({
   const [brandPalette, setBrandPalette] = useState<BrandPalette>(() =>
     parseBrandPalette(brandColor)
   );
+  const [carouselId, setCarouselId] = useState<string | undefined>(undefined);
 
   const hasDraft = Boolean(slides && slides.length > 0);
 
@@ -144,6 +145,10 @@ export default function CarouselCreator({
         throw new Error(result.error || 'API error');
       }
 
+      if (result.brandColors) {
+        setBrandPalette(clampPalette(result.brandColors));
+      }
+
       const rawSlides = Array.isArray(result.slides) ? result.slides : [];
       const withCover = applyCoverImageToSlides(
         rawSlides as Slide[],
@@ -151,6 +156,9 @@ export default function CarouselCreator({
         data.coverImageApplyTo ?? 'first'
       );
 
+      if (typeof result.carouselId === 'string') {
+        setCarouselId(result.carouselId);
+      }
       setSlides(withCover);
       setCaption(typeof result.caption === 'string' ? result.caption : '');
       setHashtags(Array.isArray(result.hashtags) ? result.hashtags : []);
@@ -332,6 +340,7 @@ export default function CarouselCreator({
           onGoBack={goToWizardKeepDraft}
           publishTarget={publishTarget}
           onPublishTargetChange={setPublishTarget}
+          carouselId={carouselId}
         />
       </div>
     </div>
