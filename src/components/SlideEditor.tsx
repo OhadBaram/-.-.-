@@ -86,8 +86,8 @@ export default function SlideEditor({
       if (typeof data.usedCount === 'number') {
         setAiImageCount(data.usedCount);
       }
-    } catch (err: any) {
-      setAiError(err.message || 'שגיאה ביצירת תמונה');
+    } catch (err: unknown) {
+      setAiError(err instanceof Error ? err.message : 'שגיאה ביצירת תמונה');
     } finally {
       setIsGeneratingImage(false);
     }
