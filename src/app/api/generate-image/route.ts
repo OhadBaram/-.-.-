@@ -10,7 +10,6 @@ export async function POST(req: Request) {
     const auth = await requireSession();
     if (!auth.ok) return auth.response;
 
-    const session = auth.session;
     const body = await req.json().catch(() => ({}));
     const rawPrompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
     const slideText = typeof body.slideText === 'string' ? body.slideText.trim() : '';
@@ -99,33 +98,118 @@ Rules:
 `;
       const generated = await generateText({
         prompt: promptOptimizer,
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.6-flash',
       });
       if (generated && generated.length > 10) {
         enhancedPrompt = generated.replace(/["\n\r]/g, ' ').trim();
       }
     } catch (optErr) {
-      console.warn('Prompt optimizer fallback to raw input:', optErr);
+      console.warn('Prompt optimizer fallback to translation:', optErr);
     }
 
-    // Generate image via Pollinations FLUX endpoint
+    // Safety guard: ensure the prompt sent to image generation APIs does not contain Hebrew Unicode
+    if (/[\u0590-\u05FF]/.test(enhancedPrompt)) {
+      try {
+        const translated = await generateText({
+          prompt: `Translate this image concept into concise English words: "${inputTopic}". Reply ONLY with the English translation.`,
+          model: 'gemini-3.6-flash',
+        });
+        if (translated && !/[\u0590-\u05FF]/.test(translated)) {
+          enhancedPrompt = translated.replace(/["\n\r]/g, ' ').trim();
+        }
+      } catch (trErr) {
+        console.warn('Translation fallback failed:', trErr);
+        enhancedPrompt = 'high quality commercial aesthetic photography';
+      }
+    }
+
+    // Resilient image generation cascade (FLUX -> Turbo -> Standard -> Compact -> Unsplash)
     const cleanPrompt = enhancedPrompt.slice(0, 450);
-    const fluxUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanPrompt)}?width=1080&height=1350&nologo=true&model=flux`;
+    const encodedPrompt = encodeURIComponent(cleanPrompt);
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 28000);
+    const candidates = [
+      {
+        name: 'FLUX',
+        url: `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1080&height=1350&nologo=true&model=flux`,
+        timeoutMs: 18000,
+      },
+      {
+        name: 'Turbo',
+        url: `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1080&height=1350&nologo=true&model=turbo`,
+        timeoutMs: 12000,
+      },
+      {
+        name: 'Standard',
+        url: `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1080&height=1350&nologo=true`,
+        timeoutMs: 10000,
+      },
+      {
+        name: 'Compact',
+        url: `https://image.pollinations.ai/prompt/${encodedPrompt}?width=864&height=1080&nologo=true`,
+        timeoutMs: 8000,
+      },
+    ];
 
-    const imgRes = await fetch(fluxUrl, { signal: controller.signal });
-    clearTimeout(timeout);
+    let dataUrl: string | null = null;
+    let lastErrorMsg = '';
 
-    if (!imgRes.ok) {
-      throw new Error(`שרת יצירת התמונות החזיר שגיאה (${imgRes.status})`);
+    for (const candidate of candidates) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), candidate.timeoutMs);
+        const imgRes = await fetch(candidate.url, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+            Accept: 'image/avif,image/webp,image/apng,image/jpeg,image/*,*/*;q=0.8',
+          },
+        });
+        clearTimeout(timeout);
+
+        if (imgRes.ok) {
+          const contentType = imgRes.headers.get('content-type') || '';
+          if (contentType.includes('image')) {
+            const arrayBuffer = await imgRes.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            const mime = contentType.split(';')[0] || 'image/jpeg';
+            dataUrl = `data:${mime};base64,${buffer.toString('base64')}`;
+            break;
+          }
+        }
+        lastErrorMsg = `${candidate.name} החזיר סטטוס ${imgRes.status}`;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        lastErrorMsg = `${candidate.name} שגיאה: ${msg}`;
+      }
     }
 
-    const arrayBuffer = await imgRes.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
-    const dataUrl = `data:${contentType};base64,${buffer.toString('base64')}`;
+    // Ultimate fallback to high quality curated photography if Pollinations is busy
+    if (!dataUrl) {
+      try {
+        const unsplashSearchUrl = `https://unsplash.com/napi/search/photos?query=${encodeURIComponent(cleanPrompt.slice(0, 100))}&per_page=3`;
+        const searchRes = await fetch(unsplashSearchUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+        });
+        if (searchRes.ok) {
+          const json = await searchRes.json();
+          const firstPhotoUrl = json?.results?.[0]?.urls?.regular;
+          if (firstPhotoUrl) {
+            const imgRes = await fetch(firstPhotoUrl);
+            if (imgRes.ok) {
+              const arrayBuffer = await imgRes.arrayBuffer();
+              const buffer = Buffer.from(arrayBuffer);
+              dataUrl = `data:image/jpeg;base64,${buffer.toString('base64')}`;
+            }
+          }
+        }
+      } catch (uErr) {
+        console.warn('Unsplash fallback failed:', uErr);
+      }
+    }
+
+    if (!dataUrl) {
+      throw new Error(lastErrorMsg || 'שרת יצירת התמונות עמוס כרגע. אנא נסה שוב בעוד רגע.');
+    }
 
     // Increment carousel counter if carouselId is provided
     let newCount = currentCount + 1;
@@ -149,11 +233,13 @@ Rules:
       remaining: Math.max(0, 8 - newCount),
       usedCount: newCount,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error generating image:', error);
+    const message = error instanceof Error ? error.message : 'שגיאה ביצירת תמונת AI. נסה שוב בעוד רגע.';
     return NextResponse.json(
-      { error: error?.message || 'שגיאה ביצירת תמונת AI. נסה שוב בעוד רגע.' },
+      { error: message },
       { status: 500 }
     );
   }
 }
+

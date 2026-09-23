@@ -5,6 +5,7 @@ import { generateCarouselSchema } from '@/lib/validations';
 import { generateJson } from '@/lib/services/ai.service';
 import { scrapeUrlsDetailed } from '@/lib/services/scraper.service';
 import { formatScrapeResultsForPrompt } from '@/lib/scrape-result';
+import { extractUrlsFromText } from '@/lib/reference-links';
 import {
   formatPastCarouselsForPrompt,
   pickPastCarouselsForStyle,
@@ -101,8 +102,19 @@ export async function POST(req: Request) {
 
     let aiProvider = process.env.DEFAULT_AI_PROVIDER || 'gemini';
     let aiModel = process.env.DEFAULT_AI_MODEL || 'gemini-3.8-flash';
-    let workspaceId = null;
-    let ws: any = null;
+    let workspaceId: string | null = null;
+    let ws: {
+      id: string;
+      plan?: string | null;
+      aiProvider?: string | null;
+      aiModel?: string | null;
+      websiteUrl?: string | null;
+      referenceLink1?: string | null;
+      referenceLink2?: string | null;
+      referenceLink3?: string | null;
+      brandIdentity?: string | null;
+      brandColor?: string | null;
+    } | null = null;
 
     if (session?.user?.email) {
       const user = await prisma.user.findUnique({
@@ -166,12 +178,20 @@ export async function POST(req: Request) {
       brandIdentityContext = `\nזהות המותג המוגדרת במערכת: ${finalBrandIdentity}\n`;
     }
 
-    const scrapeReport = await scrapeUrlsDetailed([
+    // Extract any URLs provided in the topic, brand, or reference fields
+    const urlsInTopic = extractUrlsFromText(topic);
+    const urlsInBrand = extractUrlsFromText(brand);
+    const allInputUrls = [
+      ...urlsInTopic,
+      ...urlsInBrand,
       finalWebsiteUrl,
       finalRef1,
       finalRef2,
       finalRef3,
-    ]);
+    ].filter(Boolean) as string[];
+    const uniqueUrls = Array.from(new Set(allInputUrls));
+
+    const scrapeReport = await scrapeUrlsDetailed(uniqueUrls);
     const scrapedContext = formatScrapeResultsForPrompt(scrapeReport);
 
     const learningFacts = buildBrandLearnedFacts({
@@ -213,7 +233,19 @@ ${narrativeLine}
 ${topicFidelity}
 ${brandIdentityContext}
 ${pastCarouselsContext}
-${scrapedContext ? `\nלמד על סגנון המותג והטון מהתוכן הבא שנאסף מהרשת (אופציונלי). אל תחליף את נושא הקרוסלה בנושאים מהאתר — הנושא שסופק למעלה מנצח:\n${scrapedContext}\n` : ''}
+${
+  scrapedContext
+    ? `
+הקשר ומקורות תוכן שנאספו מהקישורים שצורפו (יוטיוב / טיקטוק / פייסבוק / רשת X / אתרים):
+${scrapedContext}
+
+הנחיה קריטית ומחייבת לשימוש בקישורים:
+- אם צורף קישור לסרטון (יוטיוב, טיקטוק) או לפוסט (רשת X, פייסבוק, אתר) — עליך להשתמש בתוכן שנשלף מהקישור כמקור התוכן המרכזי והמחייב של הקרוסלה!
+- בנה את שקפי הקרוסלה ישירות סביב הרעיונות, הטיפים, השלבים והתובנות שמופיעים בתוכן הקישור, והנגש אותם בצורה קולחת ומושכת.
+- אל תתעלם מהמידע שנשלף מהקישור — המשתמש צירף אותו במפורש כדי שהקרוסלה תתבסס עליו!
+`
+    : ''
+}
 
 הנחיות מבנה (חובה):
 ${structureHint}

@@ -3,10 +3,29 @@
  * לא מבצע רשת — פונקציות טהורות בלבד.
  */
 
-export type ReferenceLinkKind = 'instagram' | 'website' | 'other';
+export type ReferenceLinkKind =
+  | 'instagram'
+  | 'youtube'
+  | 'tiktok'
+  | 'twitter'
+  | 'facebook'
+  | 'website'
+  | 'other';
 
 const INSTAGRAM_HOST =
   /^(?:www\.|m\.)?(?:instagram\.com|instagr\.am)$/i;
+
+const YOUTUBE_HOST =
+  /^(?:www\.|m\.)?(?:youtube\.com|youtu\.be)$/i;
+
+const TIKTOK_HOST =
+  /^(?:www\.|m\.|vm\.)?tiktok\.com$/i;
+
+const TWITTER_HOST =
+  /^(?:www\.|mobile\.)?(?:twitter\.com|x\.com)$/i;
+
+const FACEBOOK_HOST =
+  /^(?:www\.|m\.|web\.)?(?:facebook\.com|fb\.com|fb\.watch)$/i;
 
 export function trimUrl(raw: string | null | undefined): string | null {
   const t = (raw || '').trim();
@@ -29,6 +48,68 @@ export function isInstagramUrl(raw: string | null | undefined): boolean {
   const host = hostFromUrl(raw);
   if (!host) return false;
   return INSTAGRAM_HOST.test(host);
+}
+
+export function isYouTubeUrl(raw: string | null | undefined): boolean {
+  const host = hostFromUrl(raw);
+  if (!host) return false;
+  return YOUTUBE_HOST.test(host);
+}
+
+export function isTikTokUrl(raw: string | null | undefined): boolean {
+  const host = hostFromUrl(raw);
+  if (!host) return false;
+  return TIKTOK_HOST.test(host);
+}
+
+export function isTwitterUrl(raw: string | null | undefined): boolean {
+  const host = hostFromUrl(raw);
+  if (!host) return false;
+  return TWITTER_HOST.test(host);
+}
+
+export function isFacebookUrl(raw: string | null | undefined): boolean {
+  const host = hostFromUrl(raw);
+  if (!host) return false;
+  return FACEBOOK_HOST.test(host);
+}
+
+export function extractYouTubeVideoId(raw: string | null | undefined): string | null {
+  const url = trimUrl(raw);
+  if (!url || !isYouTubeUrl(url)) return null;
+
+  try {
+    const withProto = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+    const parsed = new URL(withProto);
+
+    if (parsed.hostname.includes('youtu.be')) {
+      const id = parsed.pathname.replace(/^\/+/, '').split('/')[0];
+      return id && id.length >= 10 ? id : null;
+    }
+
+    if (parsed.searchParams.has('v')) {
+      const id = parsed.searchParams.get('v');
+      return id && id.length >= 10 ? id : null;
+    }
+
+    const pathParts = parsed.pathname.split('/').filter(Boolean);
+    const shortsOrEmbedIdx = pathParts.findIndex((p) => p === 'shorts' || p === 'embed');
+    if (shortsOrEmbedIdx !== -1 && pathParts[shortsOrEmbedIdx + 1]) {
+      const id = pathParts[shortsOrEmbedIdx + 1];
+      return id && id.length >= 10 ? id : null;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function extractUrlsFromText(text: string | null | undefined): string[] {
+  if (!text) return [];
+  const urlRegex = /(?:https?:\/\/|www\.)[^\s<>"'()]+/gi;
+  const matches = text.match(urlRegex) || [];
+  return Array.from(new Set(matches.map((u) => (u.startsWith('http') ? u : `https://${u}`))));
 }
 
 /**
@@ -89,6 +170,10 @@ export function classifyReferenceLink(
   const url = trimUrl(raw);
   if (!url) return 'other';
   if (isInstagramUrl(url)) return 'instagram';
+  if (isYouTubeUrl(url)) return 'youtube';
+  if (isTikTokUrl(url)) return 'tiktok';
+  if (isTwitterUrl(url)) return 'twitter';
+  if (isFacebookUrl(url)) return 'facebook';
   const host = hostFromUrl(url);
   if (host) return 'website';
   return 'other';
