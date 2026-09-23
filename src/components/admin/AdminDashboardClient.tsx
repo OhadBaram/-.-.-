@@ -17,6 +17,7 @@ export interface CustomerData {
   isTrialActive: boolean;
   trialExpiredNoUpgrade: boolean;
   isInactive30Days: boolean;
+  aiImageGenEnabled: boolean;
 }
 
 export interface AdminDashboardProps {
@@ -86,6 +87,26 @@ export default function AdminDashboardClient({ adminEmail, customers: initialCus
       showToast('המנוי עודכן בהצלחה!');
     } catch (err: any) {
       alert('שגיאה בעדכון מנוי: ' + err.message);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleToggleImageGen = async (workspaceId: string, enabled: boolean, customerId: string) => {
+    setUpdatingId(customerId);
+    try {
+      const res = await fetch('/api/admin/toggle-image-gen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId, enabled })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to toggle AI image gen');
+
+      setCustomers(prev => prev.map(c => c.id === customerId ? { ...c, aiImageGenEnabled: enabled } : c));
+      showToast(enabled ? 'יצירת תמונות AI הופעלה בהצלחה!' : 'יצירת תמונות AI נוטרלה.');
+    } catch (err: any) {
+      alert('שגיאה בעדכון הרשאת תמונות AI: ' + err.message);
     } finally {
       setUpdatingId(null);
     }
@@ -276,13 +297,14 @@ export default function AdminDashboardClient({ adminEmail, customers: initialCus
                 <th className="py-3 px-4">סטטוס שבוע ניסיון</th>
                 <th className="py-3 px-4">קרוסלות שנוצרו</th>
                 <th className="py-3 px-4">סוג מנוי נוכחי</th>
+                <th className="py-3 px-4">תמונות AI</th>
                 <th className="py-3 px-4">פעולה מהירה</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {filteredCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-gray-500">
+                  <td colSpan={8} className="text-center py-8 text-gray-500">
                     לא נמצאו לקוחות התואמים את החיפוש
                   </td>
                 </tr>
@@ -349,6 +371,25 @@ export default function AdminDashboardClient({ adminEmail, customers: initialCus
                         <option value="premium">פרימיום (₪149)</option>
                         <option value="unlimited">ללא הגבלה (Unlimited)</option>
                       </select>
+                    </td>
+
+                    {/* AI Images Toggle */}
+                    <td className="py-4 px-4">
+                      <button
+                        type="button"
+                        disabled={updatingId === customer.id}
+                        onClick={() => handleToggleImageGen(customer.workspaceId, !customer.aiImageGenEnabled, customer.id)}
+                        className={`text-xs px-2.5 py-1 font-bold rounded-full transition-colors flex items-center gap-1 ${
+                          customer.aiImageGenEnabled || customer.plan === 'premium' || customer.plan === 'unlimited'
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 hover:bg-emerald-200'
+                            : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200'
+                        }`}
+                        title={customer.plan === 'premium' || customer.plan === 'unlimited' ? 'זכאי מובנה לפי מנוי' : 'הפעל/בטל ידנית'}
+                      >
+                        {customer.aiImageGenEnabled || customer.plan === 'premium' || customer.plan === 'unlimited'
+                          ? '✨ פעיל'
+                          : 'מנוטרל'}
+                      </button>
                     </td>
 
                     {/* Action */}

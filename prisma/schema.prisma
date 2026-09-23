@@ -71,6 +71,7 @@ model Workspace {
   aiProvider    String  @default("gemini") // gemini, openrouter
   aiModel       String  @default("gemini-1.5-flash")
   usageCount    Int      @default(0)
+  aiImageGenEnabled Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -98,6 +99,7 @@ model Carousel {
   targetAudience String?
   status         String    @default("draft") // draft, generated
   slidesData     Json?
+  aiImageCount   Int       @default(0)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 

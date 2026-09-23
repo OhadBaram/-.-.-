@@ -56,15 +56,27 @@ export interface FastPathWizardProps {
 }
 
 function initialPalette(
-  initialBrandPalette?: BrandPalette | string
+  initialBrandPalette?: BrandPalette | string,
+  topic?: string
 ): BrandPalette {
   if (Array.isArray(initialBrandPalette)) {
     return clampPalette(initialBrandPalette);
   }
   if (typeof initialBrandPalette === 'string') {
-    return parseBrandPalette(initialBrandPalette);
+    const parsed = parseBrandPalette(initialBrandPalette);
+    if (topic?.trim()) {
+      return recommendPaletteLocal({
+        visualStyle: 'minimal',
+        topic,
+        seedColor: parsed.accents[0],
+      });
+    }
+    return parsed;
   }
-  return recommendPaletteLocal({ visualStyle: 'minimal' });
+  return recommendPaletteLocal({
+    visualStyle: 'minimal',
+    topic: topic || null,
+  });
 }
 
 /**
@@ -98,7 +110,7 @@ export default function FastPathWizard({
   const [formError, setFormError] = useState<string | null>(null);
   const [options] = useState<WizardOptions>(DEFAULT_WIZARD_OPTIONS);
   const [brandPalette] = useState<BrandPalette>(() =>
-    initialPalette(initialBrandPalette)
+    initialPalette(initialBrandPalette, seeded.topic)
   );
 
   const topicTrimmed = topic.trim();
@@ -110,6 +122,17 @@ export default function FastPathWizard({
     if (!topicTrimmed) return options.slideCount;
     return recommendedSlideCountForTopic(topicTrimmed);
   }, [topicTrimmed, options.slideCount]);
+
+  /** פלטה לפי נושא — שומרת אקסנט מהמותג כ־seed */
+  const paletteForTopic = useMemo(
+    () =>
+      recommendPaletteLocal({
+        visualStyle: options.visualStyle,
+        topic: topicTrimmed || null,
+        seedColor: brandPalette.accents[0],
+      }),
+    [topicTrimmed, options.visualStyle, brandPalette.accents]
+  );
 
   const selectTarget = (target: PublishTarget) => {
     setPublishTarget(target);
@@ -136,7 +159,7 @@ export default function FastPathWizard({
           ...options,
           slideCount: slideHint,
         },
-        brandPalette,
+        brandPalette: paletteForTopic,
         narrativeDirection: defaultNarrativeDirection(topicTrimmed),
         flowVariant: 'fast',
         publishTarget,

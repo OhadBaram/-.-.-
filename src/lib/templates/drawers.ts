@@ -1,3 +1,5 @@
+import { textColorForBackground, luminance } from '@/lib/brand-palette';
+
 /** Darken a hex colour by amount (0–255). */
 export function darkenHex(hex: string, amount = 60): string {
   const c = hex.replace('#', '');
@@ -128,7 +130,7 @@ export function drawMinimal(
   fontFamily: string = 'Heebo, sans-serif'
 ) {
   const bg = resolveSurfaceBg(isDark, override, '#ffffff', '#111827');
-  const fg = isDark ? '#f9fafb' : '#111827';
+  const fg = textColorForBackground(bg);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
@@ -158,7 +160,8 @@ export function drawMinimal(
     const bodyFs = Math.round(fs * (42 / 72));
     const bodyLh = Math.round(bodyFs * 1.33);
     ctx.font = `${bodyFs}px ${fontFamily}`;
-    ctx.fillStyle = isDark ? '#d1d5db' : '#374151';
+    const isDarkBg = luminance(bg) < 0.45;
+    ctx.fillStyle = isDarkBg ? '#d1d5db' : '#374151';
     drawWrappedText(ctx, body, W / 2, accentY + 60, W - 160, bodyLh);
   }
 }
@@ -174,7 +177,7 @@ export function drawBold(
   fontFamily: string = 'Heebo, sans-serif'
 ) {
   const bg = resolveSurfaceBg(isDark, override, '#f9fafb', '#111827');
-  const fg = isDark ? '#ffffff' : '#111827';
+  const fg = textColorForBackground(bg);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
@@ -190,7 +193,7 @@ export function drawBold(
   ctx.fillRect(0, startY - bandHeight / 2, W, bandHeight);
 
   ctx.font = `bold ${fs}px ${fontFamily}`;
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = textColorForBackground(brandColor);
   ctx.direction = 'rtl';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -204,7 +207,8 @@ export function drawBold(
     const bodyFs = Math.round(fs * (44 / 110));
     const bodyLh = Math.round(bodyFs * 1.36);
     ctx.font = `${bodyFs}px ${fontFamily}`;
-    ctx.fillStyle = fg;
+    const isDarkBg = luminance(bg) < 0.45;
+    ctx.fillStyle = isDarkBg ? '#e5e7eb' : fg;
     drawWrappedText(ctx, body, W / 2, startY + bandHeight / 2 + 60, W - 160, bodyLh);
   }
 }
@@ -289,7 +293,7 @@ export function drawFrame(
   fontFamily: string = 'Heebo, sans-serif'
 ) {
   const bg = resolveSurfaceBg(isDark, override, '#ffffff', '#111827');
-  const fg = isDark ? '#f9fafb' : '#111827';
+  const fg = textColorForBackground(bg);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
@@ -381,7 +385,7 @@ export function drawQuote(
   fontFamily: string = 'Heebo, sans-serif'
 ) {
   const bg = resolveSurfaceBg(isDark, override, '#ffffff', '#111827');
-  const fg = isDark ? '#f9fafb' : '#111827';
+  const fg = textColorForBackground(bg);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
@@ -416,7 +420,7 @@ export function drawNumbered(
   fontFamily: string = 'Heebo, sans-serif'
 ) {
   const bg = resolveSurfaceBg(isDark, override, '#ffffff', '#111827');
-  const fg = isDark ? '#f9fafb' : '#111827';
+  const fg = textColorForBackground(bg);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
@@ -457,7 +461,7 @@ export function drawMagazine(
   fontFamily: string = 'Heebo, sans-serif'
 ) {
   const bg = resolveSurfaceBg(isDark, override, '#ffffff', '#111827');
-  const fg = isDark ? '#f9fafb' : '#111827';
+  const fg = textColorForBackground(bg);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
@@ -480,7 +484,8 @@ export function drawMagazine(
   const headLines = wrapText(ctx, title, W - 120);
   headLines.forEach(line => { ctx.fillText(line, W / 2, y); y += lh; });
 
-  ctx.strokeStyle = isDark ? '#374151' : '#e5e7eb';
+  const isDarkBg = luminance(bg) < 0.45;
+  ctx.strokeStyle = isDarkBg ? '#374151' : '#e5e7eb';
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(100, y + 24);
@@ -491,7 +496,7 @@ export function drawMagazine(
     const bodyFs = Math.round(fs * (36 / 70));
     const bodyLh = Math.round(bodyFs * 1.44);
     ctx.font = `${bodyFs}px ${fontFamily}`;
-    ctx.fillStyle = isDark ? '#d1d5db' : '#4b5563';
+    ctx.fillStyle = isDarkBg ? '#d1d5db' : '#4b5563';
     const bodyLines = wrapText(ctx, body, W - 140);
     let by = y + 60;
     bodyLines.forEach(line => { ctx.fillText(line, W / 2, by); by += bodyLh; });
@@ -509,7 +514,7 @@ export function drawWaves(
   fontFamily: string = 'Heebo, sans-serif'
 ) {
   const bg = resolveSurfaceBg(isDark, override, '#ffffff', '#111827');
-  const fg = isDark ? '#f9fafb' : '#111827';
+  const fg = textColorForBackground(bg);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 

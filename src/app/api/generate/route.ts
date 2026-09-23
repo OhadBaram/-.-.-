@@ -18,6 +18,11 @@ import {
   enforceRateLimit,
   rateLimitSubjectFromRequest,
 } from '@/lib/api/rate-limit';
+import {
+  applyPaletteColorsToSlides,
+  resolveGenerationPalette,
+  serializeBrandPalette,
+} from '@/lib/brand-palette';
 
 export const maxDuration = 60; // Allow function to run up to 60 seconds
 
@@ -172,6 +177,13 @@ export async function POST(req: Request) {
 
     const topicFidelity = buildTopicFidelityConstraint(topic);
 
+    const resolvedPalette = resolveGenerationPalette({
+      brandColors: brandColors ?? null,
+      topic,
+      visualStyle: wizardOptions.visualStyle,
+    });
+    const paletteJson = serializeBrandPalette(resolvedPalette);
+
     const prompt = `
 אתה קופירייטר ומעצב קרוסלות לאינסטגרם בפורמט אנכי 1080×1350.
 צור חבילת קרוסלה מלאה: שקפים + כיתוב פוסט + חבילת האשטאגים.
@@ -197,15 +209,17 @@ ${densityHint}
 
 הנחיות סגנון ויזואלי (צבעים וטון):
 ${visualHint}
-${
-  brandColors
-    ? `\nפלטת מותג דינמית (העדף ברקעים/אקסנטים):\n${JSON.stringify(
-        typeof brandColors === 'object' && !Array.isArray(brandColors)
-          ? brandColors
-          : { accents: brandColors, backgrounds: [] }
-      )}`
-    : ''
-}
+
+הנחיות צבעים וגיוון בין שקפים (חובה — לא לבן/שחור שטוח, גוון בצבעים לפי אופי הנושא):
+פלטת המותג והרקעים שנבחרו לנושא:
+${paletteJson}
+- חובה לגוון בצבעי הרקע בין שקפי הקרוסלה (לא לתת לכל השקפים את אותו רקע בדיוק):
+  * שקף שער (cover): בחר רקע בעל נוכחות חזקה מהפלטה (גוון דומיננטי או עמוק) שמושך את העין ועוצר גלילה.
+  * שקפי תוכן (content/proof): השתמש בגווני הרקע הבהירים והמשלימים מהפלטה, עם מעבר עדין ביניהם (למשל גוון בהיר א' ואחריו גוון בהיר ב').
+  * שקף סיום (cta): בחר רקע מנוגד או מודגש שיוצר קריאה בולטת לפעולה.
+- אסור בהחלט להחזיר #ffffff / #000000 / #111827 כרקע ברירת מחדל לכל השקפים.
+- וודא ש-textColor הוא תמיד בניגודיות מושלמת לרקע השקף: טקסט כהה על רקע בהיר, וטקסט בהיר על רקע כהה.
+- האקסנטים מיועדים להדגשות/קווים — לא לרקע מלא אלא אם הסגנון דורש.
 
 צור מערך באורך מדויק של ${count} שקפים בלבד — לא יותר ולא פחות.
 עבור כל שקף, אנא ספק את הטקסט בעברית בלבד.
@@ -215,15 +229,20 @@ ${
    - id: מחרוזת מזהה (לדוגמה "1")
    - role: אחד מתוך cover | content | proof | cta (שקף ראשון cover, אחרון cta, הוכחה proof אם קיימת)
    - text: טקסט השקף בעברית לפי צפיפות המידע שנבחרה (נאמן לנושא המדויק)
-   - backgroundColor: קוד צבע HEX שמתאים לסגנון הוויזואלי שנבחר
-   - textColor: קוד צבע HEX (קריא ומתאים לרקע)
+   - backgroundColor: צבע HEX מותאם מהפלטה לפי אופי השקף (שער עמוק/בולט, תוכן מגוון בגוונים משלימים, cta מנוגד — לא לבן שטוח)
+   - textColor: קוד צבע HEX בניגודיות חזקה וקריאה מעל הרקע
 3. "caption": כיתוב פוסט מלא בעברית (3–6 שורות), כולל פתיח, ערך קצר, וקריאה לפעולה — בלי האשטאגים בתוך הכיתוב; חייב לעסוק בנושא המדויק.
 4. "hashtags": מערך של 8–15 האשטאגים רלוונטיים בעברית ו/או באנגלית (עם #), מותאמים לנושא המדויק (לא רק לקטגוריה הרחבה).
 `;
 
 
     const parsedJson = await generateJson({ prompt, provider: aiProvider, model: aiModel });
-    const slides = Array.isArray(parsedJson) ? parsedJson : (parsedJson.slides || parsedJson);
+    const rawSlides = Array.isArray(parsedJson) ? parsedJson : (parsedJson.slides || parsedJson);
+    const slides = applyPaletteColorsToSlides(
+      Array.isArray(rawSlides) ? rawSlides : [],
+      resolvedPalette,
+      wizardOptions.visualStyle === 'luxury'
+    );
     const explanation = parsedJson.explanation || '';
     const caption =
       typeof parsedJson.caption === 'string' ? parsedJson.caption.trim() : '';
@@ -247,6 +266,7 @@ ${
       caption,
       hashtags,
       wizardMeta,
+      brandColors: resolvedPalette,
       narrativeDirection: narrativeDirection
         ? {
             id: narrativeDirection.id,
@@ -255,12 +275,14 @@ ${
         : null,
     };
 
+    let createdCarouselId: string | undefined = undefined;
+
     if (workspaceId && session?.user?.email) {
       try {
         const user = await prisma.user.findUnique({ where: { email: session.user.email } });
         if (user) {
            const tenantDb = await getTenantDB(workspaceId, user.id, ['owner', 'admin', 'member']);
-           await tenantDb.carousel.create({
+           const created = await tenantDb.carousel.create({
              data: {
                title: topic,
                topic,
@@ -270,6 +292,7 @@ ${
                workspace: { connect: { id: workspaceId } },
              }
            });
+           createdCarouselId = created?.id;
         }
       } catch (dbError) {
         console.warn('Could not save to database', dbError);
@@ -282,9 +305,11 @@ ${
       caption,
       hashtags,
       wizardMeta,
+      brandColors: resolvedPalette,
       narrativeDirection: packagePayload.narrativeDirection,
       publishTarget,
       flowVariant,
+      carouselId: createdCarouselId,
     });
   } catch (error: unknown) {
     console.error('Error generating carousel:', error);
