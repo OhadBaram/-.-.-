@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Slide } from '@/components/CarouselRenderer';
 import { ImageShapeType, SlideOverride, VibeEffectType } from '@/lib/templates/drawers';
 import ImagePickerControl from '@/components/ImagePickerControl';
@@ -24,6 +24,8 @@ interface SlideEditorProps {
   template?: string;
   /** stack = מובייל / צר; split = מחשב — מלל והמלצת AI זה לצד זה */
   layout?: 'stack' | 'split';
+  /** מזהה קרוסלה למעקב אחר מכסת יצירת תמונות */
+  carouselId?: string;
 }
 
 export default function SlideEditor({
@@ -44,12 +46,52 @@ export default function SlideEditor({
   onImageClear,
   template,
   layout = 'stack',
+  carouselId,
 }: SlideEditorProps) {
   const currentFontSize = override.fontSize ?? 64;
   const currentTextY = override.textY ?? 50;
   const isRemixing = remixingIndex === index;
   const hasSuggestion = Boolean(remixSuggestion?.trim());
   const isSplit = layout === 'split';
+
+  const [showAiPrompt, setShowAiPrompt] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiImageCount, setAiImageCount] = useState<number | undefined>(undefined);
+
+  const handleGenerateImage = async () => {
+    if (!aiPrompt.trim() && !slide.text.trim()) return;
+    setIsGeneratingImage(true);
+    setAiError(null);
+    try {
+      const res = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: aiPrompt.trim(),
+          slideText: slide.text,
+          carouselId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'שגיאה ביצירת תמונה');
+      }
+      if (data.imageUrl && onImageUpload) {
+        onImageUpload(index, data.imageUrl);
+        setShowAiPrompt(false);
+        setAiPrompt('');
+      }
+      if (typeof data.usedCount === 'number') {
+        setAiImageCount(data.usedCount);
+      }
+    } catch (err: any) {
+      setAiError(err.message || 'שגיאה ביצירת תמונה');
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
 
   const currentScale = Math.round((override.imageScale ?? 1.0) * 100);
   const currentCropTop = override.cropTopPercent ?? 0;
@@ -231,6 +273,78 @@ export default function SlideEditor({
           />
         </div>
       ) : null}
+
+      {/* מחולל תמונות AI */}
+      <div className="mt-1 p-2.5 bg-gradient-to-br from-indigo-50/80 to-purple-50/80 dark:from-indigo-950/40 dark:to-purple-950/40 border border-indigo-100 dark:border-indigo-900/50 rounded-xl flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold flex items-center gap-1 text-indigo-900 dark:text-indigo-200">
+            <span>✨</span> צור תמונה עם AI
+          </span>
+          {aiImageCount !== undefined && (
+            <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">
+              {Math.max(0, 8 - aiImageCount)} / 8 יצירות נותרו
+            </span>
+          )}
+        </div>
+
+        {!showAiPrompt ? (
+          <button
+            type="button"
+            onClick={() => setShowAiPrompt(true)}
+            className="w-full py-1.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5"
+          >
+            <span>✨</span> צור תמונה לפי תיאור
+          </button>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <textarea
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              placeholder="תאר את התמונה הרצויה (למשל: יזם צעיר עובד בבית קפה מואר ומודרני...)"
+              className="w-full p-2 text-xs border rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border-indigo-200 dark:border-indigo-800 focus:ring-2 focus:ring-indigo-500 resize-none"
+              rows={2}
+              dir="rtl"
+            />
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setAiPrompt(slide.text.slice(0, 150))}
+                className="text-[10px] py-1 px-2 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded font-medium hover:bg-indigo-200 transition-colors"
+              >
+                💡 מלא לפי תוכן השקף
+              </button>
+              <div className="flex-1" />
+              <button
+                type="button"
+                onClick={() => setShowAiPrompt(false)}
+                className="text-[10px] py-1 px-2 text-gray-500 hover:text-gray-700 dark:text-gray-400"
+              >
+                ביטול
+              </button>
+              <button
+                type="button"
+                disabled={isGeneratingImage || !aiPrompt.trim()}
+                onClick={handleGenerateImage}
+                className="text-xs py-1.5 px-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg font-bold shadow-sm disabled:opacity-50 flex items-center gap-1 transition-all"
+              >
+                {isGeneratingImage ? (
+                  <>
+                    <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    יוצר...
+                  </>
+                ) : (
+                  '🎨 הפק תמונה'
+                )}
+              </button>
+            </div>
+            {aiError && (
+              <div className="text-[11px] text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 p-2 rounded border border-red-200 dark:border-red-900 leading-snug">
+                {aiError}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="flex flex-wrap gap-1.5 items-center">
         {slide.imageUrl ? (

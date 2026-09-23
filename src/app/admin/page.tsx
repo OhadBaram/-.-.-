@@ -75,6 +75,7 @@ export default async function AdminPage() {
       isTrialActive,
       trialExpiredNoUpgrade,
       isInactive30Days,
+      aiImageGenEnabled: Boolean(ws?.aiImageGenEnabled),
     };
   });
 

@@ -178,13 +178,16 @@ export function textColorForBackground(bg: string): string {
 }
 
 /**
- * רקע אחיד לכל השקפים לפי מצב בהיר/כהה.
- * מעדיף גוון צבעוני מהפלטה על פני לבן/שחור שטוח.
+ * רקע לשקף לפי מצב בהיר/כהה, אינדקס השקף ותפקידו.
+ * מעדיף גוון צבעוני מהפלטה על פני לבן/שחור שטוח,
+ * ומגוון בצבעים בין השקפים כשיש מספר רקעים זמינים בפלטה.
  */
 export function backgroundForSlide(
   palette: BrandPalette | LegacyBrandColors,
-  _slideIndex = 0,
-  isDark = false
+  slideIndex = 0,
+  isDark = false,
+  _role?: string,
+  _totalSlides?: number
 ): string | undefined {
   const backgrounds = clampPalette(palette).backgrounds;
   if (!backgrounds.length) return undefined;
@@ -192,17 +195,25 @@ export function backgroundForSlide(
 
   if (isDark) {
     const darks = backgrounds.filter((c) => luminance(c) < 0.35);
-    const tintedDark = [...darks]
-      .filter((c) => !isNearNeutral(c))
-      .sort((a, b) => channelChroma(b) - channelChroma(a));
-    return tintedDark[0] ?? darks[0] ?? backgrounds[backgrounds.length - 1];
+    const pool = darks.length > 0 ? darks : backgrounds;
+    const sorted = [...pool].sort((a, b) => {
+      const aNeutral = isNearNeutral(a) ? 1 : 0;
+      const bNeutral = isNearNeutral(b) ? 1 : 0;
+      if (aNeutral !== bNeutral) return aNeutral - bNeutral;
+      return channelChroma(b) - channelChroma(a);
+    });
+    return sorted[slideIndex % sorted.length];
   }
 
   const lights = backgrounds.filter((c) => luminance(c) >= 0.35);
-  const tintedLight = [...lights]
-    .filter((c) => !isNearNeutral(c))
-    .sort((a, b) => channelChroma(b) - channelChroma(a));
-  return tintedLight[0] ?? lights[0] ?? backgrounds[0];
+  const pool = lights.length > 0 ? lights : backgrounds;
+  const sorted = [...pool].sort((a, b) => {
+    const aNeutral = isNearNeutral(a) ? 1 : 0;
+    const bNeutral = isNearNeutral(b) ? 1 : 0;
+    if (aNeutral !== bNeutral) return aNeutral - bNeutral;
+    return channelChroma(b) - channelChroma(a);
+  });
+  return sorted[slideIndex % sorted.length];
 }
 
 /** האם הפלטה עדיין «שטוחה» (רקעים ניטרליים בלבד) */
@@ -392,24 +403,45 @@ export function recommendPaletteLocal(input: {
 
 /**
  * מחיל רקע + צבע טקסט מהפלטה על שקפים שנוצרו —
- * כדי שלא יישארו לבן/שחור שטוח מפלט AI.
+ * משמר גוונים צבעוניים שה-AI הפיק, ומשלים/מגוון מהפלטה
+ * לשקפים ללא צבע או עם צבע לבן/שחור שטוח.
  */
 export function applyPaletteColorsToSlides<
-  T extends { backgroundColor?: string; textColor?: string },
+  T extends { backgroundColor?: string; textColor?: string; role?: string },
 >(
   slides: T[],
   palette: BrandPalette | LegacyBrandColors,
   isDark = false
 ): T[] {
-  const surface =
-    backgroundForSlide(palette, 0, isDark) ||
-    (isDark ? '#0f172a' : '#eef2ff');
-  const fg = textColorForBackground(surface);
-  return slides.map((slide) => ({
-    ...slide,
-    backgroundColor: surface,
-    textColor: fg,
-  }));
+  return slides.map((slide, index) => {
+    const existingBg = slide.backgroundColor?.trim();
+    const hasValidColor =
+      Boolean(existingBg) &&
+      /^#[0-9a-fA-F]{3,8}$/.test(existingBg!) &&
+      !isNearNeutral(existingBg!);
+
+    const surface = hasValidColor
+      ? existingBg!
+      : backgroundForSlide(palette, index, isDark, slide.role, slides.length) ||
+        (isDark ? '#0f172a' : '#eef2ff');
+
+    const existingText = slide.textColor?.trim();
+    const hasGoodContrast =
+      hasValidColor &&
+      Boolean(existingText) &&
+      /^#[0-9a-fA-F]{3,8}$/.test(existingText!) &&
+      Math.abs(luminance(existingText!) - luminance(surface)) >= 0.35;
+
+    const fg = hasGoodContrast
+      ? existingText!
+      : textColorForBackground(surface);
+
+    return {
+      ...slide,
+      backgroundColor: surface,
+      textColor: fg,
+    };
+  });
 }
 
 /**

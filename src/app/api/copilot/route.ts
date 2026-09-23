@@ -238,6 +238,26 @@ function buildToolDeclarations(): FunctionDeclaration[] {
       },
     },
     {
+      name: 'generate_slide_image',
+      description:
+        'Generate an AI image for a specific slide based on a concept or visual description.',
+      parameters: {
+        type: SchemaType.OBJECT,
+        properties: {
+          slideIndex: {
+            type: SchemaType.NUMBER,
+            description: '0-based slide index',
+          },
+          prompt: {
+            type: SchemaType.STRING,
+            description:
+              'Visual description of the desired image (e.g. "a modern entrepreneur in a coffee shop")',
+          },
+        },
+        required: ['slideIndex', 'prompt'],
+      },
+    },
+    {
       name: 'set_active_slide',
       description: 'Focus the UI on a specific slide (0-based index).',
       parameters: {
@@ -334,6 +354,11 @@ function formatDetailedActionSummary(
           parts.push(`כיוונון מיקום וחיתוך`);
         }
         details.push(`שקף ${sIdx ?? 1}: ${parts.length ? parts.join(', ') : 'התאמת הגדרות תמונה'}`);
+        break;
+      }
+      case 'generate_slide_image': {
+        const desc = a.args?.prompt ? ` לפי תיאור: "${a.args.prompt}"` : '';
+        details.push(`יצירת תמונת AI לשקף ${sIdx ?? 1}${desc}`);
         break;
       }
       case 'add_slide': {

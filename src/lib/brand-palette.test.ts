@@ -119,6 +119,31 @@ describe('topic-aware colorful defaults', () => {
     expect(next[1].backgroundColor).toBe(next[0].backgroundColor);
   });
 
+  it('applyPaletteColorsToSlides preserves diverse non-neutral AI colors', () => {
+    const diverseSlides = [
+      { backgroundColor: '#ffe4e6', textColor: '#111827', text: 'שקף 1' },
+      { backgroundColor: '#fff7ed', textColor: '#111827', text: 'שקף 2' },
+    ];
+    const next = applyPaletteColorsToSlides(diverseSlides, palette, false);
+    expect(next[0].backgroundColor).toBe('#ffe4e6');
+    expect(next[1].backgroundColor).toBe('#fff7ed');
+  });
+
+  it('applyPaletteColorsToSlides diversifies across slides for multi-background palettes', () => {
+    const multiBgPalette: BrandPalette = {
+      accents: ['#4f46e5'],
+      backgrounds: ['#eef2ff', '#0f172a', '#e0f2fe'],
+    };
+    const flatSlides = [
+      { backgroundColor: '#ffffff', textColor: '#000000', text: 'שקף 1' },
+      { backgroundColor: '#ffffff', textColor: '#000000', text: 'שקף 2' },
+    ];
+    const next = applyPaletteColorsToSlides(flatSlides, multiBgPalette, false);
+    expect(next[0].backgroundColor).not.toBe('#ffffff');
+    expect(next[1].backgroundColor).not.toBe('#ffffff');
+    expect(next[0].backgroundColor).not.toBe(next[1].backgroundColor);
+  });
+
   it('textColorForBackground picks dark text on light tint', () => {
     expect(textColorForBackground('#eef2ff')).toBe('#111827');
     expect(textColorForBackground('#0f172a')).toBe('#f8fafc');

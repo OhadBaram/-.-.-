@@ -210,11 +210,15 @@ ${densityHint}
 הנחיות סגנון ויזואלי (צבעים וטון):
 ${visualHint}
 
-פלטת מותג דינמית (חובה להשתמש בה — לא לבן/שחור שטוח):
+הנחיות צבעים וגיוון בין שקפים (חובה — לא לבן/שחור שטוח, גוון בצבעים לפי אופי הנושא):
+פלטת המותג והרקעים שנבחרו לנושא:
 ${paletteJson}
-- backgroundColor חייב להיות אחד מ־backgrounds בפלטה (או גוון קרוב מאוד אליו), מותאם לנושא.
-- אסור להחזיר #ffffff / #000000 / #111827 כרקע ברירת מחדל כשיש גוונים צבעוניים בפלטה.
-- textColor חייב להיות קריא מעל הרקע (כהה על רקע בהיר, בהיר על רקע כהה).
+- חובה לגוון בצבעי הרקע בין שקפי הקרוסלה (לא לתת לכל השקפים את אותו רקע בדיוק):
+  * שקף שער (cover): בחר רקע בעל נוכחות חזקה מהפלטה (גוון דומיננטי או עמוק) שמושך את העין ועוצר גלילה.
+  * שקפי תוכן (content/proof): השתמש בגווני הרקע הבהירים והמשלימים מהפלטה, עם מעבר עדין ביניהם (למשל גוון בהיר א' ואחריו גוון בהיר ב').
+  * שקף סיום (cta): בחר רקע מנוגד או מודגש שיוצר קריאה בולטת לפעולה.
+- אסור בהחלט להחזיר #ffffff / #000000 / #111827 כרקע ברירת מחדל לכל השקפים.
+- וודא ש-textColor הוא תמיד בניגודיות מושלמת לרקע השקף: טקסט כהה על רקע בהיר, וטקסט בהיר על רקע כהה.
 - האקסנטים מיועדים להדגשות/קווים — לא לרקע מלא אלא אם הסגנון דורש.
 
 צור מערך באורך מדויק של ${count} שקפים בלבד — לא יותר ולא פחות.
@@ -225,8 +229,8 @@ ${paletteJson}
    - id: מחרוזת מזהה (לדוגמה "1")
    - role: אחד מתוך cover | content | proof | cta (שקף ראשון cover, אחרון cta, הוכחה proof אם קיימת)
    - text: טקסט השקף בעברית לפי צפיפות המידע שנבחרה (נאמן לנושא המדויק)
-   - backgroundColor: HEX מרקעי הפלטה / גוון צבעוני לפי הנושא (לא לבן שטוח)
-   - textColor: HEX קריא מעל הרקע
+   - backgroundColor: צבע HEX מותאם מהפלטה לפי אופי השקף (שער עמוק/בולט, תוכן מגוון בגוונים משלימים, cta מנוגד — לא לבן שטוח)
+   - textColor: קוד צבע HEX בניגודיות חזקה וקריאה מעל הרקע
 3. "caption": כיתוב פוסט מלא בעברית (3–6 שורות), כולל פתיח, ערך קצר, וקריאה לפעולה — בלי האשטאגים בתוך הכיתוב; חייב לעסוק בנושא המדויק.
 4. "hashtags": מערך של 8–15 האשטאגים רלוונטיים בעברית ו/או באנגלית (עם #), מותאמים לנושא המדויק (לא רק לקטגוריה הרחבה).
 `;
@@ -271,12 +275,14 @@ ${paletteJson}
         : null,
     };
 
+    let createdCarouselId: string | undefined = undefined;
+
     if (workspaceId && session?.user?.email) {
       try {
         const user = await prisma.user.findUnique({ where: { email: session.user.email } });
         if (user) {
            const tenantDb = await getTenantDB(workspaceId, user.id, ['owner', 'admin', 'member']);
-           await tenantDb.carousel.create({
+           const created = await tenantDb.carousel.create({
              data: {
                title: topic,
                topic,
@@ -286,6 +292,7 @@ ${paletteJson}
                workspace: { connect: { id: workspaceId } },
              }
            });
+           createdCarouselId = created?.id;
         }
       } catch (dbError) {
         console.warn('Could not save to database', dbError);
@@ -302,6 +309,7 @@ ${paletteJson}
       narrativeDirection: packagePayload.narrativeDirection,
       publishTarget,
       flowVariant,
+      carouselId: createdCarouselId,
     });
   } catch (error: unknown) {
     console.error('Error generating carousel:', error);

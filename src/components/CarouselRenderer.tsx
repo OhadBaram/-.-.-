@@ -13,6 +13,8 @@ import {
   clampPalette,
   colorForSlide,
   backgroundForSlide,
+  isNearNeutral,
+  luminance,
   parseBrandPalette,
   primaryBrandColor,
   textColorForBackground,
@@ -177,15 +179,29 @@ function getSlideTemplate(slide: Slide): TemplateId {
 
 function withDefaultTemplates(slides: Slide[], fallback: TemplateId = DEFAULT_TEXT_TEMPLATE): Slide[] {
   // שיבוט עמוק ברמת השקף — מונע שיתוף מקרי של אותו אובייקט בין שקפים
-  return slides.map((slide, index) => ({
-    ...slide,
-    id: slide.id != null && String(slide.id).length > 0 ? String(slide.id) : `slide-${index + 1}`,
-    text: slide.text,
-    backgroundColor: slide.backgroundColor,
-    textColor: slide.textColor,
-    imageUrl: slide.imageUrl,
-    template: slide.template ?? fallback,
-  }));
+  return slides.map((slide, index) => {
+    let tpl = slide.template;
+    if (!tpl) {
+      if (slide.imageUrl) {
+        tpl = DEFAULT_IMAGE_TEMPLATE;
+      } else if (index === 0) {
+        tpl = 'bold';
+      } else if (index === slides.length - 1 && slides.length > 2) {
+        tpl = 'bold';
+      } else {
+        tpl = fallback;
+      }
+    }
+    return {
+      ...slide,
+      id: slide.id != null && String(slide.id).length > 0 ? String(slide.id) : `slide-${index + 1}`,
+      text: slide.text,
+      backgroundColor: slide.backgroundColor,
+      textColor: slide.textColor,
+      imageUrl: slide.imageUrl,
+      template: tpl,
+    };
+  });
 }
 
 /** מעדכן תמונה לשקף אחד בלבד — לא נוגע בשאר השקפים */
@@ -273,6 +289,7 @@ interface CarouselRendererProps {
   onGoBack?: () => void;
   publishTarget?: PublishTarget;
   onPublishTargetChange?: (target: PublishTarget) => void;
+  carouselId?: string;
 }
 
 export default function CarouselRenderer({
@@ -284,6 +301,7 @@ export default function CarouselRenderer({
   onGoBack,
   publishTarget: publishTargetProp = DEFAULT_PUBLISH_TARGET,
   onPublishTargetChange,
+  carouselId,
 }: CarouselRendererProps) {
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const drawGenerationRef = useRef(0);
@@ -419,8 +437,9 @@ export default function CarouselRenderer({
       const currentOverride: SlideOverride = {
         ...(override ?? slideOverrides[slideIndex] ?? {}),
         surfaceBg:
-          backgroundForSlide(brandPalette, slideIndex, isDark) ||
-          (override ?? slideOverrides[slideIndex] ?? {}).surfaceBg,
+          (override ?? slideOverrides[slideIndex] ?? {}).surfaceBg ||
+          slide.backgroundColor ||
+          backgroundForSlide(brandPalette, slideIndex, isDark, undefined, localSlides.length),
       };
 
       if (typeof document !== 'undefined' && document.fonts?.load) {
@@ -473,33 +492,52 @@ export default function CarouselRenderer({
 
   React.useEffect(() => {
     const isDark = theme === 'dark';
-    const surface =
-      backgroundForSlide(brandPalette, 0, isDark) ||
-      (isDark ? '#0f172a' : '#eef2ff');
-    const nextText = textColorForBackground(surface);
     setLocalSlides(
-      withDefaultTemplates(slides).map((slide) => ({
-        ...slide,
-        backgroundColor: surface,
-        textColor: nextText,
-      }))
+      withDefaultTemplates(slides).map((slide, index) => {
+        const existingBg = slide.backgroundColor?.trim();
+        const hasValidColor =
+          Boolean(existingBg) &&
+          /^#[0-9a-fA-F]{3,8}$/.test(existingBg!) &&
+          !isNearNeutral(existingBg!);
+
+        const surface = hasValidColor
+          ? existingBg!
+          : (backgroundForSlide(brandPalette, index, isDark, undefined, slides.length) ||
+             (isDark ? '#0f172a' : '#eef2ff'));
+
+        const existingText = slide.textColor?.trim();
+        const hasGoodContrast =
+          Boolean(existingText) &&
+          /^#[0-9a-fA-F]{3,8}$/.test(existingText!) &&
+          Math.abs(luminance(existingText!) - luminance(surface)) >= 0.35;
+
+        const nextText = hasGoodContrast
+          ? existingText!
+          : textColorForBackground(surface);
+
+        return {
+          ...slide,
+          backgroundColor: surface,
+          textColor: nextText,
+        };
+      })
     );
     // רק כשמגיעה חבילה חדשה מהאשף — לא מאפסים עריכות מקומיות על שינוי פלטה
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally slides-only
   }, [slides]);
 
-  /** פלטה/מצב בהיר־כהה → אותו רקע לכל השקפים, בלי למחוק טקסט או תמונות */
+  /** פלטה/מצב בהיר־כהה → עדכון רקעים מגוונים לכל השקפים לפי הפלטה החדשה */
   React.useEffect(() => {
     const isDark = theme === 'dark';
-    const surface =
-      backgroundForSlide(brandPalette, 0, isDark) ||
-      (isDark ? '#0f172a' : '#eef2ff');
-    const nextText = textColorForBackground(surface);
     setLocalSlides((prev) => {
       let changed = false;
-      const next = prev.map((slide) => {
+      const next = prev.map((slide, index) => {
+        const nextBg =
+          backgroundForSlide(brandPalette, index, isDark, undefined, prev.length) ||
+          (isDark ? '#0f172a' : '#eef2ff');
+        const nextText = textColorForBackground(nextBg);
         if (
-          slide.backgroundColor === surface &&
+          slide.backgroundColor === nextBg &&
           slide.textColor === nextText
         ) {
           return slide;
@@ -507,7 +545,7 @@ export default function CarouselRenderer({
         changed = true;
         return {
           ...slide,
-          backgroundColor: surface,
+          backgroundColor: nextBg,
           textColor: nextText,
         };
       });
@@ -808,6 +846,10 @@ export default function CarouselRenderer({
         [index]: { ...(prev[index] ?? {}), ...patch },
       }));
     },
+    onSetSlideImage: (index: number, imageUrl: string) => {
+      setLocalSlides((prev) => setSlideImageAt(prev, index, imageUrl));
+    },
+    carouselId,
   };
 
   return (
@@ -1400,6 +1442,7 @@ export default function CarouselRenderer({
               </div>
               <SlideEditor
                 layout="split"
+                carouselId={carouselId}
                 template={activeSlideTemplate}
                 slide={localSlides[activeSlideIndex]}
                 index={activeSlideIndex}
@@ -1558,6 +1601,7 @@ export default function CarouselRenderer({
             </div>
           </div>
           <SlideEditor
+            carouselId={carouselId}
             template={activeSlideTemplate}
             slide={localSlides[activeSlideIndex]}
             index={activeSlideIndex}
