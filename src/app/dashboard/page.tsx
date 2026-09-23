@@ -105,6 +105,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
     referenceLink1: userWorkspace.referenceLink1,
     referenceLink2: userWorkspace.referenceLink2,
     referenceLink3: userWorkspace.referenceLink3,
+    pastCarousels: carousels,
   });
 
   return (

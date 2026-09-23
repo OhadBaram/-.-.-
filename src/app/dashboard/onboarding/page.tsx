@@ -1,8 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ensureHttps } from '@/lib/normalize-url';
+import BrandLearnedSummary from '@/components/BrandLearnedSummary';
+import { buildBrandLearnedFacts } from '@/lib/brand-learned-summary';
+import type { ScrapeUrlResult } from '@/lib/scrape-result';
+import { isInstagramUrl } from '@/lib/reference-links';
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -19,7 +23,19 @@ export default function OnboardingPage() {
   
   // Step 3: Analysis
   const [brandIdentity, setBrandIdentity] = useState('');
+  const [scrapeReport, setScrapeReport] = useState<ScrapeUrlResult[] | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  const learnedFacts = useMemo(
+    () =>
+      buildBrandLearnedFacts({
+        websiteUrl,
+        referenceLink1,
+        brandIdentity,
+        scrapeReport,
+      }),
+    [websiteUrl, referenceLink1, brandIdentity, scrapeReport]
+  );
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -67,6 +83,9 @@ export default function OnboardingPage() {
       
       const data = await res.json();
       setBrandIdentity(data.brandIdentity || '');
+      if (Array.isArray(data.scrapeReport)) {
+        setScrapeReport(data.scrapeReport);
+      }
     } catch (err: any) {
       console.error(err);
       setError('לא הצלחנו לנתח את הקישורים. תוכל להזין את תיאור העסק ידנית.');
@@ -105,6 +124,8 @@ export default function OnboardingPage() {
       setLoading(false);
     }
   };
+
+  const refIsInstagram = isInstagramUrl(referenceLink1);
 
   return (
     <div className="min-h-screen p-4 md:p-8 flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50" dir="rtl">
@@ -154,7 +175,8 @@ export default function OnboardingPage() {
               <h1 className="text-2xl font-black text-gray-900 mb-3">תן ל-AI ללמוד אותך 🧠</h1>
               <p className="text-gray-600 text-sm leading-relaxed">
                 <span className="font-bold text-indigo-600">שלב זה מומלץ מאוד (אך אופציונלי).</span><br/>
-                המערכת תקרא את האתר שלך ותלמד את הסגנון שלך כדי שכל קרוסלה תרגיש 100% אתה, ותחסוך לך שעות של דיוקים.
+                נקרא את האתר שלכם ונלמד טון וזהות. פוסטי אינסטגרם לא נקראים
+                אוטומטית — אפשר לשמור קישור כרמז חלש (שם משתמש) בלבד.
               </p>
             </div>
             
@@ -183,6 +205,12 @@ export default function OnboardingPage() {
                   placeholder="https://instagram.com/p/..."
                   dir="ltr"
                 />
+                {refIsInstagram ? (
+                  <p className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 leading-relaxed">
+                    פוסטי אינסטגרם לא נקראים אוטומטית. נחלץ לכל היותר שם משתמש
+                    מהכתובת כרמז חלש. מומלץ גם אתר עסקי או תיאור ידני בשלב הבא.
+                  </p>
+                ) : null}
               </div>
             </div>
 
@@ -202,15 +230,17 @@ export default function OnboardingPage() {
             {isAnalyzing ? (
               <div className="py-12 text-center flex flex-col items-center">
                 <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-6"></div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">ה-AI קורא את האתר שלך...</h2>
-                <p className="text-gray-500">זה עשוי לקחת כ-15 שניות. אנו לומדים את שפת המותג וקהל היעד.</p>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">קוראים את האתר שלכם...</h2>
+                <p className="text-gray-500 text-sm leading-relaxed max-w-sm">זה עשוי לקחת כ־15 שניות. קישורי אינסטגרם לא ייקראו אוטומטית — רק האתר (אם הוזן).</p>
               </div>
             ) : (
               <>
-                <div className="text-center mb-6">
-                  <h1 className="text-2xl font-black text-gray-900 mb-2">הנה מה שלמדנו עליך 🎯</h1>
-                  <p className="text-gray-600 text-sm">זהו המידע שישמש את המערכת ליצירת התוכן שלך. תוכל לערוך ולדייק אותו עכשיו.</p>
+                <div className="text-center mb-2">
+                  <h1 className="text-2xl font-black text-gray-900 mb-2">הנה מה שלמדנו עליך</h1>
+                  <p className="text-gray-600 text-sm">בדקו את שקיפות הלמידה למטה, ואז דייקו את זהות המותג.</p>
                 </div>
+
+                <BrandLearnedSummary facts={learnedFacts} variant="onboarding" />
 
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">זהות המותג וטון הדיבור:</label>

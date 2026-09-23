@@ -31,6 +31,15 @@ export default async function CreateCarouselPage() {
     });
   }
 
+  const pastCarousels = workspace
+    ? await prisma.carousel.findMany({
+        where: { workspaceId: workspace.id },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        select: { topic: true, title: true, slidesData: true },
+      })
+    : [];
+
   const learnedBrand = buildBrandLearnedFacts({
     brandIdentity: workspace?.brandIdentity,
     brandColor: workspace?.brandColor,
@@ -38,6 +47,7 @@ export default async function CreateCarouselPage() {
     referenceLink1: workspace?.referenceLink1,
     referenceLink2: workspace?.referenceLink2,
     referenceLink3: workspace?.referenceLink3,
+    pastCarousels,
   });
 
   return (
