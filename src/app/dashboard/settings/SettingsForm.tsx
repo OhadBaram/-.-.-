@@ -178,6 +178,12 @@ export default function SettingsForm({
         </div>
       </div>
 
+      <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 leading-relaxed -mt-2">
+        קישורי אינסטגרם לא נקראים אוטומטית (תוכן פוסטים חסום טכנית). נשתמש
+        לכל היותר בשם המשתמש מהכתובת כרמז חלש. לאתרים ציבוריים — ננסה לשלוף
+        טון וזהות בזמן ניתוח/יצירה.
+      </p>
+
       <button
         type="submit"
         disabled={isSaving}

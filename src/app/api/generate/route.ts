@@ -3,7 +3,16 @@ import prisma from '@/lib/prisma';
 import { getTenantDB } from '@/lib/tenant-db';
 import { generateCarouselSchema } from '@/lib/validations';
 import { generateJson } from '@/lib/services/ai.service';
-import { scrapeUrls } from '@/lib/services/scraper.service';
+import { scrapeUrlsDetailed } from '@/lib/services/scraper.service';
+import { formatScrapeResultsForPrompt } from '@/lib/scrape-result';
+import {
+  formatPastCarouselsForPrompt,
+  pickPastCarouselsForStyle,
+} from '@/lib/past-carousels';
+import {
+  buildBrandLearnedFacts,
+  toLearningContextPayload,
+} from '@/lib/brand-learned-summary';
 import {
   buildDensityPrompt,
   buildStructurePrompt,
@@ -110,6 +119,11 @@ export async function POST(req: Request) {
     }
 
     let pastCarouselsContext = '';
+    let recentCarouselsForLearning: Array<{
+      topic?: string | null;
+      title?: string | null;
+      slidesData?: unknown;
+    }> = [];
     if (workspaceId && session?.user?.email) {
       const user = await prisma.user.findUnique({ where: { email: session.user.email } });
       if (user) {
@@ -123,26 +137,12 @@ export async function POST(req: Request) {
         
         try {
           const tenantDb = await getTenantDB(workspaceId, user.id, ['owner', 'admin', 'member']);
-          const recentCarousels = await tenantDb.carousel.findMany({
+          recentCarouselsForLearning = await tenantDb.carousel.findMany({
             orderBy: { createdAt: 'desc' },
             take: 10
           });
-          const pastCarousels = recentCarousels.filter((c: any) => c.slidesData != null).slice(0, 3);
-          if (pastCarousels.length > 0) {
-            const formatted = pastCarousels.map((c: any, i: number) => {
-              let slidesStr = '';
-              try {
-                if (Array.isArray(c.slidesData)) {
-                  slidesStr = c.slidesData.map((s: any) => s.text).join(' | ');
-                } else if (c.slidesData && Array.isArray((c.slidesData as any).slides)) {
-                  slidesStr = (c.slidesData as any).slides.map((s: any) => s.text).join(' | ');
-                }
-              } catch(e){}
-              return `Past Carousel ${i + 1} (Topic: ${c.topic || 'Unknown'}): [${slidesStr}]`;
-            }).join('\n');
-            
-            pastCarouselsContext = `\nלהלן קרוסלות קודמות שהמשתמש יצר בעבר:\n${formatted}\nלמד מהסגנון והטון בלבד — אל תחליף את נושא הקרוסלה החדשה בנושאים ישנים. כמומחה שיווק, גוון זוויות ומסרים *בתוך* הנושא הנוכחי בלבד.\n`;
-          }
+          const stylePicks = pickPastCarouselsForStyle(recentCarouselsForLearning, 3);
+          pastCarouselsContext = formatPastCarouselsForPrompt(stylePicks);
         } catch (dbErr) {
           console.warn('Failed to fetch past carousels:', dbErr);
         }
@@ -161,7 +161,25 @@ export async function POST(req: Request) {
       brandIdentityContext = `\nזהות המותג המוגדרת במערכת: ${finalBrandIdentity}\n`;
     }
 
-    const scrapedContext = await scrapeUrls([finalWebsiteUrl, finalRef1, finalRef2, finalRef3]);
+    const scrapeReport = await scrapeUrlsDetailed([
+      finalWebsiteUrl,
+      finalRef1,
+      finalRef2,
+      finalRef3,
+    ]);
+    const scrapedContext = formatScrapeResultsForPrompt(scrapeReport);
+
+    const learningFacts = buildBrandLearnedFacts({
+      brandIdentity: finalBrandIdentity,
+      brandColor: ws?.brandColor,
+      websiteUrl: finalWebsiteUrl,
+      referenceLink1: finalRef1,
+      referenceLink2: finalRef2,
+      referenceLink3: finalRef3,
+      scrapeReport,
+      pastCarousels: recentCarouselsForLearning,
+    });
+    const learningContext = toLearningContextPayload(learningFacts);
 
     const count = wizardOptions.slideCount;
     const narrativeLine = narrativeDirection
@@ -285,6 +303,7 @@ ${
       narrativeDirection: packagePayload.narrativeDirection,
       publishTarget,
       flowVariant,
+      learningContext,
     });
   } catch (error: unknown) {
     console.error('Error generating carousel:', error);

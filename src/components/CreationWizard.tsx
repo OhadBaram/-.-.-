@@ -26,6 +26,8 @@ import {
 } from '@/lib/brand-palette';
 import { buildCreationSubmitPayload } from '@/lib/creation-flow/build-payload';
 import type { CreationSubmitPayload } from '@/lib/creation-flow/build-payload';
+import BrandLearnedSummary from '@/components/BrandLearnedSummary';
+import type { BrandLearnedFacts } from '@/lib/brand-learned-summary';
 
 /** תואם ל־CreationSubmitPayload לתאימות לאחור עם CarouselCreator */
 export type CreationWizardSubmitPayload = CreationSubmitPayload;
@@ -43,6 +45,8 @@ interface CreationWizardProps {
   initialTopic?: string;
   /** סנכרון נושא חזרה לטיוטה המשותפת (מעבר חזרה למסלול מהיר) */
   onTopicChange?: (topic: string) => void;
+  /** סיכום למידת מותג למשתמש חוזר */
+  learnedBrand?: BrandLearnedFacts;
 }
 
 interface ChatMessage {
@@ -159,6 +163,7 @@ export default function CreationWizard({
   initialBrandPalette,
   initialTopic = '',
   onTopicChange,
+  learnedBrand,
 }: CreationWizardProps) {
   const seededTopic = initialTopic.trim();
   const [options, setOptions] = useState<WizardOptions>(() => {
@@ -627,6 +632,11 @@ export default function CreationWizard({
             <p className="mt-1 max-w-xl text-zinc-400 text-sm md:text-base animate-[wizardRise_0.85s_ease-out]">
               השיחה כאן לייעוץ. צורת הקרוסלה נקבעת רק בפאנל «הגדרות סופיות».
             </p>
+            {learnedBrand && phase === 'topic' ? (
+              <div className="mt-3 max-w-xl">
+                <BrandLearnedSummary facts={learnedBrand} variant="wizard" />
+              </div>
+            ) : null}
             <ol className="mt-3 flex flex-wrap gap-2 text-xs text-zinc-500">
               <li
                 className={`rounded-full border px-3 py-1 ${

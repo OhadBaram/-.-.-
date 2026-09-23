@@ -292,6 +292,7 @@ export default function CarouselCreator({
               initialReferenceLink2={initialReferenceLink2}
               initialReferenceLink3={initialReferenceLink3}
               initialBrandPalette={brandPalette}
+              learnedBrand={learnedBrand}
             />
           </div>
         </div>
