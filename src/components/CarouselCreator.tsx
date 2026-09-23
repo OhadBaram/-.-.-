@@ -144,6 +144,10 @@ export default function CarouselCreator({
         throw new Error(result.error || 'API error');
       }
 
+      if (result.brandColors) {
+        setBrandPalette(clampPalette(result.brandColors));
+      }
+
       const rawSlides = Array.isArray(result.slides) ? result.slides : [];
       const withCover = applyCoverImageToSlides(
         rawSlides as Slide[],

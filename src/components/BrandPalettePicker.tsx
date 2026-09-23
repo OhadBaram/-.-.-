@@ -105,8 +105,9 @@ export default function BrandPalettePicker({
 
   const addBackground = () => {
     if (palette.backgrounds.length >= MAX_BACKGROUND_COLORS) return;
+    const fallbacks = ['#eef2ff', '#0f172a', '#ecfdf5', '#fff7ed'];
     const fallback =
-      palette.backgrounds.length % 2 === 0 ? '#ffffff' : '#111827';
+      fallbacks[palette.backgrounds.length % fallbacks.length] || '#eef2ff';
     commit({
       ...palette,
       backgrounds: [...palette.backgrounds, fallback],

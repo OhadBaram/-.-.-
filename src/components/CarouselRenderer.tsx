@@ -15,6 +15,7 @@ import {
   backgroundForSlide,
   parseBrandPalette,
   primaryBrandColor,
+  textColorForBackground,
   type BrandPalette,
 } from '@/lib/brand-palette';
 import {
@@ -474,8 +475,8 @@ export default function CarouselRenderer({
     const isDark = theme === 'dark';
     const surface =
       backgroundForSlide(brandPalette, 0, isDark) ||
-      (isDark ? '#111827' : '#ffffff');
-    const nextText = isDark ? '#f8fafc' : '#111827';
+      (isDark ? '#0f172a' : '#eef2ff');
+    const nextText = textColorForBackground(surface);
     setLocalSlides(
       withDefaultTemplates(slides).map((slide) => ({
         ...slide,
@@ -492,8 +493,8 @@ export default function CarouselRenderer({
     const isDark = theme === 'dark';
     const surface =
       backgroundForSlide(brandPalette, 0, isDark) ||
-      (isDark ? '#111827' : '#ffffff');
-    const nextText = isDark ? '#f8fafc' : '#111827';
+      (isDark ? '#0f172a' : '#eef2ff');
+    const nextText = textColorForBackground(surface);
     setLocalSlides((prev) => {
       let changed = false;
       const next = prev.map((slide) => {
@@ -678,7 +679,7 @@ export default function CarouselRenderer({
     const newSlide: Slide = {
       id: `slide-${Date.now()}-${insertAt + 1}`,
       text: text?.trim() || 'שקף חדש — ערכו כאן',
-      backgroundColor: source?.backgroundColor || '#ffffff',
+      backgroundColor: source?.backgroundColor || '#eef2ff',
       textColor: source?.textColor || '#111827',
       template: source?.template || 'minimal',
     };

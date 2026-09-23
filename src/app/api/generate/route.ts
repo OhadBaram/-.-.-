@@ -18,6 +18,11 @@ import {
   enforceRateLimit,
   rateLimitSubjectFromRequest,
 } from '@/lib/api/rate-limit';
+import {
+  applyPaletteColorsToSlides,
+  resolveGenerationPalette,
+  serializeBrandPalette,
+} from '@/lib/brand-palette';
 
 export const maxDuration = 60; // Allow function to run up to 60 seconds
 
@@ -172,6 +177,13 @@ export async function POST(req: Request) {
 
     const topicFidelity = buildTopicFidelityConstraint(topic);
 
+    const resolvedPalette = resolveGenerationPalette({
+      brandColors: brandColors ?? null,
+      topic,
+      visualStyle: wizardOptions.visualStyle,
+    });
+    const paletteJson = serializeBrandPalette(resolvedPalette);
+
     const prompt = `
 אתה קופירייטר ומעצב קרוסלות לאינסטגרם בפורמט אנכי 1080×1350.
 צור חבילת קרוסלה מלאה: שקפים + כיתוב פוסט + חבילת האשטאגים.
@@ -197,15 +209,13 @@ ${densityHint}
 
 הנחיות סגנון ויזואלי (צבעים וטון):
 ${visualHint}
-${
-  brandColors
-    ? `\nפלטת מותג דינמית (העדף ברקעים/אקסנטים):\n${JSON.stringify(
-        typeof brandColors === 'object' && !Array.isArray(brandColors)
-          ? brandColors
-          : { accents: brandColors, backgrounds: [] }
-      )}`
-    : ''
-}
+
+פלטת מותג דינמית (חובה להשתמש בה — לא לבן/שחור שטוח):
+${paletteJson}
+- backgroundColor חייב להיות אחד מ־backgrounds בפלטה (או גוון קרוב מאוד אליו), מותאם לנושא.
+- אסור להחזיר #ffffff / #000000 / #111827 כרקע ברירת מחדל כשיש גוונים צבעוניים בפלטה.
+- textColor חייב להיות קריא מעל הרקע (כהה על רקע בהיר, בהיר על רקע כהה).
+- האקסנטים מיועדים להדגשות/קווים — לא לרקע מלא אלא אם הסגנון דורש.
 
 צור מערך באורך מדויק של ${count} שקפים בלבד — לא יותר ולא פחות.
 עבור כל שקף, אנא ספק את הטקסט בעברית בלבד.
@@ -215,15 +225,20 @@ ${
    - id: מחרוזת מזהה (לדוגמה "1")
    - role: אחד מתוך cover | content | proof | cta (שקף ראשון cover, אחרון cta, הוכחה proof אם קיימת)
    - text: טקסט השקף בעברית לפי צפיפות המידע שנבחרה (נאמן לנושא המדויק)
-   - backgroundColor: קוד צבע HEX שמתאים לסגנון הוויזואלי שנבחר
-   - textColor: קוד צבע HEX (קריא ומתאים לרקע)
+   - backgroundColor: HEX מרקעי הפלטה / גוון צבעוני לפי הנושא (לא לבן שטוח)
+   - textColor: HEX קריא מעל הרקע
 3. "caption": כיתוב פוסט מלא בעברית (3–6 שורות), כולל פתיח, ערך קצר, וקריאה לפעולה — בלי האשטאגים בתוך הכיתוב; חייב לעסוק בנושא המדויק.
 4. "hashtags": מערך של 8–15 האשטאגים רלוונטיים בעברית ו/או באנגלית (עם #), מותאמים לנושא המדויק (לא רק לקטגוריה הרחבה).
 `;
 
 
     const parsedJson = await generateJson({ prompt, provider: aiProvider, model: aiModel });
-    const slides = Array.isArray(parsedJson) ? parsedJson : (parsedJson.slides || parsedJson);
+    const rawSlides = Array.isArray(parsedJson) ? parsedJson : (parsedJson.slides || parsedJson);
+    const slides = applyPaletteColorsToSlides(
+      Array.isArray(rawSlides) ? rawSlides : [],
+      resolvedPalette,
+      wizardOptions.visualStyle === 'luxury'
+    );
     const explanation = parsedJson.explanation || '';
     const caption =
       typeof parsedJson.caption === 'string' ? parsedJson.caption.trim() : '';
@@ -247,6 +262,7 @@ ${
       caption,
       hashtags,
       wizardMeta,
+      brandColors: resolvedPalette,
       narrativeDirection: narrativeDirection
         ? {
             id: narrativeDirection.id,
@@ -282,6 +298,7 @@ ${
       caption,
       hashtags,
       wizardMeta,
+      brandColors: resolvedPalette,
       narrativeDirection: packagePayload.narrativeDirection,
       publishTarget,
       flowVariant,
