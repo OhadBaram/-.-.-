@@ -28,6 +28,7 @@ import type { WizardSharedDraft } from '@/lib/creation-flow/wizard-draft';
 import { normalizeWizardDraft } from '@/lib/creation-flow/wizard-draft';
 import BrandLearnedSummary from '@/components/BrandLearnedSummary';
 import type { BrandLearnedFacts } from '@/lib/brand-learned-summary';
+import { extractUrlsFromText } from '@/lib/reference-links';
 
 const QUICK_TOPICS = [
   '5 טעויות שמרחיקות לקוחות מהעסק',
@@ -283,10 +284,16 @@ export default function FastPathWizard({
                 if (formError) setFormError(null);
               }}
               rows={3}
-              placeholder="למשל: 5 טעויות שמרחיקות לקוחות מהעסק"
+              placeholder="תארו את הרעיון, או הדביקו קישור ליוטיוב, טיקטוק, פוסט או מאמר..."
               className="w-full rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/40 px-4 py-3 text-base text-gray-900 dark:text-zinc-100 placeholder:text-gray-400 dark:placeholder:text-zinc-600 focus:outline-none focus:border-indigo-400/50"
               disabled={isLoading}
             />
+            {extractUrlsFromText(topic).length > 0 ? (
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-xs font-medium">
+                <span className="text-base">🔗</span>
+                <span>זוהה קישור מקור! המערכת תסרוק את התוכן ישירות מהקישור ותבסס עליו את הקרוסלה.</span>
+              </div>
+            ) : null}
             <div className="flex flex-wrap gap-2">
               {QUICK_TOPICS.map((prompt) => (
                 <button

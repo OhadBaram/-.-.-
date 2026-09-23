@@ -11,6 +11,9 @@ import {
   enforceRateLimit,
   rateLimitSubjectFromRequest,
 } from '@/lib/api/rate-limit';
+import { extractUrlsFromText } from '@/lib/reference-links';
+import { scrapeUrlsDetailed } from '@/lib/services/scraper.service';
+import { formatScrapeResultsForPrompt } from '@/lib/scrape-result';
 
 export const maxDuration = 30;
 
@@ -23,18 +26,19 @@ function normalizeDirections(
 
   const cleaned = raw
     .slice(0, 3)
-    .map((item: any, index: number): NarrativeDirection | null => {
-      const title = String(item?.title || '').trim();
+    .map((item: unknown, index: number): NarrativeDirection | null => {
+      const record = item && typeof item === 'object' ? (item as Record<string, unknown>) : null;
+      const title = String(record?.title || '').trim();
       if (!title) return null;
       return {
-        id: String(item?.id || `dir-${index + 1}`).trim() || `dir-${index + 1}`,
+        id: String(record?.id || `dir-${index + 1}`).trim() || `dir-${index + 1}`,
         title,
-        summary: String(item?.summary || '').trim() || fallback[index % 2].summary,
+        summary: String(record?.summary || '').trim() || fallback[index % 2].summary,
         whyItWorks:
-          String(item?.whyItWorks || '').trim() ||
+          String(record?.whyItWorks || '').trim() ||
           fallback[index % 2].whyItWorks,
         structureHint:
-          String(item?.structureHint || '').trim() ||
+          String(record?.structureHint || '').trim() ||
           fallback[index % 2].structureHint,
       };
     })
@@ -68,12 +72,31 @@ export async function POST(req: Request) {
     const aiProvider = process.env.DEFAULT_AI_PROVIDER || 'gemini';
     const aiModel = process.env.DEFAULT_AI_MODEL || 'gemini-3.8-flash';
 
+    const urlsInTopic = extractUrlsFromText(topic);
+    let scrapedContext = '';
+    if (urlsInTopic.length > 0) {
+      try {
+        const scrapeReport = await scrapeUrlsDetailed(urlsInTopic);
+        scrapedContext = formatScrapeResultsForPrompt(scrapeReport);
+      } catch (scrapeErr) {
+        console.warn('Propose styles scrape failed:', scrapeErr);
+      }
+    }
+
     const topicFidelity = buildTopicFidelityConstraint(topic);
 
     const prompt = `
 אתה אסטרטג תוכן לקרוסלות אינסטגרם בעברית (פורמט אנכי 1080×1350).
-המשתמש נתן נושא אחד. הצע בדיוק 2 כיווני סגנון נרטיביים שונים — לא סגנון ויזואלי, אלא מבנה תוכן.
-
+המשתמש נתן נושא או מקור תוכן. הצע בדיוק 2 כיווני סגנון נרטיביים מובחנים — מבנה תוכן חזק שמתאים לאינסטגרם.
+${
+  scrapedContext
+    ? `
+=== מקור תוכן מחייב שנשלף מהקישור שצורף ===
+${scrapedContext}
+הנחיה חשובה: שני הכיוונים הנרטיביים חייבים להתבסס ישירות על התוכן, הרעיונות, הטיפים והתובנות מהקישור הנ״ל!
+`
+    : ''
+}
 נושא: ${topic}
 קהל: ${audience || 'לא צוין'}
 מטרה: ${goal || 'לא צוינה'}

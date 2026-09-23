@@ -26,6 +26,9 @@ import {
   enforceRateLimit,
   rateLimitSubjectFromRequest,
 } from '@/lib/api/rate-limit';
+import { extractUrlsFromText } from '@/lib/reference-links';
+import { scrapeUrlsDetailed } from '@/lib/services/scraper.service';
+import { formatScrapeResultsForPrompt } from '@/lib/scrape-result';
 
 export const maxDuration = 30;
 
@@ -99,8 +102,27 @@ export async function POST(req: Request) {
       priorUserTopics.find((t) => !isRecommendedAllIntent(t) && t.length > 2) ||
       '';
 
-    // Fast path: «מומלץ» or clear option picks after intake
-    if (intakeAlreadyShown && (localPicks.applyRecommendedAll || localPicks.slideCount || localPicks.visualStyle || localPicks.density || localPicks.readyForDirections)) {
+    const urlsInMessage = extractUrlsFromText(message);
+    let scrapedLinkContext = '';
+    if (urlsInMessage.length > 0) {
+      try {
+        const scrapeReport = await scrapeUrlsDetailed(urlsInMessage);
+        scrapedLinkContext = formatScrapeResultsForPrompt(scrapeReport);
+      } catch (scrapeErr) {
+        console.warn('Wizard chat link scrape failed:', scrapeErr);
+      }
+    }
+
+    // Fast path: «מומלץ» or clear option picks after intake (only when no new external links are provided)
+    if (
+      urlsInMessage.length === 0 &&
+      intakeAlreadyShown &&
+      (localPicks.applyRecommendedAll ||
+        localPicks.slideCount ||
+        localPicks.visualStyle ||
+        localPicks.density ||
+        localPicks.readyForDirections)
+    ) {
       const topic = existingTopicGuess || message.trim();
       const suggestions = buildIntakeSuggestions(topic);
       const reply =
@@ -149,31 +171,58 @@ export async function POST(req: Request) {
     ).join(', ');
 
     const prompt = `
-אתה סוכן יצירת קרוסלות בעברית במוצר «קרוסל. איי. אי».
-קול: מקצועי, נלהב בקצרה, בלי להתחנף יתר על המידה. אל תעתיק ניסוחים ממוצרים אחרים.
+אתה במאי קריאייטיב ואסטרטג קרוסלות לאינסטגרם בעברית במוצר «קרוסל. איי. אי».
+התפקיד שלך הוא להוביל את המשתמש ליצירת הקרוסלה הטובה ביותר ברשת.
+קול: מקצועי, חד, שיווקי, אנרגטי וענייני.
 
-כלל זהב ל־UI: הצ׳אט הוא ייעוץ בלבד. מה שקובע את הקרוסלה — רק פאנל «הגדרות סופיות».
-לעולם אל תכתוב «נעלתי», «קבעתי», «כך תהיה הקרוסלה» כאילו הצ׳אט מחליט. כתוב «ממליץ», «הצעה», «אפשר לשנות בפאנל».
+כלל זהב ל־UI: הצ׳אט הוא ייעוץ והובלה. מה שקובע את הקרוסלה — פאנל «הגדרות סופיות».
+לעולם אל תכתוב «נעלתי» או «קבעתי». כתוב «ממליץ», «הנה כיוון חזק», «אפשר להתאים בפאנל».
 
-זרימה:
-1) כשמגיע נושא ברור בפעם הראשונה — החזר תשובת קליטה מובנית (intake), אל תעבור ליצירת שקפים.
-2) אחרי קליטה — המשתמש משנה בפאנל (מקור האמת) או לוחץ «המשך עם ההגדרות הסופיות» / כותב «מומלץ».
-3) רק אז phase=ready_for_directions. המערכת תציע שני כיווני תוכן בנפרד.
+${
+  scrapedLinkContext
+    ? `
+=== מידע שנשלף מהקישור שצירף המשתמש (יוטיוב / טיקטוק / רשת X / אתר) ===
+${scrapedLinkContext}
 
-מבנה חובה לתשובת intake (reply) בעברית, עם כותרות בדיוק כך:
-- פתיח קצר + התאמה לנישה + משפט אחד: «זה ייעוץ — ההגדרות הסופיות בפאנל קובעות»
+הנחיית על לקישור שסופק:
+1. פתח בהתייחסות ישירה וברורה לתוכן הסרטון/הקישור: ציין את כותרת הסרטון ושם היוצר/ערוץ, כדי שהמשתמש יידע בוודאות שהתוכן נקרא ומנותח.
+2. אם מדובר בסרטון או מאמר עם כמה תתי-נושאים (או אם המשתמש שלח לינק בלבד בלי הנחיות ספציפיות):
+   קבע phase="clarify" והצג שאלת הבהרה חדה עם 2-3 אפשרויות מיקוד שעלו מתוך הסרטון (לדוגמה: 1. הטיפים המעשיים ליישום מיידי | 2. הטעויות הנפוצות שהודגשו | 3. תובנות מפתח ומסרים מרכזיים).
+`
+    : ''
+}
+
+חוק מניעת אי-בהירות ושאלות הבהרה (Clarification Engine):
+בכל מקום שבו קיימת אי-בהירות ברמה גבוהה:
+1. הנושא כללי, רחב או גנרי מאוד (למשל: "הצלחה", "מוטיבציה", "שיווק", "כושר", "נדל״ן", "בינה מלאכותית") ללא קהל, זווית או הצעה קונקרטית,
+2. המשתמש שאל שאלה קצרה או עמומה שניתן לקחת לכיוונים שונים בתכלית,
+3. צורף קישור מקיף ללא פירוט באיזה פן שלו המשתמש מעוניין:
+חובה עליך לקבוע phase="clarify", ולא לנחש בצורה עיוורת!
+
+מבנה תשובת הבהרה (phase="clarify"):
+- משפט פתיחה חיובי ומקצועי על הפוטנציאל של הנושא.
+- שאלת הבהרה ממוקדת שמציעה 2-3 זוויות שונות לבחירה, ממוספרות בבירור.
+- הזמנה קצרה: "בחרו מספר או כתבו איך תרצו שנתמקד".
+כאשר phase="clarify" — קבע readyForDirections=false.
+
+זרימה רגילה (כאשר הנושא כבר ברור וממוקד):
+1) כשמגיע נושא ברור וממוקד בפעם הראשונה — החזר תשובת קליטה מובנית (intake), אל תעבור ליצירת שקפים.
+2) אחרי קליטה — המשתמש משנה בפאנל או לוחץ «המשך עם ההגדרות הסופיות» / כותב «מומלץ».
+3) רק אז phase=ready_for_directions.
+
+מבנה חובה לתשובת intake (reply) בעברית:
+- פתיח קצר + התאמה לנישה + משפט: «זה ייעוץ — ההגדרות הסופיות בפאנל קובעות»
 - ## המלצה · מספר עמודים
-  המלץ 7 (שער+תוכן+סיום) כברירת מחדל; אם בנושא יש N טיפים/פריטים — המלץ N+2 (בין ${MIN_SLIDE_COUNT}–${MAX_SLIDE_COUNT}). ציין שאפשר מותאם.
+  המלץ 7 (שער+תוכן+סיום) כברירת מחדל; אם בנושא יש N טיפים/פריטים — המלץ N+2 (בין ${MIN_SLIDE_COUNT}–${MAX_SLIDE_COUNT}).
 - ## המלצה · סטייל ויזואלי
   הצג את האפשרויות: ${styleOptionsList}
-  תן המלצה מודעת-נישה (למשל לטק/AI: נועז / כהה ניגודיות גבוהה). ציין שצילומי מסך כהשראה — בקרוב, ואפשר תיאור חופשי.
+  תן המלצה מודעת-נישה.
 - ## המלצה · צפיפות מידע
   קליל / סטנדרטי ⭐ / עשיר (${densityOptionsList})
 - סיום: שנו בפאנל מה שרוצים, ואז «המשך עם ההגדרות הסופיות».
 
 אם זו תשובת intake — readyForDirections=false.
 אם המשתמש כתב «מומלץ» או ביקש להמשיך עם ההגדרות — readyForDirections=true ו-applyRecommendedAll בהתאם.
-אם חסר נושא — שאל שאלה אחת קצרה, phase=clarify.
 
 הגדרות נוכחיות מהאשף:
 - מספר שקפים: ${slideCount}
@@ -195,7 +244,7 @@ ${message}
 
 החזר JSON בלבד:
 {
-  "reply": "טקסט בעברית לפי המבנה למעלה (או אישור קצר אם זו בחירת אפשרויות)",
+  "reply": "טקסט בעברית לפי המבנה למעלה",
   "topic": "נושא מעודכן או ריק",
   "phase": "clarify" | "intake" | "awaiting_options" | "ready_for_directions",
   "readyForDirections": false,

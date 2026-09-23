@@ -141,6 +141,7 @@ export async function POST(req: Request) {
       title?: string | null;
       slidesData?: unknown;
     }> = [];
+    let stylePicks: ReturnType<typeof pickPastCarouselsForStyle> = [];
     if (workspaceId && session?.user?.email) {
       const user = await prisma.user.findUnique({ where: { email: session.user.email } });
       if (user) {
@@ -158,25 +159,18 @@ export async function POST(req: Request) {
             orderBy: { createdAt: 'desc' },
             take: 10
           });
-          const stylePicks = pickPastCarouselsForStyle(recentCarouselsForLearning, 3);
-          pastCarouselsContext = formatPastCarouselsForPrompt(stylePicks);
+          stylePicks = pickPastCarouselsForStyle(recentCarouselsForLearning, 3);
         } catch (dbErr) {
           console.warn('Failed to fetch past carousels:', dbErr);
         }
       }
     }
 
-    let brandIdentityContext = '';
-
     const finalWebsiteUrl = websiteUrl || ws?.websiteUrl;
     const finalRef1 = referenceLink1 || ws?.referenceLink1;
     const finalRef2 = referenceLink2 || ws?.referenceLink2;
     const finalRef3 = referenceLink3 || ws?.referenceLink3;
     const finalBrandIdentity = brand || ws?.brandIdentity;
-
-    if (finalBrandIdentity) {
-      brandIdentityContext = `\nזהות המותג המוגדרת במערכת: ${finalBrandIdentity}\n`;
-    }
 
     // Extract any URLs provided in the topic, brand, or reference fields
     const urlsInTopic = extractUrlsFromText(topic);
@@ -193,6 +187,12 @@ export async function POST(req: Request) {
 
     const scrapeReport = await scrapeUrlsDetailed(uniqueUrls);
     const scrapedContext = formatScrapeResultsForPrompt(scrapeReport);
+
+    // Calculate style picks and check if user provided a specific targeted source/link
+    const hasTargetedSource = Boolean(scrapedContext && scrapedContext.trim().length > 0) || urlsInTopic.length > 0;
+    pastCarouselsContext = formatPastCarouselsForPrompt(stylePicks, {
+      hasSpecificSourceOrLink: hasTargetedSource,
+    });
 
     const learningFacts = buildBrandLearnedFacts({
       brandIdentity: finalBrandIdentity,
@@ -222,30 +222,35 @@ export async function POST(req: Request) {
     });
     const paletteJson = serializeBrandPalette(resolvedPalette);
 
+    const sourceContextSection = hasTargetedSource && scrapedContext.trim().length > 0
+      ? `
+=== מקור התוכן המרכזי והמחייב ביותר (PRIORITY 1 - SOURCE OF TRUTH) ===
+הקשר ומקורות תוכן שנאספו מהקישורים שצורפו:
+${scrapedContext}
+
+חוק ברזל עליון (CRITICAL OVERRIDE):
+1. המשתמש סיפק קישור זה כמקור התוכן המרכזי והבלעדי של הקרוסלה!
+2. כל השקפים חייבים להתבסס אך ורק על המידע, התובנות, הנתונים, הטיפים והרעיונות שהופיעו בתוכן שנשלף מהקישור.
+3. חל איסור חמור להכניס נושאים, תחומים או מונחים מהיסטוריית העבר של המשתמש.
+4. אם המשתמש פעל בעבר בתחום מסוים (למשל נדל"ן, כושר, קוסמטיקה), והקישור עוסק בנושא אחר לגמרי (למשל שיווק דיגיטלי, טכנולוגיה, פסיכולוגיה) — הקרוסלה חייבת לעסוק ב-100% בנושא של הקישור!
+`
+      : '';
+
+    const brandSection = hasTargetedSource
+      ? (finalBrandIdentity ? `\nטון דיבור סגנוני כללי (בלבד — ללא שינוי נושא הקרוסלה): ${finalBrandIdentity}\n` : '')
+      : (finalBrandIdentity ? `\nזהות המותג / טון: ${finalBrandIdentity}\n` : 'זהות המותג / טון: טבעי וברור בעברית');
+
     const prompt = `
 אתה קופירייטר ומעצב קרוסלות לאינסטגרם בפורמט אנכי 1080×1350.
-צור חבילת קרוסלה מלאה: שקפים + כיתוב פוסט + חבילת האשטאגים.
+צור חבילת קרוסלה מלאה ברמת סוכנות קריאייטיב: שקפים חדים + כיתוב פוסט + חבילת האשטאגים.
+${sourceContextSection}
 נושא / טקסט מקור: ${topic}
 קהל יעד: ${audience || 'כללי'}
 מטרה: ${goal || 'מתן ערך ומעורבות'}
-זהות המותג / טון: ${brand || 'טבעי וברור בעברית'}
+${brandSection}
 ${narrativeLine}
 ${topicFidelity}
-${brandIdentityContext}
 ${pastCarouselsContext}
-${
-  scrapedContext
-    ? `
-הקשר ומקורות תוכן שנאספו מהקישורים שצורפו (יוטיוב / טיקטוק / פייסבוק / רשת X / אתרים):
-${scrapedContext}
-
-הנחיה קריטית ומחייבת לשימוש בקישורים:
-- אם צורף קישור לסרטון (יוטיוב, טיקטוק) או לפוסט (רשת X, פייסבוק, אתר) — עליך להשתמש בתוכן שנשלף מהקישור כמקור התוכן המרכזי והמחייב של הקרוסלה!
-- בנה את שקפי הקרוסלה ישירות סביב הרעיונות, הטיפים, השלבים והתובנות שמופיעים בתוכן הקישור, והנגש אותם בצורה קולחת ומושכת.
-- אל תתעלם מהמידע שנשלף מהקישור — המשתמש צירף אותו במפורש כדי שהקרוסלה תתבסס עליו!
-`
-    : ''
-}
 
 הנחיות מבנה (חובה):
 ${structureHint}

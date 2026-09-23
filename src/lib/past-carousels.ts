@@ -68,9 +68,20 @@ export function pickPastCarouselsForStyle(
 }
 
 export function formatPastCarouselsForPrompt(
-  picks: PastCarouselStylePick[]
+  picks: PastCarouselStylePick[],
+  options?: { hasSpecificSourceOrLink?: boolean }
 ): string {
   if (picks.length === 0) return '';
+
+  if (options?.hasSpecificSourceOrLink) {
+    // When the user provides a specific link or targeted topic:
+    // Strictly isolate past carousels to tone/structure, and completely ban old topics/terminology.
+    return `
+הנחיית סגנון על בסיס העדפות המשתמש (עיצוב וטון בלבד):
+- שמור על משפטים ממוקדים, עברית רהוטה וקולחת, וקצב קריאה אינסטגרמי מהיר.
+- חוק ברזל: אל תשתמש באף נושא, מושג, תחום עיסוק או מונח מקצועי שהופיע בקרוסלות קודמות של המשתמש. הקרוסלה הנוכחית מתמקדת במאה אחוז אך ורק בקישור ובתוכן החדש שסופק!
+`;
+  }
 
   const formatted = picks
     .map(

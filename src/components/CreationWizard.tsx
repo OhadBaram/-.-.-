@@ -28,6 +28,7 @@ import { buildCreationSubmitPayload } from '@/lib/creation-flow/build-payload';
 import type { CreationSubmitPayload } from '@/lib/creation-flow/build-payload';
 import BrandLearnedSummary from '@/components/BrandLearnedSummary';
 import type { BrandLearnedFacts } from '@/lib/brand-learned-summary';
+import { extractUrlsFromText } from '@/lib/reference-links';
 
 /** תואם ל־CreationSubmitPayload לתאימות לאחור עם CarouselCreator */
 export type CreationWizardSubmitPayload = CreationSubmitPayload;
@@ -836,7 +837,7 @@ export default function CreationWizard({
                       }
                     }}
                     rows={2}
-                    placeholder="נושא אחד — למשל: 5 טיפים לעבודה עם Cursor"
+                    placeholder="כתבו רעיון, בקשה, או הדביקו קישור ליוטיוב/רשתות/כתבה..."
                     className="flex-1 resize-none bg-transparent border-0 text-zinc-100 placeholder:text-zinc-500 px-3 py-2 focus:outline-none focus:ring-0 text-[15px]"
                     disabled={busy}
                   />
@@ -849,6 +850,12 @@ export default function CreationWizard({
                     שלח
                   </button>
                 </div>
+                {extractUrlsFromText(inputText).length > 0 ? (
+                  <div className="mt-2 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-950/40 border border-emerald-800/60 text-emerald-300 text-xs font-medium">
+                    <span>🔗</span>
+                    <span>זוהה קישור מקור! הבוט ינתח את התוכן וישאל שאלות הבהרה לפי הצורך.</span>
+                  </div>
+                ) : null}
                 {topicDraft ? (
                   <p className="mt-2 text-xs text-zinc-500">
                     נושא ליצירה:{' '}

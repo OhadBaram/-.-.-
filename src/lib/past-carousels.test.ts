@@ -33,6 +33,14 @@ describe('past-carousels', () => {
     expect(prompt).toContain('למד מהסגנון והטון בלבד');
   });
 
+  it('isolates past topics and bans topic contamination when a specific link/source is provided', () => {
+    const picks = pickPastCarouselsForStyle(sample, 2);
+    const prompt = formatPastCarouselsForPrompt(picks, { hasSpecificSourceOrLink: true });
+    expect(prompt).not.toContain('Past Carousel 1');
+    expect(prompt).toContain('חוק ברזל');
+    expect(prompt).toContain('אל תשתמש באף נושא');
+  });
+
   it('summarizes for UI in Hebrew', () => {
     const summary = summarizePastCarousels(sample, 3);
     expect(summary.totalCount).toBe(3);
