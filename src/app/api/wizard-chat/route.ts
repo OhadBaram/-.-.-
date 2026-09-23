@@ -103,10 +103,15 @@ export async function POST(req: Request) {
       '';
 
     const urlsInMessage = extractUrlsFromText(message);
+    const urlsInHistory = (history || [])
+      .filter((m) => m.role === 'user')
+      .flatMap((m) => extractUrlsFromText(m.text));
+    const allUrlsInChat = Array.from(new Set([...urlsInMessage, ...urlsInHistory]));
+
     let scrapedLinkContext = '';
-    if (urlsInMessage.length > 0) {
+    if (allUrlsInChat.length > 0) {
       try {
-        const scrapeReport = await scrapeUrlsDetailed(urlsInMessage);
+        const scrapeReport = await scrapeUrlsDetailed(allUrlsInChat);
         scrapedLinkContext = formatScrapeResultsForPrompt(scrapeReport);
       } catch (scrapeErr) {
         console.warn('Wizard chat link scrape failed:', scrapeErr);
@@ -115,7 +120,7 @@ export async function POST(req: Request) {
 
     // Fast path: «מומלץ» or clear option picks after intake (only when no new external links are provided)
     if (
-      urlsInMessage.length === 0 &&
+      allUrlsInChat.length === 0 &&
       intakeAlreadyShown &&
       (localPicks.applyRecommendedAll ||
         localPicks.slideCount ||
@@ -185,9 +190,13 @@ ${
 ${scrapedLinkContext}
 
 הנחיית על לקישור שסופק:
-1. פתח בהתייחסות ישירה וברורה לתוכן הסרטון/הקישור: ציין את כותרת הסרטון ושם היוצר/ערוץ, כדי שהמשתמש יידע בוודאות שהתוכן נקרא ומנותח.
-2. אם מדובר בסרטון או מאמר עם כמה תתי-נושאים (או אם המשתמש שלח לינק בלבד בלי הנחיות ספציפיות):
-   קבע phase="clarify" והצג שאלת הבהרה חדה עם 2-3 אפשרויות מיקוד שעלו מתוך הסרטון (לדוגמה: 1. הטיפים המעשיים ליישום מיידי | 2. הטעויות הנפוצות שהודגשו | 3. תובנות מפתח ומסרים מרכזיים).
+1. פתח בהתייחסות ישירה וברורה לתוכן הסרטון/הערוץ/הקישור: ציין במפורש את שם הסרטון או ערוץ היוטיוב/היוצר ותחום העיסוק שלו, כדי שהמשתמש יידע בוודאות שהערוץ/התוכן זוהה ונותח לעומק!
+2. אם סופק ערוץ יוטיוב או פרופיל עם סרטונים מרובים:
+   - ציין את זיהוי הערוץ והנושא הראשי שלו על סמך התיאור ושמות הסרטונים האחרונים שנשלפו.
+   - חובה לקבוע phase="clarify" ולהציע למשתמש 2-3 זוויות ממוקדות לבחירה (למשל: התמקדות באחד הסרטונים האחרונים הבולטים של הערוץ לפי כותרתו, או קרוסלת סקירה מקיפה של תובנות המפתח של הערוץ).
+   - חל איסור מוחלט להמציא נושא או תעשייה אחרת!
+3. אם מדובר בסרטון או מאמר עם כמה תתי-נושאים (או אם המשתמש שלח לינק בלבד בלי הנחיות ספציפיות):
+   - קבע phase="clarify" והצג שאלת הבהרה חדה עם 2-3 אפשרויות מיקוד שעלו מתוך הסרטון.
 `
     : ''
 }

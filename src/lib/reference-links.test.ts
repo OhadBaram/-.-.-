@@ -3,12 +3,14 @@ import {
   classifyReferenceLink,
   extractInstagramUsername,
   extractUrlsFromText,
+  extractYouTubeChannelHandle,
   extractYouTubeVideoId,
   hostFromUrl,
   isFacebookUrl,
   isInstagramUrl,
   isTikTokUrl,
   isTwitterUrl,
+  isYouTubeChannelUrl,
   isYouTubeUrl,
 } from '@/lib/reference-links';
 
@@ -33,6 +35,14 @@ describe('reference-links', () => {
     expect(extractYouTubeVideoId('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
     expect(extractYouTubeVideoId('https://youtu.be/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
     expect(extractYouTubeVideoId('https://www.youtube.com/shorts/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+  });
+
+  it('detects YouTube channel URLs and handles', () => {
+    expect(isYouTubeChannelUrl('https://www.youtube.com/@mkbhd')).toBe(true);
+    expect(isYouTubeChannelUrl('https://www.youtube.com/channel/UCBJycsmduvYEL83R_U4JriQ')).toBe(true);
+    expect(isYouTubeChannelUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toBe(false);
+    expect(extractYouTubeChannelHandle('https://www.youtube.com/@mkbhd')).toBe('@mkbhd');
+    expect(extractYouTubeChannelHandle('https://www.youtube.com/channel/UCBJycsmduvYEL83R_U4JriQ')).toBe('UCBJycsmduvYEL83R_U4JriQ');
   });
 
   it('extracts URLs from mixed prompt text', () => {

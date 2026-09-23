@@ -105,6 +105,42 @@ export function extractYouTubeVideoId(raw: string | null | undefined): string | 
   }
 }
 
+export function isYouTubeChannelUrl(raw: string | null | undefined): boolean {
+  const url = trimUrl(raw);
+  if (!url || !isYouTubeUrl(url)) return false;
+  if (extractYouTubeVideoId(url)) return false;
+  try {
+    const withProto = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+    const parsed = new URL(withProto);
+    const path = parsed.pathname;
+    return (
+      path.startsWith('/@') ||
+      path.startsWith('/channel/') ||
+      path.startsWith('/c/') ||
+      path.startsWith('/user/') ||
+      (path.length > 1 && !path.includes('/watch') && !path.includes('/shorts') && !path.includes('/embed'))
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function extractYouTubeChannelHandle(raw: string | null | undefined): string | null {
+  const url = trimUrl(raw);
+  if (!url || !isYouTubeUrl(url)) return null;
+  try {
+    const withProto = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+    const parsed = new URL(withProto);
+    const handleMatch = parsed.pathname.match(/^\/@([^/]+)/);
+    if (handleMatch) return `@${handleMatch[1]}`;
+    const channelMatch = parsed.pathname.match(/^\/(?:channel|c|user)\/([^/]+)/);
+    if (channelMatch) return channelMatch[1];
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function extractUrlsFromText(text: string | null | undefined): string[] {
   if (!text) return [];
   const urlRegex = /(?:https?:\/\/|www\.)[^\s<>"'()]+/gi;

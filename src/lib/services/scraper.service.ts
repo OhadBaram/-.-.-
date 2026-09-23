@@ -13,30 +13,32 @@ import {
 } from '@/lib/reference-links';
 
 /**
- * משיכת מידע מסרטון יוטיוב (oEmbed רשמי + דף הווידאו לחילוץ תיאור מלא, כותרת, ערוץ ומילות מפתח)
+ * משיכת מידע מיוטיוב — תמיכה מלאה בסרטון בודד (oEmbed + דף צפייה) ובערוץ שלם (פרופיל ערוץ + RSS סרטונים אחרונים)
  */
 async function scrapeYouTube(url: string): Promise<ScrapeUrlResult> {
   const hostname = hostFromUrl(url) || 'youtube.com';
   const videoId = extractYouTubeVideoId(url);
-  let title = '';
-  let author = '';
-  let description = '';
 
-  // 1. YouTube official oEmbed API
-  try {
-    const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
-    const res = await fetch(oembedUrl, { signal: AbortSignal.timeout(6000) });
-    if (res.ok) {
-      const data = await res.json();
-      title = (data.title || '').trim();
-      author = (data.author_name || '').trim();
-    }
-  } catch (err) {
-    console.warn('YouTube oEmbed error:', err);
-  }
-
-  // 2. Direct page fetch for rich description & keywords
+  // 1. טיפול בסרטון בודד
   if (videoId) {
+    let title = '';
+    let author = '';
+    let description = '';
+
+    // oEmbed רשמי
+    try {
+      const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+      const res = await fetch(oembedUrl, { signal: AbortSignal.timeout(6000) });
+      if (res.ok) {
+        const data = await res.json();
+        title = (data.title || '').trim();
+        author = (data.author_name || '').trim();
+      }
+    } catch (err) {
+      console.warn('YouTube oEmbed error:', err);
+    }
+
+    // קריאת דף הווידאו לחילוץ תיאור מלא
     try {
       const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
         headers: {
@@ -67,18 +69,132 @@ async function scrapeYouTube(url: string): Promise<ScrapeUrlResult> {
     } catch (err) {
       console.warn('YouTube page fetch error:', err);
     }
+
+    if (!title && !description) {
+      return buildFetchedScrapeResult(url, '');
+    }
+
+    const promptSections = [
+      `=== מקור תוכן מחייב: סרטון יוטיוב שצורף (${url}) ===`,
+      title ? `כותרת הסרטון: ${title}` : '',
+      author ? `ערוץ יוטיוב / יוצר: ${author}` : '',
+      description ? `תיאור הסרטון ונקודות תוכן מרכזיות:\n${description.slice(0, 3000)}` : '',
+      `הנחיה לקרוסלה: המשתמש צירף סרטון יוטיוב זה כבסיס לקרוסלה. יש לבנות את שקפי הקרוסלה ישירות סביב הרעיונות, הטיפים והתובנות של סרטון זה!`,
+    ].filter(Boolean);
+
+    const promptText = promptSections.join('\n\n') + '\n';
+    return {
+      url,
+      kind: 'youtube',
+      hostname,
+      status: 'success',
+      promptText,
+      contentChars: (title + description).length,
+      signals: [title, author].filter(Boolean) as string[],
+      instagramUsername: null,
+      statusLabelHe: 'זוהה סרטון יוטיוב',
+      detailHe: `נשלף תוכן מלא מסרטון יוטיוב: "${title || author || url}"`,
+    };
   }
 
-  if (!title && !description) {
+  // 2. טיפול בערוץ יוטיוב (Channel / Profile)
+  let channelTitle = '';
+  let channelDesc = '';
+  let channelKeywords: string[] = [];
+  let channelId: string | null = null;
+  const recentVideos: Array<{ title: string; description?: string }> = [];
+
+  const directIdMatch = url.match(/\/channel\/(UC[a-zA-Z0-9_-]+)/);
+  if (directIdMatch) {
+    channelId = directIdMatch[1];
+  }
+
+  try {
+    const pageRes = await fetch(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'he,en;q=0.9',
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (pageRes.ok) {
+      const html = await pageRes.text();
+
+      const ogTitle = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i)?.[1];
+      const htmlTitle = html.match(/<title>([^<]+)<\/title>/i)?.[1]?.replace(/ - YouTube$/, '').trim();
+      channelTitle = ogTitle || htmlTitle || '';
+
+      const ogDesc = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i)?.[1];
+      const metaDesc = html.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i)?.[1];
+      channelDesc = (ogDesc || metaDesc || '')
+        .replace(/\\n/g, '\n')
+        .replace(/\\r/g, '')
+        .replace(/\\"/g, '"')
+        .trim();
+
+      if (!channelId) {
+        const idMatch =
+          html.match(/youtube\.com\/channel\/(UC[a-zA-Z0-9_-]+)/i)?.[1] ||
+          html.match(/"channelId":"(UC[a-zA-Z0-9_-]+)"/)?.[1] ||
+          html.match(/<meta\s+itemprop=["']channelId["']\s+content=["']([^"']+)["']/i)?.[1];
+        if (idMatch) channelId = idMatch;
+      }
+
+      const kwMatch = html.match(/<meta\s+name=["']keywords["']\s+content=["']([^"']+)["']/i)?.[1];
+      if (kwMatch) {
+        channelKeywords = kwMatch.split(',').map((k) => k.trim()).filter(Boolean);
+      }
+    }
+  } catch (err) {
+    console.warn('YouTube channel page fetch error:', err);
+  }
+
+  // שליפת סרטונים אחרונים מערוץ היוטיוב באמצעות RSS רשמי
+  if (channelId) {
+    try {
+      const rssRes = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`, {
+        headers: { 'Accept': 'application/xml, text/xml' },
+        signal: AbortSignal.timeout(6000),
+      });
+      if (rssRes.ok) {
+        const xml = await rssRes.text();
+        const entryMatches = [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)];
+        for (const entry of entryMatches.slice(0, 8)) {
+          const entryXml = entry[1];
+          const entryTitle = entryXml.match(/<title>([^<]+)<\/title>/)?.[1];
+          const entryDesc = entryXml.match(/<media:description>([\s\S]*?)<\/media:description>/)?.[1];
+          if (entryTitle) {
+            recentVideos.push({
+              title: entryTitle.trim(),
+              description: entryDesc ? entryDesc.slice(0, 200).trim() : undefined,
+            });
+          }
+        }
+      }
+    } catch (rssErr) {
+      console.warn('YouTube channel RSS fetch error:', rssErr);
+    }
+  }
+
+  if (!channelTitle && !channelDesc && recentVideos.length === 0) {
     return buildFetchedScrapeResult(url, '');
   }
 
   const promptSections = [
-    `=== תוכן ומסרים מסרטון יוטיוב שצורף (${url}) ===`,
-    title ? `כותרת הסרטון: ${title}` : '',
-    author ? `ערוץ יוטיוב / יוצר: ${author}` : '',
-    description ? `תיאור הסרטון ונקודות תוכן מרכזיות:\n${description.slice(0, 3000)}` : '',
-    `הנחיה לקרוסלה: המשתמש צירף סרטון יוטיוב זה כבסיס לקרוסלה. יש לבנות את שקפי הקרוסלה ישירות סביב הרעיונות, הטיפים והתובנות של סרטון זה!`,
+    `=== מקור תוכן מחייב: ערוץ יוטיוב (${url}) ===`,
+    channelTitle ? `שם ערוץ היוטיוב: ${channelTitle}` : '',
+    channelDesc ? `אודות הערוץ ותחומי הפעילות:\n${channelDesc.slice(0, 2000)}` : '',
+    channelKeywords.length > 0 ? `תגיות ונושאי מפתח: ${channelKeywords.slice(0, 15).join(', ')}` : '',
+    recentVideos.length > 0
+      ? `סרטונים אחרונים בערוץ (תחומי המומחיות והתוכן העדכני של הערוץ):\n` +
+        recentVideos
+          .slice(0, 8)
+          .map((v, i) => `${i + 1}. "${v.title}"${v.description ? ` (${v.description.slice(0, 120)})` : ''}`)
+          .join('\n')
+      : '',
+    `הנחיה לקרוסלה: המשתמש צירף קישור לערוץ יוטיוב זה! עליך לבסס את תוכן הקרוסלה באופן מדויק על הנושאים, הערך ותחומי הידע של ערוץ זה. אין להמציא נושאים שאינם קשורים לערוץ! אם המשתמש לא בחר סרטון ספציפי, בנה קרוסלה המבוססת על תובנות המפתח מתוך הסרטונים האחרונים או מהנושא המרכזי של הערוץ.`,
   ].filter(Boolean);
 
   const promptText = promptSections.join('\n\n') + '\n';
@@ -88,16 +204,16 @@ async function scrapeYouTube(url: string): Promise<ScrapeUrlResult> {
     hostname,
     status: 'success',
     promptText,
-    contentChars: (title + description).length,
-    signals: [title, author].filter(Boolean) as string[],
+    contentChars: (channelTitle + channelDesc + promptText).length,
+    signals: [channelTitle, ...recentVideos.slice(0, 3).map((v) => v.title)].filter(Boolean),
     instagramUsername: null,
-    statusLabelHe: 'זוהה סרטון יוטיוב',
-    detailHe: `נשלף תוכן מלא מסרטון יוטיוב: "${title || author || url}"`,
+    statusLabelHe: 'זוהה ערוץ יוטיוב',
+    detailHe: `נשלף תוכן עשיר מערוץ יוטיוב: "${channelTitle || url}" (${recentVideos.length} סרטונים נסרקו)`,
   };
 }
 
 /**
- * משיכת מידע מטיקטוק (oEmbed רשמי + מטא תגיות)
+ * משיכת מידע מטיקטוק (oEmbed רשמי + זחלן לפרופילים)
  */
 async function scrapeTikTok(url: string): Promise<ScrapeUrlResult> {
   const hostname = hostFromUrl(url) || 'tiktok.com';
@@ -116,15 +232,34 @@ async function scrapeTikTok(url: string): Promise<ScrapeUrlResult> {
     console.warn('TikTok oEmbed error:', err);
   }
 
+  // גיבוי לפרופילי טיקטוק שאינם נתמכים ב-oEmbed
+  if (!title && !author) {
+    try {
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'facebookexternalhit/1.1' },
+        signal: AbortSignal.timeout(6000),
+      });
+      if (res.ok) {
+        const html = await res.text();
+        const ogTitle = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i)?.[1];
+        const ogDesc = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i)?.[1];
+        if (ogTitle) title = ogTitle.trim();
+        if (ogDesc) author = ogDesc.trim();
+      }
+    } catch (err) {
+      console.warn('TikTok profile fallback error:', err);
+    }
+  }
+
   if (!title && !author) {
     return buildFetchedScrapeResult(url, '');
   }
 
   const promptSections = [
-    `=== תוכן מסרטון טיקטוק שצורף (${url}) ===`,
-    title ? `כותרת וכיתוב הסרטון: ${title}` : '',
-    author ? `יוצר/ת בטיקטוק: ${author}` : '',
-    `הנחיה לקרוסלה: התבסס על המסר והנושא המרכזי של סרטון הטיקטוק בעיצוב שקפי הקרוסלה.`,
+    `=== תוכן מטיקטוק שצורף (${url}) ===`,
+    title ? `כותרת/פרופיל בטיקטוק: ${title}` : '',
+    author ? `תיאור/יוצר בטיקטוק: ${author}` : '',
+    `הנחיה לקרוסלה: התבסס על המסר והנושא המרכזי של תוכן הטיקטוק בעיצוב שקפי הקרוסלה.`,
   ].filter(Boolean);
 
   return {
@@ -136,7 +271,7 @@ async function scrapeTikTok(url: string): Promise<ScrapeUrlResult> {
     contentChars: (title + author).length,
     signals: [title, author].filter(Boolean) as string[],
     instagramUsername: null,
-    statusLabelHe: 'זוהה סרטון טיקטוק',
+    statusLabelHe: 'זוהה תוכן טיקטוק',
     detailHe: `נשלף תוכן מטיקטוק: "${title.slice(0, 50) || author || url}"`,
   };
 }
@@ -242,8 +377,7 @@ async function scrapeInstagram(url: string): Promise<ScrapeUrlResult> {
   try {
     const res = await fetch(url, {
       headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'User-Agent': 'facebookexternalhit/1.1',
         'Accept-Language': 'he,en;q=0.9',
       },
       signal: AbortSignal.timeout(5000),
