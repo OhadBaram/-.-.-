@@ -3,6 +3,8 @@
 import { useSession, signIn, signOut } from 'next-auth/react';
 import Link from 'next/link';
 import ThemeToggle from '@/components/ThemeToggle';
+import LandingDemoVideo from '@/components/LandingDemoVideo';
+import LandingCarouselsShowcase from '@/components/LandingCarouselsShowcase';
 
 export default function Home() {
   const { data: session } = useSession();
@@ -15,6 +17,8 @@ export default function Home() {
           <span className="text-xl md:text-2xl font-black text-indigo-700 dark:text-indigo-400">קרוסל. איי. אי</span>
         </div>
         <div className="flex items-center gap-3 md:gap-6">
+          <a href="#demo" className="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium hidden md:block">איך זה עובד (30 שנ׳)</a>
+          <a href="#showcase" className="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium hidden md:block">דוגמאות מוצלחות</a>
           <a href="#features" className="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium hidden md:block">פיצ&apos;רים</a>
           <Link href="/pricing" className="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium text-sm md:text-base">מחירים</Link>
           <ThemeToggle />
@@ -52,11 +56,21 @@ export default function Home() {
           <Link href="/dashboard/create" className="px-8 py-4 bg-indigo-600 text-white rounded-full text-lg font-bold hover:bg-indigo-700 transition shadow-lg hover:shadow-xl transform hover:-translate-y-1 w-full sm:w-auto text-center">
             התחל ליצור עכשיו
           </Link>
-          <a href="#features" className="px-8 py-4 bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-gray-600 rounded-full text-lg font-bold hover:bg-gray-50 dark:hover:bg-gray-700 transition shadow-sm w-full sm:w-auto text-center">
-            איך זה עובד?
+          <a href="#demo" className="px-8 py-4 bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-gray-600 rounded-full text-lg font-bold hover:bg-gray-50 dark:hover:bg-gray-700 transition shadow-sm w-full sm:w-auto text-center">
+            צפו איך זה עובד (30 שניות) ⚡
           </a>
         </div>
       </section>
+
+      {/* 30-Second Video / Simulation Demo Section */}
+      <div id="demo">
+        <LandingDemoVideo />
+      </div>
+
+      {/* Showcase of Successful Carousels */}
+      <div id="showcase">
+        <LandingCarouselsShowcase />
+      </div>
 
       {/* AI Value Section */}
       <section id="features" className="py-20 bg-white dark:bg-gray-950 transition-colors duration-300">

@@ -28,7 +28,8 @@ import {
 } from '@/lib/api/rate-limit';
 import { extractUrlsFromText } from '@/lib/reference-links';
 import { scrapeUrlsDetailed } from '@/lib/services/scraper.service';
-import { formatScrapeResultsForPrompt } from '@/lib/scrape-result';
+import { formatScrapeResultsForPrompt, type ScrapeUrlResult } from '@/lib/scrape-result';
+import { classifyTier1Intent } from '@/lib/decision-router/tier1-classifier';
 
 export const maxDuration = 30;
 
@@ -109,56 +110,39 @@ export async function POST(req: Request) {
     const allUrlsInChat = Array.from(new Set([...urlsInMessage, ...urlsInHistory]));
 
     let scrapedLinkContext = '';
+    let scrapeReport: ScrapeUrlResult[] = [];
     if (allUrlsInChat.length > 0) {
       try {
-        const scrapeReport = await scrapeUrlsDetailed(allUrlsInChat);
+        scrapeReport = await scrapeUrlsDetailed(allUrlsInChat);
         scrapedLinkContext = formatScrapeResultsForPrompt(scrapeReport);
       } catch (scrapeErr) {
         console.warn('Wizard chat link scrape failed:', scrapeErr);
       }
     }
 
-    // Fast path: «מומלץ» or clear option picks after intake (only when no new external links are provided)
-    if (
-      allUrlsInChat.length === 0 &&
-      intakeAlreadyShown &&
-      (localPicks.applyRecommendedAll ||
-        localPicks.slideCount ||
-        localPicks.visualStyle ||
-        localPicks.density ||
-        localPicks.readyForDirections)
-    ) {
-      const topic = existingTopicGuess || message.trim();
-      const suggestions = buildIntakeSuggestions(topic);
-      const reply =
-        buildOptionsAckReply(localPicks, topic) ||
-        'עדכנתי. לחצו «המשך עם ההגדרות הסופיות» או כתבו «מומלץ» / «המשך».';
+    // שרשרת החלטה - שכבה 1: מסווג היוריסטי דטרמיניסטי מיידי (0ms, אפס טוקנים)
+    const tier1Decision = classifyTier1Intent({
+      message,
+      history,
+      scrapedResults: scrapeReport,
+      intakeAlreadyShown,
+      existingTopicGuess,
+    });
 
+    if (tier1Decision.handled) {
       return NextResponse.json({
-        reply,
-        topic,
-        phase: (localPicks.readyForDirections || localPicks.applyRecommendedAll
-          ? 'ready_for_directions'
-          : 'awaiting_options') as WizardChatPhase,
-        readyForDirections: Boolean(
-          localPicks.readyForDirections || localPicks.applyRecommendedAll
-        ),
-        applyRecommendedAll: localPicks.applyRecommendedAll,
-        suggestedSlideCount: localPicks.applyRecommendedAll
-          ? suggestions.slideCount
-          : localPicks.slideCount,
-        suggestedDensity: localPicks.applyRecommendedAll
-          ? suggestions.density
-          : localPicks.density,
-        suggestedVisualStyle: localPicks.applyRecommendedAll
-          ? suggestions.visualStyle
-          : localPicks.visualStyle,
-        suggestedVisualStyleCustom: localPicks.visualStyleCustom || '',
-        useRecommendedStructure: localPicks.applyRecommendedAll
-          ? true
-          : localPicks.useRecommendedStructure,
-        suggestedAudience: '',
-        suggestedGoal: '',
+        reply: tier1Decision.reply,
+        topic: tier1Decision.topic,
+        phase: tier1Decision.phase,
+        readyForDirections: tier1Decision.readyForDirections,
+        applyRecommendedAll: tier1Decision.applyRecommendedAll,
+        suggestedSlideCount: tier1Decision.suggestedSlideCount ?? null,
+        suggestedDensity: tier1Decision.suggestedDensity ?? null,
+        suggestedVisualStyle: tier1Decision.suggestedVisualStyle ?? null,
+        suggestedVisualStyleCustom: tier1Decision.suggestedVisualStyleCustom || '',
+        useRecommendedStructure: tier1Decision.useRecommendedStructure ?? null,
+        suggestedAudience: tier1Decision.suggestedAudience || '',
+        suggestedGoal: tier1Decision.suggestedGoal || '',
         offline: true,
       });
     }
